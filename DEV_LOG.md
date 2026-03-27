@@ -1019,3 +1019,102 @@ RUN ln -sf /opt/conda/envs/TeleCouplingAI/bin/x86_64-conda-linux-gnu-g++ \
 - [ ] 部署到真实 Linux 服务器（当前在 Windows Docker Desktop 验证完毕）
 
 ---
+
+---
+
+## 续：2026-03-27（下半场）
+
+### 八、高优先级 E2E 测试完成（Tool 3/4/6）
+
+在 `tests/test_e2e_tools.py` 中追加三个工具的 E2E 测试：
+
+| Tool | 描述 | 输出文件数 | 耗时 | 结果 |
+|------|------|----------|------|------|
+| Tool 3 | CBC Main（natcap.invest） | 266 | ~44s | ✅ |
+| Tool 4 | Seasonal Water Yield | 84 | ~32s | ✅ |
+| Tool 6 | Crop Regression | 67 | ~13s | ✅ |
+
+至此 **6/6 工具全部 E2E 通过**。
+
+**Tool 3 注意点**：`snapshots.csv` 中 TIF 路径为相对路径，测试中动态替换为容器绝对路径（`/data/datainput/CoastalBlueCarbon_input/`）再上传。
+
+**Tool 4 注意点**：所有输入文件已挂载在容器内，无需上传，直接在 chat 消息中引用 `/data/datainput/SeasonalWaterYield_input/` 路径。
+
+---
+
+### 九、环境变量固化进 Dockerfile
+
+将原本只在 `.env.docker` 中维护的以下变量写入 `backend/Dockerfile` 的 `ENV` 指令：
+
+```dockerfile
+ENV PROJ_DATA=/opt/conda/envs/TeleCouplingAI/share/proj
+ENV PROJ_LIB=/opt/conda/envs/TeleCouplingAI/share/proj
+ENV GDAL_DATA=/opt/conda/envs/TeleCouplingAI/share/gdal
+ENV SSL_CERT_FILE=.../certifi/cacert.pem
+ENV REQUESTS_CA_BUNDLE=.../certifi/cacert.pem
+ENV PYTHONPATH=/app:/opt/conda/envs/TeleCouplingAI/share/qgis/python:/opt/conda/envs/TeleCouplingAI/share/qgis/python/plugins
+```
+
+同时在 `.env.docker` 中删除这些重复项，只保留应用级配置和 `HOST_*` 路径变量。
+
+---
+
+### 十、发现并修复 Docker 卷挂载 Bug（根本原因）
+
+**问题**：`/data/model_data` 在容器内始终为空，导致 Tool 5/6 并发测试失败。
+
+**根本原因**：Docker Compose 的**卷路径变量替换**（`${HOST_MODEL_DATA_PATH:-/data/model_data}`）读取的是项目目录的 `.env` 文件或 shell 环境变量，而不是 `env_file:` 指定的 `.env.docker`。`.env.docker` 中的 `HOST_*` 变量对卷替换无效。
+
+**修复**：将 `HOST_SHARED_DIR`、`HOST_UPLOADS_DIR`、`HOST_MODEL_DATA_PATH` 三个变量也写入项目根的 `.env` 文件。
+
+---
+
+### 十一、render/zoom QGIS 端点测试
+
+发现 QGIS Python 绑定不在 `site-packages`，而在：
+```
+/opt/conda/envs/TeleCouplingAI/share/qgis/python/
+```
+需要显式加入 `PYTHONPATH`，否则子进程报 `No module named 'qgis'`。
+
+修复后新增两个集成测试，均通过：
+- `test_render_zoom_success`：普通 TIF 渲染，返回 download URL
+- `test_render_zoom_with_extent`：带 bounding box 渲染
+
+---
+
+### 十二、多用户并发测试 `tests/test_concurrent_tools.py`
+
+**场景**：3 个用户同时运行不同工具（Tool 1 / Tool 2 / Tool 5），验证：
+- Celery 并发调度正常
+- 各 session 输出目录完全隔离
+- 无跨 session 数据污染
+
+**过程中发现并修复的问题**：
+
+| 问题 | 原因 | 修复 |
+|------|------|------|
+| UserC SSE 连接在 120s 被断开 | `agent.py` 中 httpx `timeout=120.0`，并发时 Gemini 调用超时 | 改为 `timeout=300.0` |
+| SSE `ChunkedEncodingError` | 连接中断但任务已完成 | 捕获异常，等待输出文件出现再判断结果 |
+
+**最终结果**：3/3 通过，总耗时 97s，各 session 完全隔离。
+
+---
+
+### 十三、start.bat 更新
+
+主要变更：
+- `python main.py` → `uvicorn main:app --host 0.0.0.0 --port 8000 --reload`
+- `workers.task_queue` → `celery_app`（模块名同步）
+- 添加 Redis 启动前检查
+- 显示所有服务地址（Frontend / Backend / API Docs / Health）
+
+---
+
+### 十四、待完成（更新）
+
+- [ ] CORS 收窄 + `ssl_verify=True`（用户手动测试完毕后）
+- [ ] 部署到真实 Linux 服务器
+- [ ] 下次重建镜像后，将 `.env.docker` 中临时保留的 `PYTHONPATH` 行删除（已固化进 Dockerfile）
+
+---
