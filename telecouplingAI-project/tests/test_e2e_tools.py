@@ -280,3 +280,141 @@ def test_e2e_crop_percentile():
 
     output_files = assert_outputs_exist(sid, min_files=1)
     print("  [PASS] Crop Percentile")
+
+
+# ── Tool 3: Coastal Blue Carbon Main ───────────────────────────────────────
+
+@pytest.mark.timeout(600)
+def test_e2e_cbc_main():
+    """
+    Upload transitions + biophysical tables.
+    snapshots.csv is rewritten with absolute container paths for the TIFs
+    (already mounted at /data/datainput/CoastalBlueCarbon_input/).
+    """
+    print("\n\n=== Tool 3: Coastal Blue Carbon Main ===")
+    sid = new_sid()
+
+    cbc_root = (
+        r"C:\YPHOME\Jianan_Projects\Telecoupling_AI_Project\fulldev"
+        r"\telecouplingAI-project\datainput_for_demo\CoastalBlueCarbon_input"
+    )
+    preproc_root = os.path.join(cbc_root, "outputs_preprocessor")
+    container_cbc = "/data/datainput/CoastalBlueCarbon_input"
+
+    # Build snapshots.csv with absolute container paths
+    snapshots_content = (
+        '"snapshot_year","raster_path"\n'
+        f'2010,{container_cbc}/GBJC_2010_mean_Resample.tif\n'
+        f'2030,{container_cbc}/GBJC_2030_mean_Resample.tif\n'
+        f'2050,{container_cbc}/GBJC_2050_mean_Resample.tif\n'
+    ).encode()
+
+    transitions_bytes  = read_local(os.path.join(preproc_root, "transitions_sample.csv"))
+    biophysical_bytes  = read_local(os.path.join(preproc_root, "biophysical_table_sample.csv"))
+
+    upload_resp = upload_files(sid, [
+        ("files", "snapshots.csv",            snapshots_content, "text/csv"),
+        ("files", "transitions_sample.csv",   transitions_bytes, "text/csv"),
+        ("files", "biophysical_table_sample.csv", biophysical_bytes, "text/csv"),
+    ])
+    print(f"  Uploaded: {[f['filename'] for f in upload_resp['uploaded']]}")
+
+    uploaded = {f["filename"]: f["path"] for f in upload_resp["uploaded"]}
+
+    message = (
+        "Please run the Coastal Blue Carbon Main Model tool with:\n"
+        f"- landcover_snapshot_csv: {uploaded['snapshots.csv']}\n"
+        f"- landcover_transitions_table: {uploaded['transitions_sample.csv']}\n"
+        f"- biophysical_table_path: {uploaded['biophysical_table_sample.csv']}\n"
+        "Run the tool now without asking for confirmation."
+    )
+    print(f"  Session: {sid}")
+    events = stream_chat(sid, message, timeout=600)
+
+    error_events = [e for e in events if e.get("type") == "error"]
+    assert not error_events, f"Tool returned error: {error_events}"
+
+    output_files = assert_outputs_exist(sid, min_files=1)
+    print("  [PASS] CBC Main")
+
+
+# ── Tool 4: Seasonal Water Yield ────────────────────────────────────────────
+
+@pytest.mark.timeout(600)
+def test_e2e_seasonal_water_yield():
+    """
+    All input files are already mounted at /data/datainput/SeasonalWaterYield_input/.
+    No uploads needed — just reference container paths directly in the chat message.
+    """
+    print("\n\n=== Tool 4: Seasonal Water Yield ===")
+    sid = new_sid()
+
+    swy = "/data/datainput/SeasonalWaterYield_input"
+
+    message = (
+        "Please run the Seasonal Water Yield tool with:\n"
+        f"- aoi_path: {swy}/watershed_gura.shp\n"
+        f"- lulc_raster_path: {swy}/land_use_gura.tif\n"
+        f"- dem_raster_path: {swy}/DEM_gura.tif\n"
+        f"- soil_group_path: {swy}/soil_group_gura.tif\n"
+        f"- biophysical_table_path: {swy}/biophysical_table_gura_SWY.csv\n"
+        f"- precip_dir: {swy}/Precipitation_monthly\n"
+        f"- et0_dir: {swy}/ET0_monthly\n"
+        f"- rain_events_table_path: {swy}/rain_events_gura.csv\n"
+        "- threshold_flow_accumulation: 1000\n"
+        "Run the tool now without asking for confirmation."
+    )
+    print(f"  Session: {sid}")
+    events = stream_chat(sid, message, timeout=600)
+
+    error_events = [e for e in events if e.get("type") == "error"]
+    assert not error_events, f"Tool returned error: {error_events}"
+
+    output_files = assert_outputs_exist(sid, min_files=1)
+    print("  [PASS] Seasonal Water Yield")
+
+
+# ── Tool 6: Crop Production Regression ─────────────────────────────────────
+
+@pytest.mark.timeout(360)
+def test_e2e_crop_regression():
+    """
+    Upload landcover_to_crop_table.csv + crop_fertilization_rates.csv.
+    landcover.tif and model_data referenced from container mounts.
+    """
+    print("\n\n=== Tool 6: Crop Production Regression ===")
+    sid = new_sid()
+
+    reg_demo = (
+        r"C:\YPHOME\Jianan_Projects\Telecoupling_AI_Project\fulldev"
+        r"\telecouplingAI-project\datainput_for_demo"
+        r"\CropProductionRegression_input\sample_user_data"
+    )
+    table_bytes  = read_local(os.path.join(reg_demo, "landcover_to_crop_table.csv"))
+    fert_bytes   = read_local(os.path.join(reg_demo, "crop_fertilization_rates.csv"))
+
+    upload_resp = upload_files(sid, [
+        ("files", "landcover_to_crop_table.csv", table_bytes, "text/csv"),
+        ("files", "crop_fertilization_rates.csv", fert_bytes, "text/csv"),
+    ])
+    print(f"  Uploaded: {[f['filename'] for f in upload_resp['uploaded']]}")
+
+    uploaded = {f["filename"]: f["path"] for f in upload_resp["uploaded"]}
+    container_reg = "/data/datainput/CropProductionRegression_input/sample_user_data"
+
+    message = (
+        "Please run the Crop Production Regression tool with:\n"
+        f"- landcover_raster_path: {container_reg}/landcover.tif\n"
+        f"- landcover_to_crop_table_path: {uploaded['landcover_to_crop_table.csv']}\n"
+        f"- fertilization_rate_table_path: {uploaded['crop_fertilization_rates.csv']}\n"
+        "The model data path is already configured in the system.\n"
+        "Run the tool now without asking for confirmation."
+    )
+    print(f"  Session: {sid}")
+    events = stream_chat(sid, message, timeout=360)
+
+    error_events = [e for e in events if e.get("type") == "error"]
+    assert not error_events, f"Tool returned error: {error_events}"
+
+    output_files = assert_outputs_exist(sid, min_files=1)
+    print("  [PASS] Crop Regression")
