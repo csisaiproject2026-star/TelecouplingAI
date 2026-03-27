@@ -48,9 +48,22 @@ RUN pip install --no-cache-dir \
 # --- Step 4: copy code ---
 COPY . .
 
-# --- Step 5: QGIS offscreen rendering ---
+# --- Step 5: runtime environment variables ---
+# QGIS offscreen rendering
 ENV QT_QPA_PLATFORM=offscreen
 ENV QGIS_PREFIX_PATH=/opt/conda/envs/TeleCouplingAI
+
+# PROJ / GDAL data paths (required by natcap.invest / pygeoprocessing)
+ENV PROJ_DATA=/opt/conda/envs/TeleCouplingAI/share/proj
+ENV PROJ_LIB=/opt/conda/envs/TeleCouplingAI/share/proj
+ENV GDAL_DATA=/opt/conda/envs/TeleCouplingAI/share/gdal
+
+# SSL: fix httpx TLS in conda env (certifi bundle instead of conda's)
+ENV SSL_CERT_FILE=/opt/conda/envs/TeleCouplingAI/lib/python3.12/site-packages/certifi/cacert.pem
+ENV REQUESTS_CA_BUNDLE=/opt/conda/envs/TeleCouplingAI/lib/python3.12/site-packages/certifi/cacert.pem
+
+# Python path: app code + QGIS Python bindings + QGIS plugins
+ENV PYTHONPATH=/app:/opt/conda/envs/TeleCouplingAI/share/qgis/python:/opt/conda/envs/TeleCouplingAI/share/qgis/python/plugins
 
 EXPOSE 8000
 

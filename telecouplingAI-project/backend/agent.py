@@ -46,8 +46,8 @@ def _get_client() -> genai.Client:
     return genai.Client(
         api_key=settings.GOOGLE_API_KEY,
         http_options=HttpOptions(
-            httpx_client=httpx.Client(verify=False, timeout=120.0),
-            httpx_async_client=httpx.AsyncClient(verify=False, timeout=120.0),
+            httpx_client=httpx.Client(verify=False, timeout=300.0),
+            httpx_async_client=httpx.AsyncClient(verify=False, timeout=300.0),
         ),
     )
 

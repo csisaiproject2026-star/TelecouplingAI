@@ -171,6 +171,51 @@ def test_render_zoom_missing_file():
     assert r.status_code == 404
 
 
+def test_render_zoom_success():
+    """
+    Render a real TIF (already mounted at /data/datainput) and verify
+    the response contains a download URL.
+    """
+    sid = new_sid()
+    r = requests.post(
+        f"{BASE}/api/render/zoom",
+        data={
+            "file_path": "/data/datainput/CoastalBlueCarbon_input/GBJC_2010_mean_Resample.tif",
+            "output_path": f"/data/outputs/{sid}/render_test.png",
+            "width": "800",
+            "height": "600",
+        },
+        headers={"X-Session-ID": sid},
+        timeout=60,
+    )
+    assert r.status_code == 200, f"render/zoom failed: {r.text}"
+    body = r.json()
+    assert "url" in body, f"No 'url' in response: {body}"
+    assert body["url"].startswith("http"), f"Unexpected url: {body['url']}"
+
+
+def test_render_zoom_with_extent():
+    """
+    Render a TIF with a specific bounding box extent.
+    """
+    sid = new_sid()
+    r = requests.post(
+        f"{BASE}/api/render/zoom",
+        data={
+            "file_path": "/data/datainput/CoastalBlueCarbon_input/GBJC_2010_mean_Resample.tif",
+            "output_path": f"/data/outputs/{sid}/render_extent.png",
+            "extent": "[120.5, 29.0, 122.0, 31.0]",
+            "width": "800",
+            "height": "600",
+        },
+        headers={"X-Session-ID": sid},
+        timeout=60,
+    )
+    assert r.status_code == 200, f"render/zoom with extent failed: {r.text}"
+    body = r.json()
+    assert "url" in body
+
+
 # ---------------------------------------------------------------------------
 # 7. Celery / Redis connectivity — submit a task that requires params check
 # ---------------------------------------------------------------------------
