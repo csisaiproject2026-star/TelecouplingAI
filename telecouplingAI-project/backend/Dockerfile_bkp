@@ -1,0 +1,72 @@
+# 1. 使用 Miniconda 官方镜像作为底座
+FROM condaforge/miniforge3:latest
+
+# 2. 设置工作目录
+WORKDIR /app
+
+# RUN FOllOW:
+    mamba create -n TeleCouplingAI python=3.13.11 -y
+    source activate TeleCouplingAI
+    mamba install -c conda-forge -y \
+        gdal=3.10.3 \
+        geos=3.14.1 \
+        proj=9.7.1 \
+        geopandas=1.1.2 \
+        rasterio=1.4.4 \
+        shapely=2.1.2 \
+        numpy=2.4.1 \
+        pandas=2.3.3 \
+        scikit-learn=1.8.0 \
+        matplotlib=3.10.8 \
+        rtree=1.4.1 \
+        networkx=3.6.1 \
+        taskgraph=0.11.2
+
+    mamba install -c conda-forge -y \
+        fastapi=0.128.0 \
+        uvicorn=0.40.0 \
+        pydantic=2.10.6 \
+        flask=3.1.2 \
+        flask-cors=6.0.2 \
+        requests=2.32.5 \
+        python-dotenv=1.2.1 \
+        pillow=12.1.0 \
+        pyyaml=6.0.3
+
+    #apt-get update && apt-get install -y g++
+    mamba install -c conda-forge -y gxx_linux-64 gcc_linux-64
+    # 1. 建立 g++ 的软链接 (链接到 Conda 环境里的编译器)
+    ln -s $CONDA_PREFIX/bin/x86_64-conda-linux-gnu-g++ $CONDA_PREFIX/bin/g++
+
+    # 2. 建立 gcc 的软链接
+    ln -s $CONDA_PREFIX/bin/x86_64-conda-linux-gnu-gcc $CONDA_PREFIX/bin/gcc
+
+    # 3. 验证一下，现在敲 g++ 是否有反应
+    g++ --version
+
+    pip install pygeoprocessing==2.4.10 \
+        frozenlist==1.8.0 \
+        importlib-metadata==8.7.1 \
+        propcache==0.4.1
+    pip install natcap.invest==3.14.3
+
+# 3. 将本机的环境清单拷贝到容器里
+# COPY local_TelecouplingAI_environment.yml .
+
+# 4. 根据清单创建环境
+# --name base 表示我们直接更新 base 环境，或者你可以指定新名字
+# 如果你的 yml 里有名字，它会自动创建那个名字的环境
+#RUN conda env create -f local_TelecouplingAI_environment.yml
+
+# 5. 确保后续命令在复刻的环境中运行
+# 注意：替换下面的 'TeleCouplingAI' 为你 yml 文件第一行显示的名字
+#ENV PATH /opt/conda/envs/TeleCouplingAI/bin:$PATH
+
+# 6. 拷贝你的后端代码
+#COPY . .
+
+#EXPOSE 8000
+
+# 7. 启动后端
+CMD ["tail", "-f", "/dev/null"]
+#CMD ["python", "main.py"]

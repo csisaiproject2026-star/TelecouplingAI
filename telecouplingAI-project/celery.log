@@ -1,0 +1,287 @@
+[2026-03-27 10:48:03,307: INFO/MainProcess] Connected to redis://localhost:6379/0
+[2026-03-27 10:48:05,349: INFO/MainProcess] mingle: searching for neighbors
+[2026-03-27 10:48:12,483: WARNING/MainProcess] C:\Users\dru18\.conda\envs\TeleCouplingAI\Lib\site-packages\celery\app\control.py:56: DuplicateNodenameWarning: Received multiple replies from node name: celery@Jianan.
+Please make sure you give each node a unique nodename using
+the celery worker `-n` option.
+  warnings.warn(DuplicateNodenameWarning(
+
+[2026-03-27 10:48:12,483: INFO/MainProcess] mingle: all alone
+[2026-03-27 10:48:22,679: INFO/MainProcess] celery@Jianan ready.
+[2026-03-27 10:55:04,782: INFO/MainProcess] Connected to redis://localhost:6379/0
+[2026-03-27 10:55:08,854: INFO/MainProcess] mingle: searching for neighbors
+[2026-03-27 10:55:15,927: INFO/MainProcess] mingle: all alone
+[2026-03-27 10:55:24,088: INFO/MainProcess] celery@Jianan ready.
+[2026-03-27 10:57:25,838: INFO/MainProcess] Task workers.task_queue.run_tool_task[e72ce7e6-9e5f-4194-9eb2-e5a5208e5731] received
+[2026-03-27 10:57:27,857: ERROR/MainProcess] Tool task failed: run_network_analysis_grouping
+Traceback (most recent call last):
+  File "C:\YPHOME\Jianan_Projects\Telecoupling_AI_Project\fulldev\telecouplingAI-project\backend\workers\task_queue.py", line 83, in run_tool_task
+    result = execute_tool(
+        tool_name, params, session_id, tid,
+    ...<7 lines>...
+        ),
+    )
+  File "C:\YPHOME\Jianan_Projects\Telecoupling_AI_Project\fulldev\telecouplingAI-project\backend\workers\task_queue.py", line 37, in execute_tool
+    from tools.network_analysis import run_network_analysis
+ModuleNotFoundError: No module named 'tools'
+[2026-03-27 10:57:29,922: INFO/MainProcess] Task workers.task_queue.run_tool_task[e72ce7e6-9e5f-4194-9eb2-e5a5208e5731] succeeded in 4.0830029000062495s: None
+[2026-03-27 10:59:29,888: INFO/MainProcess] Connected to redis://localhost:6379/0
+[2026-03-27 10:59:33,953: INFO/MainProcess] mingle: searching for neighbors
+[2026-03-27 10:59:41,111: INFO/MainProcess] mingle: all alone
+[2026-03-27 10:59:49,246: INFO/MainProcess] celery@Jianan ready.
+[2026-03-27 11:00:26,684: INFO/MainProcess] Task workers.task_queue.run_tool_task[6ec6427f-19b3-4c64-8be6-4a1d8496ca4a] received
+[2026-03-27 11:00:28,910: WARNING/MainProcess] C:\Users\dru18\.conda\envs\TeleCouplingAI\Lib\site-packages\natcap\invest\__init__.py:34: FutureWarning: 
+        natcap.invest requires GDAL exceptions to be enabled. You must
+        call gdal.UseExceptions() to avoid unexpected behavior from
+        natcap.invest. A future version will enable exceptions on import.
+        gdal.UseExceptions() affects global state, so this may affect the
+        behavior of other packages.
+  warnings.warn(('''
+
+[2026-03-27 11:00:30,959: INFO/MainProcess] [R] Rscript=C:\R\R-4.5.2\bin\Rscript.EXE script=C:\YPHOME\Jianan_Projects\Telecoupling_AI_Project\fulldev\telecouplingAI-project\backend\r_scripts\network_analysis.R cwd=C:\YPHOME\Jianan_Projects\Telecoupling_AI_Project\fulldev
+[2026-03-27 11:00:34,281: INFO/MainProcess] [R] returncode=0 stdout={"success":true,"out_pdf":"C:\\YPHOME\\Jianan_Projects\\Telecoupling_AI_Project\\fulldev\\telecouplingAI-project\\outputs\\test_637052e0\\20260327_110030_network_analysis\\network_plot_6ec6427f-19b3-4 stderr=Reading node and link data...
+Reading shapefile...
+Detecting communities using: walktrap
+Merging clusters with shapefile...
+Shapefile written to: C:\YPHOME\Jianan_Projects\Telecoupling_AI_Project\full
+[2026-03-27 11:00:38,379: INFO/MainProcess] Task workers.task_queue.run_tool_task[6ec6427f-19b3-4c64-8be6-4a1d8496ca4a] succeeded in 11.694919200032018s: None
+[2026-03-27 11:05:26,471: INFO/MainProcess] Task workers.task_queue.run_tool_task[82956dda-be3b-4753-a79d-d329a096b5d2] received
+[2026-03-27 11:05:28,514: INFO/MainProcess] [R] Rscript=C:\R\R-4.5.2\bin\Rscript.EXE script=C:\YPHOME\Jianan_Projects\Telecoupling_AI_Project\fulldev\telecouplingAI-project\backend\r_scripts\network_analysis.R cwd=C:\YPHOME\Jianan_Projects\Telecoupling_AI_Project\fulldev
+[2026-03-27 11:05:31,751: INFO/MainProcess] [R] returncode=0 stdout={"success":true,"out_pdf":"C:\\YPHOME\\Jianan_Projects\\Telecoupling_AI_Project\\fulldev\\telecouplingAI-project\\outputs\\csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197\\20260327_110528_network_analysis\\ stderr=Reading node and link data...
+Reading shapefile...
+Detecting communities using: walktrap
+Merging clusters with shapefile...
+Shapefile written to: C:\YPHOME\Jianan_Projects\Telecoupling_AI_Project\full
+[2026-03-27 11:05:35,778: INFO/MainProcess] Task workers.task_queue.run_tool_task[82956dda-be3b-4753-a79d-d329a096b5d2] succeeded in 9.30603840004187s: None
+[2026-03-27 11:11:50,036: INFO/MainProcess] Connected to redis://localhost:6379/0
+[2026-03-27 11:11:52,081: INFO/MainProcess] mingle: searching for neighbors
+[2026-03-27 11:11:59,195: INFO/MainProcess] mingle: all alone
+[2026-03-27 11:12:09,352: INFO/MainProcess] celery@Jianan ready.
+[2026-03-27 11:13:28,508: INFO/MainProcess] Task workers.task_queue.run_tool_task[6554ed49-3b45-41f7-836c-e58d58764ca1] received
+[2026-03-27 11:13:30,724: WARNING/MainProcess] C:\Users\dru18\.conda\envs\TeleCouplingAI\Lib\site-packages\natcap\invest\__init__.py:34: FutureWarning: 
+        natcap.invest requires GDAL exceptions to be enabled. You must
+        call gdal.UseExceptions() to avoid unexpected behavior from
+        natcap.invest. A future version will enable exceptions on import.
+        gdal.UseExceptions() affects global state, so this may affect the
+        behavior of other packages.
+  warnings.warn(('''
+
+[2026-03-27 11:13:32,801: INFO/MainProcess] prepare and test inputs for common errors
+[2026-03-27 11:13:32,874: INFO/MainProcess] Building file registry
+[2026-03-27 11:13:32,875: INFO/MainProcess] Checking that the AOI is not the output aggregate vector
+[2026-03-27 11:13:32,875: INFO/MainProcess] Aligning and clipping dataset list
+[2026-03-27 11:13:33,148: INFO/MainProcess] 1 of 27 aligned: prcp_a0.tif
+[2026-03-27 11:13:33,189: INFO/MainProcess] 2 of 27 aligned: prcp_a1.tif
+[2026-03-27 11:13:33,229: INFO/MainProcess] 3 of 27 aligned: prcp_a2.tif
+[2026-03-27 11:13:33,272: INFO/MainProcess] 4 of 27 aligned: prcp_a3.tif
+[2026-03-27 11:13:33,314: INFO/MainProcess] 5 of 27 aligned: prcp_a4.tif
+[2026-03-27 11:13:33,354: INFO/MainProcess] 6 of 27 aligned: prcp_a5.tif
+[2026-03-27 11:13:33,395: INFO/MainProcess] 7 of 27 aligned: prcp_a6.tif
+[2026-03-27 11:13:33,436: INFO/MainProcess] 8 of 27 aligned: prcp_a7.tif
+[2026-03-27 11:13:33,477: INFO/MainProcess] 9 of 27 aligned: prcp_a8.tif
+[2026-03-27 11:13:33,518: INFO/MainProcess] 10 of 27 aligned: prcp_a9.tif
+[2026-03-27 11:13:33,557: INFO/MainProcess] 11 of 27 aligned: prcp_a10.tif
+[2026-03-27 11:13:33,596: INFO/MainProcess] 12 of 27 aligned: prcp_a11.tif
+[2026-03-27 11:13:33,632: INFO/MainProcess] 13 of 27 aligned: soil_group_aligned.tif
+[2026-03-27 11:13:33,684: INFO/MainProcess] 14 of 27 aligned: et0_a0.tif
+[2026-03-27 11:13:33,736: INFO/MainProcess] 15 of 27 aligned: et0_a1.tif
+[2026-03-27 11:13:33,789: INFO/MainProcess] 16 of 27 aligned: et0_a2.tif
+[2026-03-27 11:13:33,841: INFO/MainProcess] 17 of 27 aligned: et0_a3.tif
+[2026-03-27 11:13:33,893: INFO/MainProcess] 18 of 27 aligned: et0_a4.tif
+[2026-03-27 11:13:33,945: INFO/MainProcess] 19 of 27 aligned: et0_a5.tif
+[2026-03-27 11:13:33,998: INFO/MainProcess] 20 of 27 aligned: et0_a6.tif
+[2026-03-27 11:13:34,050: INFO/MainProcess] 21 of 27 aligned: et0_a7.tif
+[2026-03-27 11:13:34,115: INFO/MainProcess] 22 of 27 aligned: et0_a8.tif
+[2026-03-27 11:13:34,167: INFO/MainProcess] 23 of 27 aligned: et0_a9.tif
+[2026-03-27 11:13:34,218: INFO/MainProcess] 24 of 27 aligned: et0_a10.tif
+[2026-03-27 11:13:34,270: INFO/MainProcess] 25 of 27 aligned: et0_a11.tif
+[2026-03-27 11:13:34,327: INFO/MainProcess] 26 of 27 aligned: lulc_aligned.tif
+[2026-03-27 11:13:34,376: INFO/MainProcess] 27 of 27 aligned: dem_aligned.tif
+[2026-03-27 11:13:34,376: INFO/MainProcess] aligned all 27 rasters.
+[2026-03-27 11:13:34,609: INFO/MainProcess] (fill pits): complete
+[2026-03-27 11:13:35,098: INFO/MainProcess] Flow dir MFD 100.0% complete
+[2026-03-27 11:13:35,533: INFO/MainProcess] Flow accum MFD 100.0% complete
+[2026-03-27 11:13:35,716: INFO/MainProcess] Extract streams MFD: filter out incomplete divergent streams
+[2026-03-27 11:13:35,730: INFO/MainProcess] Extract streams MFD: 100.0% complete
+[2026-03-27 11:13:35,745: INFO/MainProcess] quick flow
+[2026-03-27 11:13:35,745: INFO/MainProcess] loading number of monthly events
+[2026-03-27 11:13:35,784: INFO/MainProcess] A task was created that had an identical args signature sans target paths, but a different target_path_list of the same length. To avoid recomputation, dynamically adding previous Task (n_events as a constant raster month 0 (5)) as a dependent task to this one (n_events as a constant raster month 1 (6)).
+[2026-03-27 11:13:35,786: INFO/MainProcess] not precalculated (n_events as a constant raster month 1 (6)), Task hash exists, but there are these mismatches: Recorded path not in target path list c:\yphome\jianan_projects\telecoupling_ai_project\fulldev\telecouplingai-project\outputs\csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197\20260327_111332_seasonal_water_yield\intermediate_outputs\n_events0.tif
+[2026-03-27 11:13:35,975: INFO/MainProcess] A task was created that had an identical args signature sans target paths, but a different target_path_list of the same length. To avoid recomputation, dynamically adding previous Task (n_events as a constant raster month 1 (6)) as a dependent task to this one (n_events as a constant raster month 8 (12)).
+[2026-03-27 11:13:35,977: INFO/MainProcess] not precalculated (n_events as a constant raster month 8 (12)), Task hash exists, but there are these mismatches: Recorded path not in target path list c:\yphome\jianan_projects\telecoupling_ai_project\fulldev\telecouplingai-project\outputs\csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197\20260327_111332_seasonal_water_yield\intermediate_outputs\n_events1.tif
+[2026-03-27 11:13:36,033: INFO/MainProcess] A task was created that had an identical args signature sans target paths, but a different target_path_list of the same length. To avoid recomputation, dynamically adding previous Task (n_events as a constant raster month 3 (7)) as a dependent task to this one (n_events as a constant raster month 10 (13)).
+[2026-03-27 11:13:36,035: INFO/MainProcess] not precalculated (n_events as a constant raster month 10 (13)), Task hash exists, but there are these mismatches: Recorded path not in target path list c:\yphome\jianan_projects\telecoupling_ai_project\fulldev\telecouplingai-project\outputs\csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197\20260327_111332_seasonal_water_yield\intermediate_outputs\n_events3.tif
+[2026-03-27 11:13:36,060: INFO/MainProcess] A task was created that had an identical args signature sans target paths, but a different target_path_list of the same length. To avoid recomputation, dynamically adding previous Task (n_events as a constant raster month 2 (6)) as a dependent task to this one (n_events as a constant raster month 11 (13)).
+[2026-03-27 11:13:36,062: INFO/MainProcess] not precalculated (n_events as a constant raster month 11 (13)), Task hash exists, but there are these mismatches: Recorded path not in target path list c:\yphome\jianan_projects\telecoupling_ai_project\fulldev\telecouplingai-project\outputs\csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197\20260327_111332_seasonal_water_yield\intermediate_outputs\n_events2.tif
+[2026-03-27 11:13:36,190: INFO/MainProcess] starting stats_worker
+[2026-03-27 11:13:36,191: INFO/MainProcess] started stats_worker <Thread(Thread-2 (stats_worker), started daemon 26228)>
+[2026-03-27 11:13:36,242: INFO/MainProcess] 100.0% complete
+[2026-03-27 11:13:36,242: INFO/MainProcess] Waiting for raster stats worker result.
+[2026-03-27 11:13:36,274: INFO/MainProcess] starting stats_worker
+[2026-03-27 11:13:36,274: INFO/MainProcess] started stats_worker <Thread(Thread-3 (stats_worker), started daemon 26716)>
+[2026-03-27 11:13:36,319: INFO/MainProcess] 100.0% complete
+[2026-03-27 11:13:36,320: INFO/MainProcess] Waiting for raster stats worker result.
+[2026-03-27 11:13:36,327: INFO/MainProcess] calculate quick flow for month 1
+[2026-03-27 11:13:36,369: INFO/MainProcess] starting stats_worker
+[2026-03-27 11:13:36,369: INFO/MainProcess] started stats_worker <Thread(Thread-4 (stats_worker), started daemon 22344)>
+[2026-03-27 11:13:36,530: INFO/MainProcess] 100.0% complete
+[2026-03-27 11:13:36,530: INFO/MainProcess] Waiting for raster stats worker result.
+[2026-03-27 11:13:36,544: INFO/MainProcess] calculate quick flow for month 2
+[2026-03-27 11:13:36,579: INFO/MainProcess] starting stats_worker
+[2026-03-27 11:13:36,579: INFO/MainProcess] started stats_worker <Thread(Thread-5 (stats_worker), started daemon 13936)>
+[2026-03-27 11:13:36,737: INFO/MainProcess] 100.0% complete
+[2026-03-27 11:13:36,738: INFO/MainProcess] Waiting for raster stats worker result.
+[2026-03-27 11:13:36,757: INFO/MainProcess] calculate quick flow for month 3
+[2026-03-27 11:13:36,794: INFO/MainProcess] starting stats_worker
+[2026-03-27 11:13:36,795: INFO/MainProcess] started stats_worker <Thread(Thread-6 (stats_worker), started daemon 27752)>
+[2026-03-27 11:13:36,959: INFO/MainProcess] 100.0% complete
+[2026-03-27 11:13:36,959: INFO/MainProcess] Waiting for raster stats worker result.
+[2026-03-27 11:13:36,977: INFO/MainProcess] calculate quick flow for month 4
+[2026-03-27 11:13:37,015: INFO/MainProcess] starting stats_worker
+[2026-03-27 11:13:37,016: INFO/MainProcess] started stats_worker <Thread(Thread-7 (stats_worker), started daemon 24936)>
+[2026-03-27 11:13:37,202: INFO/MainProcess] 100.0% complete
+[2026-03-27 11:13:37,203: INFO/MainProcess] Waiting for raster stats worker result.
+[2026-03-27 11:13:37,221: INFO/MainProcess] calculate quick flow for month 5
+[2026-03-27 11:13:37,259: INFO/MainProcess] starting stats_worker
+[2026-03-27 11:13:37,260: INFO/MainProcess] started stats_worker <Thread(Thread-8 (stats_worker), started daemon 19612)>
+[2026-03-27 11:13:37,440: INFO/MainProcess] 100.0% complete
+[2026-03-27 11:13:37,440: INFO/MainProcess] Waiting for raster stats worker result.
+[2026-03-27 11:13:37,458: INFO/MainProcess] calculate quick flow for month 6
+[2026-03-27 11:13:37,493: INFO/MainProcess] starting stats_worker
+[2026-03-27 11:13:37,493: INFO/MainProcess] started stats_worker <Thread(Thread-9 (stats_worker), started daemon 18704)>
+[2026-03-27 11:13:37,648: INFO/MainProcess] 100.0% complete
+[2026-03-27 11:13:37,649: INFO/MainProcess] Waiting for raster stats worker result.
+[2026-03-27 11:13:37,669: INFO/MainProcess] calculate quick flow for month 7
+[2026-03-27 11:13:37,706: INFO/MainProcess] starting stats_worker
+[2026-03-27 11:13:37,707: INFO/MainProcess] started stats_worker <Thread(Thread-10 (stats_worker), started daemon 19796)>
+[2026-03-27 11:13:37,854: INFO/MainProcess] 100.0% complete
+[2026-03-27 11:13:37,855: INFO/MainProcess] Waiting for raster stats worker result.
+[2026-03-27 11:13:37,873: INFO/MainProcess] calculate quick flow for month 8
+[2026-03-27 11:13:37,910: INFO/MainProcess] starting stats_worker
+[2026-03-27 11:13:37,911: INFO/MainProcess] started stats_worker <Thread(Thread-11 (stats_worker), started daemon 3508)>
+[2026-03-27 11:13:38,058: INFO/MainProcess] 100.0% complete
+[2026-03-27 11:13:38,059: INFO/MainProcess] Waiting for raster stats worker result.
+[2026-03-27 11:13:38,077: INFO/MainProcess] calculate quick flow for month 9
+[2026-03-27 11:13:38,116: INFO/MainProcess] starting stats_worker
+[2026-03-27 11:13:38,117: INFO/MainProcess] started stats_worker <Thread(Thread-12 (stats_worker), started daemon 24524)>
+[2026-03-27 11:13:38,271: INFO/MainProcess] 100.0% complete
+[2026-03-27 11:13:38,271: INFO/MainProcess] Waiting for raster stats worker result.
+[2026-03-27 11:13:38,285: INFO/MainProcess] calculate quick flow for month 10
+[2026-03-27 11:13:38,329: INFO/MainProcess] starting stats_worker
+[2026-03-27 11:13:38,330: INFO/MainProcess] started stats_worker <Thread(Thread-13 (stats_worker), started daemon 24772)>
+[2026-03-27 11:13:38,507: INFO/MainProcess] 100.0% complete
+[2026-03-27 11:13:38,508: INFO/MainProcess] Waiting for raster stats worker result.
+[2026-03-27 11:13:38,522: INFO/MainProcess] calculate quick flow for month 11
+[2026-03-27 11:13:38,564: INFO/MainProcess] starting stats_worker
+[2026-03-27 11:13:38,565: INFO/MainProcess] started stats_worker <Thread(Thread-14 (stats_worker), started daemon 14388)>
+[2026-03-27 11:13:38,729: INFO/MainProcess] 100.0% complete
+[2026-03-27 11:13:38,730: INFO/MainProcess] Waiting for raster stats worker result.
+[2026-03-27 11:13:38,748: INFO/MainProcess] calculate quick flow for month 12
+[2026-03-27 11:13:38,787: INFO/MainProcess] starting stats_worker
+[2026-03-27 11:13:38,787: INFO/MainProcess] started stats_worker <Thread(Thread-15 (stats_worker), started daemon 7776)>
+[2026-03-27 11:13:38,944: INFO/MainProcess] 100.0% complete
+[2026-03-27 11:13:38,945: INFO/MainProcess] Waiting for raster stats worker result.
+[2026-03-27 11:13:39,130: INFO/MainProcess] starting stats_worker
+[2026-03-27 11:13:39,130: INFO/MainProcess] started stats_worker <Thread(Thread-16 (stats_worker), started daemon 27244)>
+[2026-03-27 11:13:39,339: INFO/MainProcess] 100.0% complete
+[2026-03-27 11:13:39,339: INFO/MainProcess] Waiting for raster stats worker result.
+[2026-03-27 11:13:39,357: INFO/MainProcess] calculate local recharge
+[2026-03-27 11:13:39,385: INFO/MainProcess] starting stats_worker
+[2026-03-27 11:13:39,386: INFO/MainProcess] started stats_worker <Thread(Thread-17 (stats_worker), started daemon 25364)>
+[2026-03-27 11:13:39,440: INFO/MainProcess] 100.0% complete
+[2026-03-27 11:13:39,441: INFO/MainProcess] Waiting for raster stats worker result.
+[2026-03-27 11:13:39,448: INFO/MainProcess] A task was created that had an identical args signature sans target paths, but a different target_path_list of the same length. To avoid recomputation, dynamically adding previous Task (classify kc month 0 (28)) as a dependent task to this one (classify kc month 1 (29)).
+[2026-03-27 11:13:39,450: INFO/MainProcess] not precalculated (classify kc month 1 (29)), Task hash exists, but there are these mismatches: Recorded path not in target path list c:\yphome\jianan_projects\telecoupling_ai_project\fulldev\telecouplingai-project\outputs\csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197\20260327_111332_seasonal_water_yield\intermediate_outputs\kc_0.tif
+[2026-03-27 11:13:39,458: INFO/MainProcess] starting stats_worker
+[2026-03-27 11:13:39,459: INFO/MainProcess] started stats_worker <Thread(Thread-18 (stats_worker), started daemon 25740)>
+[2026-03-27 11:13:39,513: INFO/MainProcess] 100.0% complete
+[2026-03-27 11:13:39,513: INFO/MainProcess] Waiting for raster stats worker result.
+[2026-03-27 11:13:39,531: INFO/MainProcess] starting stats_worker
+[2026-03-27 11:13:39,531: INFO/MainProcess] started stats_worker <Thread(Thread-19 (stats_worker), started daemon 26056)>
+[2026-03-27 11:13:39,586: INFO/MainProcess] 100.0% complete
+[2026-03-27 11:13:39,586: INFO/MainProcess] Waiting for raster stats worker result.
+[2026-03-27 11:13:39,604: INFO/MainProcess] starting stats_worker
+[2026-03-27 11:13:39,605: INFO/MainProcess] started stats_worker <Thread(Thread-20 (stats_worker), started daemon 19988)>
+[2026-03-27 11:13:39,658: INFO/MainProcess] 100.0% complete
+[2026-03-27 11:13:39,659: INFO/MainProcess] Waiting for raster stats worker result.
+[2026-03-27 11:13:39,690: INFO/MainProcess] starting stats_worker
+[2026-03-27 11:13:39,690: INFO/MainProcess] started stats_worker <Thread(Thread-21 (stats_worker), started daemon 15956)>
+[2026-03-27 11:13:39,744: INFO/MainProcess] 100.0% complete
+[2026-03-27 11:13:39,744: INFO/MainProcess] Waiting for raster stats worker result.
+[2026-03-27 11:13:39,751: INFO/MainProcess] A task was created that had an identical args signature sans target paths, but a different target_path_list of the same length. To avoid recomputation, dynamically adding previous Task (classify kc month 4 (31)) as a dependent task to this one (classify kc month 5 (32)).
+[2026-03-27 11:13:39,753: INFO/MainProcess] not precalculated (classify kc month 5 (32)), Task hash exists, but there are these mismatches: Recorded path not in target path list c:\yphome\jianan_projects\telecoupling_ai_project\fulldev\telecouplingai-project\outputs\csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197\20260327_111332_seasonal_water_yield\intermediate_outputs\kc_4.tif
+[2026-03-27 11:13:39,762: INFO/MainProcess] starting stats_worker
+[2026-03-27 11:13:39,762: INFO/MainProcess] started stats_worker <Thread(Thread-22 (stats_worker), started daemon 17632)>
+[2026-03-27 11:13:39,816: INFO/MainProcess] 100.0% complete
+[2026-03-27 11:13:39,816: INFO/MainProcess] Waiting for raster stats worker result.
+[2026-03-27 11:13:39,834: INFO/MainProcess] starting stats_worker
+[2026-03-27 11:13:39,837: INFO/MainProcess] started stats_worker <Thread(Thread-23 (stats_worker), started daemon 1828)>
+[2026-03-27 11:13:39,896: INFO/MainProcess] 100.0% complete
+[2026-03-27 11:13:39,896: INFO/MainProcess] Waiting for raster stats worker result.
+[2026-03-27 11:13:39,904: INFO/MainProcess] A task was created that had an identical args signature sans target paths, but a different target_path_list of the same length. To avoid recomputation, dynamically adding previous Task (classify kc month 6 (32)) as a dependent task to this one (classify kc month 7 (33)).
+[2026-03-27 11:13:39,906: INFO/MainProcess] not precalculated (classify kc month 7 (33)), Task hash exists, but there are these mismatches: Recorded path not in target path list c:\yphome\jianan_projects\telecoupling_ai_project\fulldev\telecouplingai-project\outputs\csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197\20260327_111332_seasonal_water_yield\intermediate_outputs\kc_6.tif
+[2026-03-27 11:13:39,915: INFO/MainProcess] starting stats_worker
+[2026-03-27 11:13:39,915: INFO/MainProcess] started stats_worker <Thread(Thread-24 (stats_worker), started daemon 19124)>
+[2026-03-27 11:13:39,969: INFO/MainProcess] 100.0% complete
+[2026-03-27 11:13:39,969: INFO/MainProcess] Waiting for raster stats worker result.
+[2026-03-27 11:13:39,986: INFO/MainProcess] starting stats_worker
+[2026-03-27 11:13:39,987: INFO/MainProcess] started stats_worker <Thread(Thread-25 (stats_worker), started daemon 16292)>
+[2026-03-27 11:13:40,040: INFO/MainProcess] 100.0% complete
+[2026-03-27 11:13:40,041: INFO/MainProcess] Waiting for raster stats worker result.
+[2026-03-27 11:13:40,048: INFO/MainProcess] A task was created that had an identical args signature sans target paths, but a different target_path_list of the same length. To avoid recomputation, dynamically adding previous Task (classify kc month 2 (29)) as a dependent task to this one (classify kc month 9 (34)).
+[2026-03-27 11:13:40,050: INFO/MainProcess] not precalculated (classify kc month 9 (34)), Task hash exists, but there are these mismatches: Recorded path not in target path list c:\yphome\jianan_projects\telecoupling_ai_project\fulldev\telecouplingai-project\outputs\csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197\20260327_111332_seasonal_water_yield\intermediate_outputs\kc_2.tif
+[2026-03-27 11:13:40,059: INFO/MainProcess] starting stats_worker
+[2026-03-27 11:13:40,059: INFO/MainProcess] started stats_worker <Thread(Thread-26 (stats_worker), started daemon 12304)>
+[2026-03-27 11:13:40,113: INFO/MainProcess] 100.0% complete
+[2026-03-27 11:13:40,113: INFO/MainProcess] Waiting for raster stats worker result.
+[2026-03-27 11:13:40,125: INFO/MainProcess] A task was created that had an identical args signature sans target paths, but a different target_path_list of the same length. To avoid recomputation, dynamically adding previous Task (classify kc month 3 (30)) as a dependent task to this one (classify kc month 10 (34)).
+[2026-03-27 11:13:40,128: INFO/MainProcess] not precalculated (classify kc month 10 (34)), Task hash exists, but there are these mismatches: Recorded path not in target path list c:\yphome\jianan_projects\telecoupling_ai_project\fulldev\telecouplingai-project\outputs\csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197\20260327_111332_seasonal_water_yield\intermediate_outputs\kc_3.tif
+[2026-03-27 11:13:40,136: INFO/MainProcess] starting stats_worker
+[2026-03-27 11:13:40,137: INFO/MainProcess] started stats_worker <Thread(Thread-27 (stats_worker), started daemon 25292)>
+[2026-03-27 11:13:40,191: INFO/MainProcess] 100.0% complete
+[2026-03-27 11:13:40,191: INFO/MainProcess] Waiting for raster stats worker result.
+[2026-03-27 11:13:40,198: INFO/MainProcess] A task was created that had an identical args signature sans target paths, but a different target_path_list of the same length. To avoid recomputation, dynamically adding previous Task (classify kc month 10 (34)) as a dependent task to this one (classify kc month 11 (34)).
+[2026-03-27 11:13:40,200: INFO/MainProcess] not precalculated (classify kc month 11 (34)), Task hash exists, but there are these mismatches: Recorded path not in target path list c:\yphome\jianan_projects\telecoupling_ai_project\fulldev\telecouplingai-project\outputs\csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197\20260327_111332_seasonal_water_yield\intermediate_outputs\kc_10.tif
+[2026-03-27 11:13:40,209: INFO/MainProcess] starting stats_worker
+[2026-03-27 11:13:40,209: INFO/MainProcess] started stats_worker <Thread(Thread-28 (stats_worker), started daemon 26048)>
+[2026-03-27 11:13:40,263: INFO/MainProcess] 100.0% complete
+[2026-03-27 11:13:40,263: INFO/MainProcess] Waiting for raster stats worker result.
+[2026-03-27 11:13:44,110: INFO/MainProcess] starting stats_worker
+[2026-03-27 11:13:44,111: INFO/MainProcess] started stats_worker <Thread(Thread-29 (stats_worker), started daemon 28284)>
+[2026-03-27 11:13:44,162: INFO/MainProcess] 100.0% complete
+[2026-03-27 11:13:44,162: INFO/MainProcess] Waiting for raster stats worker result.
+[2026-03-27 11:13:44,318: INFO/MainProcess] starting reprojection
+[2026-03-27 11:13:44,322: INFO/MainProcess] reprojection 100.0% complete on reprojected.gpkg
+[2026-03-27 11:13:44,342: INFO/MainProcess] Clipping rasters to their intersection with the vector
+[2026-03-27 11:13:44,381: INFO/MainProcess] calculating disjoint polygon sets
+[2026-03-27 11:13:44,382: INFO/MainProcess] build shapely polygon list
+[2026-03-27 11:13:44,385: INFO/MainProcess] build shapely rtree index
+[2026-03-27 11:13:44,391: INFO/MainProcess] poly feature lookup 100.0% complete on aggregated_results_swy.shp
+[2026-03-27 11:13:44,391: INFO/MainProcess] build poly intersection lookup
+[2026-03-27 11:13:44,392: INFO/MainProcess] poly intersection feature lookup 100.0% complete on aggregated_results_swy.shp
+[2026-03-27 11:13:44,392: INFO/MainProcess] maximal subset build 100.0% complete on aggregated_results_swy.shp
+[2026-03-27 11:13:44,413: INFO/MainProcess] calculating stats on raster 0 of 1
+[2026-03-27 11:13:44,422: INFO/MainProcess] disjoint polygon set 1 of 1
+[2026-03-27 11:13:44,449: INFO/MainProcess] all done processing polygon sets for aggregated_results_swy.shp
+[2026-03-27 11:13:44,519: INFO/MainProcess] starting reprojection
+[2026-03-27 11:13:44,521: INFO/MainProcess] reprojection 100.0% complete on reprojected.gpkg
+[2026-03-27 11:13:44,541: INFO/MainProcess] Clipping rasters to their intersection with the vector
+[2026-03-27 11:13:44,580: INFO/MainProcess] calculating disjoint polygon sets
+[2026-03-27 11:13:44,581: INFO/MainProcess] build shapely polygon list
+[2026-03-27 11:13:44,582: INFO/MainProcess] build shapely rtree index
+[2026-03-27 11:13:44,582: INFO/MainProcess] poly feature lookup 100.0% complete on aggregated_results_swy.shp
+[2026-03-27 11:13:44,582: INFO/MainProcess] build poly intersection lookup
+[2026-03-27 11:13:44,582: INFO/MainProcess] poly intersection feature lookup 100.0% complete on aggregated_results_swy.shp
+[2026-03-27 11:13:44,582: INFO/MainProcess] maximal subset build 100.0% complete on aggregated_results_swy.shp
+[2026-03-27 11:13:44,601: INFO/MainProcess] calculating stats on raster 0 of 1
+[2026-03-27 11:13:44,609: INFO/MainProcess] disjoint polygon set 1 of 1
+[2026-03-27 11:13:44,635: INFO/MainProcess] all done processing polygon sets for aggregated_results_swy.shp
+[2026-03-27 11:13:44,646: INFO/MainProcess] calculate L_sum
+[2026-03-27 11:13:45,079: INFO/MainProcess] Flow accum MFD 100.0% complete
+[2026-03-27 11:13:46,262: INFO/MainProcess]   (\w/)  SWY Complete!
+[2026-03-27 11:13:46,262: INFO/MainProcess]   (..  \ 
+[2026-03-27 11:13:46,262: INFO/MainProcess]  _/  )  \______
+[2026-03-27 11:13:46,262: INFO/MainProcess] (oo /'\        )`,
+[2026-03-27 11:13:46,262: INFO/MainProcess]  `--' (v  __( / ||
+[2026-03-27 11:13:46,262: INFO/MainProcess]        |||  ||| ||
+[2026-03-27 11:13:46,262: INFO/MainProcess]       //_| //_|
+[2026-03-27 11:13:59,650: INFO/MainProcess] Task workers.task_queue.run_tool_task[6554ed49-3b45-41f7-836c-e58d58764ca1] succeeded in 31.141716399986763s: None

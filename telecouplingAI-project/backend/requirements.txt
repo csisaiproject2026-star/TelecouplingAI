@@ -1,0 +1,30 @@
+# ============================================
+# CSIS Backend Python Dependencies
+# ============================================
+# NOTE: gdal, geopandas, rasterio, shapely, numpy, pandas,
+#       scikit-learn, matplotlib, networkx, natcap.invest,
+#       pygeoprocessing are installed via conda in the Dockerfile.
+#       Only pip-only packages are listed here.
+# ============================================
+
+# --- Web framework ---
+fastapi==0.128.0
+uvicorn[standard]==0.40.0
+python-multipart==0.0.21
+aiofiles>=23.0.0          # 23.x+ is the current stable series; 3.x was a pre-release scheme
+
+# --- Config ---
+pydantic-settings>=2.0.0
+
+# --- AI (Gemini) ---
+google-genai>=0.8.0
+
+# --- Task queue ---
+celery[redis]>=5.3.0
+redis>=5.0.0
+
+# --- Async HTTP (for file downloads etc.) ---
+aiohttp[speedups]>=3.9.0  # [speedups] pulls in propcache and other optional deps
+
+# --- Logging ---
+loguru>=0.7.0

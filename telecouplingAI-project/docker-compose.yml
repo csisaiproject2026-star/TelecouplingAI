@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  api-server:
+    build: ./backend
+    container_name: tele-backend
+    env_file: .env
+    volumes:
+      - ./data:/app/data
+      - ./datainput_for_demo:/data/datainput:ro
+      - ${SHARED_DIR:-/data/outputs}:/data/outputs
+      - ${UPLOADS_DIR:-/data/uploads}:/data/uploads
+      - ${MODEL_DATA_PATH:-/data/model_data}:/data/model_data:ro
+    ports:
+      - "8000:8000"
+    depends_on:
+      - redis
+    restart: always
+
+  celery-worker:
+    build: ./backend
+    command: conda run --no-capture-output -n TeleCouplingAI celery -A workers.task_queue worker --concurrency=2 --pool=prefork
+    env_file: .env
+    volumes:
+      - ./data:/app/data
+      - ./datainput_for_demo:/data/datainput:ro
+      - ${SHARED_DIR:-/data/outputs}:/data/outputs
+      - ${UPLOADS_DIR:-/data/uploads}:/data/uploads
+      - ${MODEL_DATA_PATH:-/data/model_data}:/data/model_data:ro
+    depends_on:
+      - redis
+    restart: always
+
+  redis:
+    image: redis:7.2-alpine
+    command: redis-server --maxmemory 2gb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    restart: always
+
+  frontend-ui:
+    build: ./frontend
+    container_name: tele-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - api-server
+    restart: always
+
+  file-server:
+    image: nginx:1.25-alpine
+    ports:
+      - "8001:80"
+    volumes:
+      - ${SHARED_DIR:-/data/outputs}:/usr/share/nginx/html/download:ro
+      - ./nginx/file-server.conf:/etc/nginx/nginx.conf:ro
+    restart: always

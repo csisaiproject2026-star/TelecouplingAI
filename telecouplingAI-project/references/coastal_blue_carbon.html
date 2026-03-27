@@ -1,0 +1,1234 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Coastal Blue Carbon &#8212; InVEST®  documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=d1e82800" />
+    <script src="_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="_static/doctools.js?v=9bcbadda"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Coastal Vulnerability Model" href="coastal_vulnerability.html" />
+    <link rel="prev" title="Carbon Storage and Sequestration" href="carbonstorage.html" />
+        
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz@8..60&display=swap" rel="stylesheet">
+        <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,700&display=swap" rel="stylesheet">
+        <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz@1,8..60&display=swap" rel="stylesheet">
+
+  </head><body>
+  <div class="document">
+    
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="index.html">
+              <img class="logo" src="_static/InVEST_logo_300x300.png" alt="Logo of InVEST®"/>
+            </a></p>
+<h1 class="logo"><a href="index.html">InVEST®</a></h1>
+
+
+
+
+
+
+<p>
+<iframe src="https://ghbtns.com/github-btn.html?user=natcap&repo=invest.users-guide&type=watch&count=true&size=large&v=2"
+  allowtransparency="true" frameborder="0" scrolling="0" width="200px" height="35px"></iframe>
+</p>
+
+
+
+
+
+
+  <div>
+    <h3><a href="index.html">Table of Contents</a></h3>
+    <ul>
+<li><a class="reference internal" href="#">Coastal Blue Carbon</a><ul>
+<li><a class="reference internal" href="#summary">Summary</a></li>
+<li><a class="reference internal" href="#introduction">Introduction</a></li>
+<li><a class="reference internal" href="#the-model">The Model</a><ul>
+<li><a class="reference internal" href="#modeling-considerations">Modeling Considerations</a></li>
+<li><a class="reference internal" href="#how-it-works">How it Works</a><ul>
+<li><a class="reference internal" href="#carbon-storage">Carbon Storage</a></li>
+<li><a class="reference internal" href="#carbon-accumulation">Carbon Accumulation</a></li>
+<li><a class="reference internal" href="#carbon-emissions">Carbon Emissions</a><ul>
+<li><a class="reference internal" href="#magnitude-and-timing-of-loss">Magnitude and Timing of Loss</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#valuation-of-net-sequestered-carbon">Valuation of Net Sequestered Carbon</a></li>
+<li><a class="reference internal" href="#identifying-lulc-transitions-with-the-preprocessor">Identifying LULC Transitions with the Preprocessor</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#limitations-and-simplifications">Limitations and Simplifications</a></li>
+<li><a class="reference internal" href="#data-needs-and-running-the-model">Data Needs and Running the Model</a><ul>
+<li><a class="reference internal" href="#step-1-preprocessing-coastal-blue-carbon-preprocessor">Step 1. Preprocessing - Coastal Blue Carbon Preprocessor</a><ul>
+<li><a class="reference internal" href="#inputs">Inputs</a></li>
+<li><a class="reference internal" href="#outputs">Outputs</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#step-2-the-main-model-coastal-blue-carbon">Step 2. The Main Model - Coastal Blue Carbon</a><ul>
+<li><a class="reference internal" href="#id2">Inputs</a></li>
+<li><a class="reference internal" href="#id3">Outputs</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#advanced-usage-spatially-explicit-biophysical-parameters">Advanced Usage: Spatially-explicit Biophysical Parameters</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#example-use-case">Example Use-Case</a><ul>
+<li><a class="reference internal" href="#freeport-texas">Freeport, Texas</a><ul>
+<li><a class="reference internal" href="#id4">Summary</a></li>
+<li><a class="reference internal" href="#limitations">Limitations</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#appendix-global-database-of-carbon-values">Appendix: Global Database of Carbon Values</a></li>
+<li><a class="reference internal" href="#references">References</a></li>
+</ul>
+</li>
+</ul>
+
+  </div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="coastal-blue-carbon">
+<span id="id1"></span><h1>Coastal Blue Carbon<a class="headerlink" href="#coastal-blue-carbon" title="Link to this heading">¶</a></h1>
+<section id="summary">
+<h2>Summary<a class="headerlink" href="#summary" title="Link to this heading">¶</a></h2>
+<p>Marine and terrestrial ecosystems help regulate Earth’s climate by adding and
+removing greenhouse gases (GHGs) such as carbon dioxide (CO<sub>2</sub>) to and
+from the atmosphere.  Coastal marshes, mangroves, and seagrasses, in
+particular, store large amounts of carbon in their sediments, leaves, and other
+forms of biomass.  In addition to storing carbon, marine ecosystems continually
+accumulate carbon in their sediments, creating large reservoirs of long-term
+sequestered carbon. By storing and sequestering carbon, marine ecosystems keep
+CO<sub>2</sub> out of the atmosphere where it would otherwise contribute to
+climate change.</p>
+<p>Management activities that change the cover of coastal vegetation, such as the
+restoration of seagrass beds and the clearing of mangrove forests, change the
+ability of coastal and marine areas to store and sequester carbon.</p>
+<p>The InVEST Coastal Blue Carbon model attempts to predict the amount of carbon
+stored and sequestered over a coastal zone at particular points in time due to
+changes in land cover. Using an estimate of the monetary social value, or where
+available, a market price for stored and sequestered carbon, the InVEST Coastal
+Blue Carbon model also quantifies the marginal value of storage and
+sequestration.</p>
+<p>Results of the InVEST Coastal Blue Carbon model can be used to compare current
+and future scenarios of carbon stock and net sequestration, as well as identify
+locations within the landscape where degradation of coastal ecosystems should
+be avoided and restoration of coastal ecosystems should be prioritized in order
+to preserve and enhance these carbon storage and sequestration services.</p>
+</section>
+<section id="introduction">
+<h2>Introduction<a class="headerlink" href="#introduction" title="Link to this heading">¶</a></h2>
+<p>This model makes use of a variety of information, including:</p>
+<ul class="simple">
+<li><p>The distribution and abundance of coastal vegetation</p></li>
+<li><p>Habitat-specific carbon stock data</p></li>
+<li><p>Impact characteristics of various land-cover disturbances to biomass and soil
+carbon stock pools to predict carbon emission rates</p></li>
+<li><p>Carbon accumulation rates to estimate carbon stock, net sequestration and
+value across a land or seascape</p></li>
+<li><p>Estimates of the monetary social value or market price of carbon</p></li>
+</ul>
+<p>To quantify the value of carbon storage and sequestration, the model focuses on
+changes in atmospheric carbon dioxide and other greenhouse gases as a result of
+changes caused by human activities that can affect marine ecosystems which
+store and sequester carbon.  Changes to the composition of the atmosphere have
+wide-ranging effects on natural systems that can result in changes to
+agricultural productivity, air quality, sea levels, and more.</p>
+</section>
+<section id="the-model">
+<h2>The Model<a class="headerlink" href="#the-model" title="Link to this heading">¶</a></h2>
+<section id="modeling-considerations">
+<h3>Modeling Considerations<a class="headerlink" href="#modeling-considerations" title="Link to this heading">¶</a></h3>
+<p>Mapping and modeling changes in carbon storage and sequestration for coastal
+and marine habitats can present challenges.  The types of spatial inputs and
+available information about the carbon cycle vary by location.  Some study
+areas have high-quality data available for a detailed analysis while other
+locations do not have the information necessary to model changes in the
+position and function of coastal vegetation.  Salt marsh, for example, is often
+studied in the context of migration due to sea-level rise.  The combination of
+natural (e.g. sea-level rise) and anthropogenic (e.g. salt marsh migration
+blocked by roads) factors should be included in scenario maps and subsequent
+carbon modeling where possible.  When exploring future land cover scenarios,
+land cover map outputs produced by the SLAMM model (Sea Level Affecting Marshes
+Model, developed by Warren Pinnacle) can be useful inputs to the InVEST Coastal
+Blue Carbon model (Clougheet et al. 2010).  However, because not all sites have
+the detailed elevation and habitat information required to run SLAMM, this
+InVEST model provides a flexible approach that allows users to provide either
+detailed land use/land cover maps or maps indicating the presence of coastal
+and marine vegetation that can sequester carbon.</p>
+</section>
+<section id="how-it-works">
+<h3>How it Works<a class="headerlink" href="#how-it-works" title="Link to this heading">¶</a></h3>
+<p>InVEST Coastal Blue Carbon models the carbon cycle through a bookkeeping-type
+approach (Houghton, 2003). This approach simplifies the carbon cycle by
+accounting for storage in three main pools (biomass, sediment carbon (i.e.
+soil), and standing dead carbon (i.e. litter) see Figure 1).  Accumulation of
+carbon in coastal habitats occurs primarily in sediments (Pendleton et al.,
+2012).  The model requires users to provide maps of coastal ecosystems that
+store carbon, such as mangroves and seagrasses.  Users must also provide data
+on the amount of carbon stored in the three carbon pools and the rate of annual
+carbon accumulation in the biomass and sediments. If local information is not
+available, users can draw upon the global database of values for carbon stocks
+and accumulation rates sourced from the peer-reviewed literature that is
+included in the model.  If data from field studies or other local sources are
+available, these values should be used instead of those in the global database.
+The model requires land cover maps, which represent changes in human use
+patterns in coastal areas or changes to sea level, to estimate the amount of
+carbon lost or gained over a specified period of time.  The model quantifies
+carbon storage across the land or seascape by summing the carbon stored in
+these three carbon pools.</p>
+<figure class="align-default">
+<img alt="_images/BlueCarbon_carbon_pools.png" src="_images/BlueCarbon_carbon_pools.png" />
+</figure>
+<p>Figure 1. Three carbon pools for marine ecosystems included in the InVEST blue carbon model - Biomass (aboveground + belowground), soil and litter.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Several parameters are shared across most of the equations in the model:</p>
+<ul class="simple">
+<li><p><span class="math notranslate nohighlight">\(t\)</span> is the timestep.  This model operates on an annual timescale, so
+<span class="math notranslate nohighlight">\(t\)</span> represents the year represented by the timestep.</p>
+<ul>
+<li><p><span class="math notranslate nohighlight">\(t_{baseline}\)</span> represents the year of the baseline landcover.</p></li>
+</ul>
+</li>
+<li><p><span class="math notranslate nohighlight">\(s\)</span> is the snapshot year.  This represents the year of any of
+the transition snapshots after the baseline year.</p></li>
+<li><p><span class="math notranslate nohighlight">\(p\)</span> represents the carbon pool, generally biomass or soil.  The litter
+pool is considered only in the carbon accumulation calculations and is not
+affected by emissions.</p></li>
+</ul>
+<p>The model considers each grid cell <span class="math notranslate nohighlight">\(x\)</span> independently, and has therefore
+been factored out of the equations described below.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Although this user’s guide chapter refers to units in Megatonnes of
+CO2-equivalent per hectare, the model does no conversion of units
+whatsoever, and so any units representing the habitat-specific rate of
+accumulation or emissions, so long as they are consistent across all
+model inputs, may be used.</p>
+</div>
+<section id="carbon-storage">
+<h4>Carbon Storage<a class="headerlink" href="#carbon-storage" title="Link to this heading">¶</a></h4>
+<p>Coastal blue carbon habitats can simply indicate the dominant vegetation type
+(e.g., eelgrass, mangrove, etc), or they can be based on details that affect
+pool storage values such as plant species, vegetation density, temperature
+regime, or vegetation age (e.g., time since restoration or last major
+disturbance).</p>
+<p>For the sake of the carbon storage estimation, each coastal blue carbon habitat
+is assumed to be in storage equilibrium at any point in time (accumulation of
+carbon will be accounted for in the sequestration component of the model).</p>
+<p>Carbon stocks <span class="math notranslate nohighlight">\(S\)</span> for a given year <span class="math notranslate nohighlight">\(t\)</span> and pool <span class="math notranslate nohighlight">\(p\)</span> are
+calculated by adding the net carbon sequestration for year <span class="math notranslate nohighlight">\(t\)</span> to the
+stocks available in the prior year <span class="math notranslate nohighlight">\(t-1\)</span>.  Or, alternatively, by using
+the initial stock values from the biophysical table,
+<span class="math notranslate nohighlight">\(S_{p,t_{baseline}}\)</span>.</p>
+<div class="math notranslate nohighlight" id="equation-cbc-stocks-pool">
+<span class="eqno">(6)<a class="headerlink" href="#equation-cbc-stocks-pool" title="Link to this equation">¶</a></span>\[\begin{split}S_{p,t} = \begin{Bmatrix}
+        S_{p,t-1} + N_{p,t} &amp; if &amp; t &gt; t_{baseline} \\
+        S_{p,t_{baseline}} &amp; if &amp; t = t_{baseline}
+\end{Bmatrix}\end{split}\]</div>
+<p>The carbon stocks for year <span class="math notranslate nohighlight">\(t\)</span> represent the carbon stocks at the very
+beginning of year <span class="math notranslate nohighlight">\(t\)</span>.</p>
+<p>Net sequestration <span class="math notranslate nohighlight">\(N_{p,t}\)</span> refers to the amount of carbon gained or lost
+within year <span class="math notranslate nohighlight">\(t\)</span>, and the state of the most recent transition determines
+whether carbon is accumulating (positive net sequestration) or emitting
+(negative net sequestration).  A single cell may <em>either</em> accumulate <em>or</em> emit
+carbon; it is not possible to do both within a single timestep.  In this way,
+the model assumes that a grid cell transitions completely from one habitat type
+to another during a transition event.  The nature of sequestration
+(accumulation or emission) will also remain consistent between
+transition years on a given pixel.</p>
+<p>Therefore, <span class="math notranslate nohighlight">\(N_{p,t}\)</span> will be equal to one of these equations,
+depending on the state of the most recent transition:</p>
+<div class="math notranslate nohighlight" id="equation-cbc-net-sequestration">
+<span class="eqno">(7)<a class="headerlink" href="#equation-cbc-net-sequestration" title="Link to this equation">¶</a></span>\[\begin{split}N_{p,t} = \begin{Bmatrix}
+        -1 \cdot E_{p,t} &amp; if &amp; carbon\ is\ emitting \\
+        A_{p,t} &amp; if &amp; carbon\ is\ accumulating
+\end{Bmatrix}\end{split}\]</div>
+<p>The rate of accumulation <span class="math notranslate nohighlight">\(A_{p,t}\)</span> is defined by the user in the
+biophysical table for each landcover classification.  When a landcover class
+transitions into an accumulation state, the rate of accumulation will reflect
+the destination landcover class.</p>
+<p>Note that emissions <span class="math notranslate nohighlight">\(E_{p,t}\)</span> is calculated as a positive value, and the
+<span class="math notranslate nohighlight">\(-1\)</span> is needed to reflect a loss of carbon from the pool.</p>
+<p>Note that the above only applies to the biomass and soil pools.  Litter stocks
+are not subject to emissions, and so may only accumulate linearly according to
+the rate defined by the user in the biophysical table:</p>
+<div class="math notranslate nohighlight" id="equation-cbc-stocks-litter">
+<span class="eqno">(8)<a class="headerlink" href="#equation-cbc-stocks-litter" title="Link to this equation">¶</a></span>\[S_{p_{litter},t} = S_{p_{litter},t_{baseline}} + (A_{p_{litter}} \cdot (t - t_{baseline}))\]</div>
+<p>Therefore, net sequestration for the litter pool, <span class="math notranslate nohighlight">\(N_{p_{litter},t}\)</span> is
+equivalent to <span class="math notranslate nohighlight">\(A_{p_{litter}}\)</span>, which is defined by the user in the
+biophysical table.  The rate of accumulation may change only when the landcover
+class transitions to another class.</p>
+<p>The model also calculates total stocks for each timestep year <span class="math notranslate nohighlight">\(t\)</span>:</p>
+<ul class="simple">
+<li><p>For the baseline year, total stock is simply the sum of all carbon stocks in all 3 pools, as defined by the user in the biohysical table:</p></li>
+</ul>
+<div class="math notranslate nohighlight" id="equation-cbc-stocks-total-base-year">
+<span class="eqno">(9)<a class="headerlink" href="#equation-cbc-stocks-total-base-year" title="Link to this equation">¶</a></span>\[S_{t,total} = S_{t,p_{soil}} + S_{t,p_{biomass}} + S_{t,p_{litter}}\]</div>
+<ul class="simple">
+<li><p>For each year between baseline+1 and the first snapshot transition, total stock is the stock from the previous year, plus accumulation:</p></li>
+</ul>
+<div class="math notranslate nohighlight" id="equation-cbc-stocks-total-pre-snapshot">
+<span class="eqno">(10)<a class="headerlink" href="#equation-cbc-stocks-total-pre-snapshot" title="Link to this equation">¶</a></span>\[S_{t,total} = S_{t-1} + A_{t-1-&gt;t}\]</div>
+<ul class="simple">
+<li><p>For years after the first snapshot transition, total stock is the stock from the previous year, plus accumulation during that year, minus emissions during that year caused by disturbance during the transition:</p></li>
+</ul>
+<div class="math notranslate nohighlight" id="equation-cbc-stocks-total-post-snapshot">
+<span class="eqno">(11)<a class="headerlink" href="#equation-cbc-stocks-total-post-snapshot" title="Link to this equation">¶</a></span>\[S_{t,total} = S_{t-1} + A_{t-1-&gt;t} + E_{t-1-&gt;t}\]</div>
+<p>In practice, if accumulation or emission happens, for example, in the year 2030, they will start appearing in the carbon stock output in year 2031, not 2030, after there has been a year for carbon to be accumulated or emitted.</p>
+</section>
+<section id="carbon-accumulation">
+<h4>Carbon Accumulation<a class="headerlink" href="#carbon-accumulation" title="Link to this heading">¶</a></h4>
+<p>We model accumulation as the rate of carbon retained in the soil in organic
+form after the first year of decomposition. In relation to the annual ecosystem
+budget, this pool has not been remineralized, so it represents net
+accumulation. This carbon is usually derived from belowground production, and
+residence time can range from decades to millennia (Romero et al. 1994, Mateo
+et al. 1997). This accumulation contributes to the development of carbon
+“reservoirs” which are considered virtually permanent unless disturbed. Thus,
+even in the absence of a land-use or land-cover change, carbon continues to be
+sequestered naturally.</p>
+<p>Loss of carbon from the soil pool (sediments) upon disturbance is more nuanced
+than sequestration because different types of human uses and/or stasis may
+cause varied disruption of the soils and the carbon stored below.  For example,
+high impact activities such as the clearing of mangroves for a shrimp pond or
+sediment dredging may result in a larger soil carbon disturbance than other
+activities such as commercial fishing or oil exploration.  The impacts from
+coastal development on carbon storage vary since some types of development may
+involve paving over the soil, which often keeps a large percentage of the
+carbon stored intact.  Alternatively, dredging could remove seagrasses and
+disturb the sediments below, releasing carbon into the atmosphere.</p>
+</section>
+<section id="carbon-emissions">
+<h4>Carbon Emissions<a class="headerlink" href="#carbon-emissions" title="Link to this heading">¶</a></h4>
+<p>When coastal ecosystems are degraded by human activities, the carbon stored in
+the living plant material (above and below the ground) and the soil may be
+emitted to the atmosphere. The magnitude of post-conversion CO<sub>2</sub>
+release depends on the type of vegetation disturbed and the level of
+disturbance. The type of disturbance will determine the amount of aboveground
+biomass loss and depth to which the soil profile will be altered. The deeper
+the effects of the disturbance, the more soil carbon that will be exposed to
+oxygen, oxidized and consequently emitted in the form of CO<sub>2</sub>. Some
+disturbances will only disturb the top soil layers while the deeper layers
+remain inundated and their carbon intact.  Other disturbances may affect
+several meters of the soil profile. To estimate the extent of the impact of
+various disturbances, we classify disturbances into three categories of impact:
+high, medium and low.  Examples of high impact disturbances include mangrove
+conversion to shrimp farms and draining or diking salt marshes for conversion
+to agriculture.  Low impact disturbance examples include recreational boating
+or float home marinas.</p>
+<p>Carbon emissions begin in a snapshot year where the landcover classification
+underlying grid cell <span class="math notranslate nohighlight">\(x\)</span> transitions into a state of low-, med-, or
+high-impact disturbance.  In subsequent years, emissions continue until either
+grid cell <span class="math notranslate nohighlight">\(x\)</span> experiences another transition, or else the analysis year
+is reached.</p>
+<p>The model uses an exponential decay function based on the user-defined
+half-life <span class="math notranslate nohighlight">\(H_{p}\)</span> of the carbon pool in question, as well as the volume of
+disturbed carbon. In this case, <span class="math notranslate nohighlight">\(s\)</span> represents the year of the transition, and
+<span class="math notranslate nohighlight">\(E_{p,t}\)</span> is the volume of carbon emitted from pool <span class="math notranslate nohighlight">\(p\)</span> in year <span class="math notranslate nohighlight">\(t\)</span>.</p>
+<div class="math notranslate nohighlight" id="equation-cbc-emissions">
+<span class="eqno">(12)<a class="headerlink" href="#equation-cbc-emissions" title="Link to this equation">¶</a></span>\[E_{p,t} = D_{p,s} \cdot ({ 0.5 }^{ \frac { t-(s+1) }{ H_{p,s} } } - { 0.5 }^{ \frac { t-s }{ H_{p,s} } })\]</div>
+<p>The volume of disturbed carbon <span class="math notranslate nohighlight">\(D_{p,s}\)</span> represents the total volume of
+carbon that will be released over time from the transition taking place on grid
+cell <span class="math notranslate nohighlight">\(x\)</span> in transition year <span class="math notranslate nohighlight">\(s\)</span> as time <span class="math notranslate nohighlight">\(t \rightarrow
+\infty\)</span>.  This quantity is determined by the magnitude of the disturbance
+<span class="math notranslate nohighlight">\(M_{p,s}\)</span> (low- med- or high-impact), the stocks <span class="math notranslate nohighlight">\(S\)</span> present at the
+beginning of year <span class="math notranslate nohighlight">\(s\)</span>, and the landcover transition undergone in year
+<span class="math notranslate nohighlight">\(s\)</span>:</p>
+<div class="math notranslate nohighlight" id="equation-cbc-disturbance-volume">
+<span class="eqno">(13)<a class="headerlink" href="#equation-cbc-disturbance-volume" title="Link to this equation">¶</a></span>\[D_{p,s} = S_{p,s} \cdot M_{p,s}\]</div>
+<p>The magnitude of the disturbance is determined by the transition matrix (low-,
+med-, or high-impact), and specified as a percentage of carbon disturbed in the
+Biophysical Table.  When a landcover classification undergoes a transition into
+a state of emission, the disturbance magnitude will be taken from the source
+landcover class.</p>
+<section id="magnitude-and-timing-of-loss">
+<h5>Magnitude and Timing of Loss<a class="headerlink" href="#magnitude-and-timing-of-loss" title="Link to this heading">¶</a></h5>
+<p>We model the release of carbon from the biomass and soil pools by estimating
+the fraction of carbon lost from each pool’s total stock at the time of
+disturbance.  The fraction of carbon lost is determined by the original coastal
+blue carbon habitat and the level of impact resulting from the disturbance (see
+Table 1).</p>
+<p>The InVEST Coastal Blue Carbon model allows users to provide details on the
+level of disturbance that occurs during a transition from a coastal blue carbon
+habitat to a non-coastal blue carbon habitat.  This information can be provided
+to the model through a preprocessor tool and further clarified with an input
+transition table.</p>
+<p>In general, carbon stock pools emit carbon at different rates: most emissions
+from the biomass pool take place within the first year, whereas emissions from
+the soil pool may take much longer. The model assigns exponential decay
+functions and half-life values to the biomass and soil carbon pools of each
+habitat type (Table 1; Murray et al. 2011).</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p><strong>Rank</strong></p></th>
+<th class="head"><p>Salt marshes</p></th>
+<th class="head"><p>Mangroves</p></th>
+<th class="head"><p>Seagrasses</p></th>
+<th class="head"><p>Other vegetation</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><strong>% carbon loss from biomass</strong></p></td>
+<td><div class="line-block">
+<div class="line">LI/MI: 50% biomass loss (1)</div>
+<div class="line">HI: 100% biomass loss</div>
+</div>
+</td>
+<td><div class="line-block">
+<div class="line">LI/MI: 50% biomass loss (1)</div>
+<div class="line">HI: 100% biomass loss</div>
+</div>
+</td>
+<td><div class="line-block">
+<div class="line">LI/MI: 50% biomass loss (1)</div>
+<div class="line">HI: 100% biomass loss</div>
+</div>
+</td>
+<td><p>Use literature/field data</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>% carbon loss from soil</strong></p></td>
+<td><div class="line-block">
+<div class="line">LI: 30% loss (1)</div>
+<div class="line">MI/HI: 100% loss (3)</div>
+</div>
+</td>
+<td><div class="line-block">
+<div class="line">LI: 30% loss (1)</div>
+<div class="line">MI: 50% loss (1)</div>
+<div class="line">HI: 66% loss (up to 1.5 m depth) (1)</div>
+</div>
+</td>
+<td><div class="line-block">
+<div class="line">LI/MI: top 10% washes away, bottom 90% decomposes in place (2)</div>
+<div class="line">HI: top 50% washes away, bottom 50% decomposes in place (2)</div>
+</div>
+</td>
+<td><p>Use literature/field data</p></td>
+</tr>
+<tr class="row-even"><td><p><strong>Rate of decay (over 25 years)</strong></p></td>
+<td><div class="line-block">
+<div class="line">Biomass half-life: 6 months (2)</div>
+<div class="line">Soil half-life: 7.5 years (2)</div>
+</div>
+</td>
+<td><div class="line-block">
+<div class="line">Biomass half-life: 15 years, but assume 75% is released immediately from burning</div>
+<div class="line">Soil half-life 7.5 years (2)</div>
+</div>
+</td>
+<td><div class="line-block">
+<div class="line">Biomass half-life: 100 days (2)</div>
+<div class="line">Soil half-life: 1 year (2)</div>
+</div>
+</td>
+<td><p>Use literature/field data</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>Methane emissions</strong></p></td>
+<td><p>1.85 T CO2/ha/yr (4)</p></td>
+<td><p>0.4 T CO2/ha/yr</p></td>
+<td><p>Negligible</p></td>
+<td><p>Use literature/field data</p></td>
+</tr>
+</tbody>
+</table>
+<p>Table 1: Percent carbon loss and habitat-specific decay rates as a result of <strong>low (LI), medium (MI) and high (HI) impact</strong> activities disturbing salt marsh, mangrove, and seagrass ecosystems.  These default values can be adjusted by modifying the input CSV tables.</p>
+<p>References (numbers in parentheses above):</p>
+<ol class="arabic simple">
+<li><p>Donato, D. C., Kauffman, J. B., Murdiyarso, D., Kurnianto, S., Stidham, M., &amp; Kanninen, M. (2011). Mangroves among the most carbon-rich forests in the tropics. Nature Geoscience, 4(5), 293-297.</p></li>
+<li><p>Murray, B. C., Pendleton, L., Jenkins, W. A., &amp; Sifleet, S. (2011). Green payments for blue carbon: Economic incentives for protecting threatened coastal habitats. Nicholas Institute for Environmental Policy Solutions, Report NI, 11, 04.</p></li>
+<li><p>Crooks, S., Herr, D., Tamelander, J., Laffoley, D., &amp; Vandever, J. (2011). Mitigating climate change through restoration and management of coastal wetlands and near-shore marine ecosystems: challenges and opportunities. Environment Department Paper, 121, 2011-009.</p></li>
+<li><p>Krithika, K., Purvaja, R., &amp; Ramesh, R. (2008). Fluxes of methane and nitrous oxide from an Indian mangrove. Current Science (00113891), 94(2).</p></li>
+</ol>
+</section>
+</section>
+<section id="valuation-of-net-sequestered-carbon">
+<h4>Valuation of Net Sequestered Carbon<a class="headerlink" href="#valuation-of-net-sequestered-carbon" title="Link to this heading">¶</a></h4>
+<p>The valuation option for the blue carbon model estimates the economic value of
+sequestration (not storage) as a function of the amount of carbon sequestered,
+the monetary value of each ton of sequestered carbon, a discount rate, and the
+change in the value of carbon sequestration over time. The value of sequestered
+carbon is dependent on who is making the decision to change carbon emissions
+and falls into two categories: social and private. If changes in carbon
+emissions are due to public policy, such as zoning coastal areas for
+development, then decision-makers should weigh the benefits of development
+against the social losses from carbon emissions. Because local carbon emissions
+affect the atmosphere on a global scale, the social cost of carbon (SCC) is
+commonly calculated at a global scale (USIWGSCC, 2010). Efforts to calculate
+the social cost of carbon have relied on multiple integrated assessment models
+such as FUND (<a class="reference external" href="http://www.fund-model.org/">http://www.fund-model.org/</a>), PAGE (Hope, 2011), DICE and RICE
+(<a class="reference external" href="https://sites.google.com/site/williamdnordhaus/dice-rice">https://sites.google.com/site/williamdnordhaus/dice-rice</a>). The US Interagency
+Working Group on the Social Cost of Carbon has synthesized the results of some
+of these models and gives guidance for the appropriate SCC through time for
+three different discount rates (USIWGSCC, 2010; 2013). If your research
+questions lead you to a social cost of carbon approach, it is strongly
+recommended to consult this guidance. The most relevant considerations for
+applying SCC valuation based on the USIWGSCC approach in InVEST are the
+following:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>The discount rate that you choose for your application must be one of the
+three options in the report (2.5%, 3%, or 5%). In the context of policy
+analysis, discount rates reflect society’s time preferences. For a primer on
+social discount rates, see Baumol (1968).</p></li>
+<li><p>Since the damages incurred from carbon emissions occur beyond the date of
+their initial release into the atmosphere, the damages from emissions in any
+one period are the sum of future damages, discounted back to that point. For
+example, to calculate the SCC for emissions in 2030, the present value (in
+2030) of the sum of future damages (2030 onward) is needed. This means that
+the SCC in any future period is a function of the discount rate, and
+therefore, a consistent discount rate should be used throughout the
+analysis. There are different SCC schedules (price list) for different
+discount rates. Your choice of an appropriate discount rate for your context
+will, therefore, determine the appropriate SCC schedule choice.</p></li>
+</ul>
+</div></blockquote>
+<p>An alternative to SCC is the market value of carbon credits approach. If the
+decision-maker is a private entity, such as an individual or a corporation,
+they may be able to monetize their land use decisions via carbon credits.
+Markets for carbon are currently operating across several geographies and new
+markets are taking hold in Australia, California, and Quebec (World Bank,
+2012). These markets set a cap on total emissions of carbon and require that
+emitters purchase carbon credits to offset any emissions. Conservation efforts
+that increase sequestration can be leveraged as a means to offset carbon
+emissions and therefore sequestered carbon can potentially be monetized at the
+price established in a carbon credit market. The means for monetizing carbon
+offsets depends critically on the specific rules of each market, and therefore
+it is important to determine whether or not your research context allows for
+the sale of sequestration credits into a carbon market. It is also important to
+note that the idiosyncrasies of market design drive carbon credit prices
+observed in the market and therefore prices do not necessarily reflect the
+social damages from carbon.</p>
+<p>For further detail and discussion on the Social Cost of Carbon,
+refer to <a class="reference external" href="https://www.carbonbrief.org/qa-social-cost-carbon">https://www.carbonbrief.org/qa-social-cost-carbon</a>.</p>
+<p>Net present value <span class="math notranslate nohighlight">\(V\)</span> is calculated for each snapshot year <span class="math notranslate nohighlight">\(s\)</span>
+after the baseline year, extending out to the final analysis year.</p>
+<div class="math notranslate nohighlight" id="equation-cbc-net-present-value">
+<span class="eqno">(14)<a class="headerlink" href="#equation-cbc-net-present-value" title="Link to this equation">¶</a></span>\[V = \sum_{t=0}^{T} \frac{p_t (S_t - S_{t-1})}{(1+d)^t}\]</div>
+<p>where</p>
+<blockquote>
+<div><ul class="simple">
+<li><p><span class="math notranslate nohighlight">\(V\)</span> is the net present value of carbon sequestration</p></li>
+<li><p><span class="math notranslate nohighlight">\(T\)</span> is the number of years between <span class="math notranslate nohighlight">\(t_{baseline}\)</span> and the
+snapshot year <span class="math notranslate nohighlight">\(s\)</span>.  If an analysis year is provided beyond the final
+snapshot year, this will be used in addition to the snapshot years.</p></li>
+<li><p><span class="math notranslate nohighlight">\(p_t\)</span> is the price per ton of carbon at timestep <span class="math notranslate nohighlight">\(t\)</span></p></li>
+<li><p><span class="math notranslate nohighlight">\(S_t\)</span> represents the total carbon stock at timestep <span class="math notranslate nohighlight">\(t\)</span>, summed
+across the soil and biomass pools.</p></li>
+<li><p><span class="math notranslate nohighlight">\(d\)</span> is the discount rate</p></li>
+</ul>
+</div></blockquote>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The most recent carbon price table used for federal policy making in the
+United States can be found at <a class="reference external" href="https://www.epa.gov/sites/production/files/2016-12/documents/sc_co2_tsd_august_2016.pdf">https://www.epa.gov/sites/production/files/2016-12/documents/sc_co2_tsd_august_2016.pdf</a>.
+For a discussion on why these methods are currently used in the US
+and what has happened since 2016, see the discussion at
+<a class="reference external" href="https://www.gao.gov/assets/710/707776.pdf">https://www.gao.gov/assets/710/707776.pdf</a>.</p>
+<p>The sample price tables that come with the latest version of InVEST
+are based on 2016 carbon price estimates from the US Environmental
+Protection Agency from the 2016 publication linked above.  These tables
+are in USD from the year 2007, which is consistent with USIWGSCC estimates.</p>
+<p>Any currency may be used.</p>
+</div>
+</section>
+<section id="identifying-lulc-transitions-with-the-preprocessor">
+<h4>Identifying LULC Transitions with the Preprocessor<a class="headerlink" href="#identifying-lulc-transitions-with-the-preprocessor" title="Link to this heading">¶</a></h4>
+<p>The land use / land cover (LULC) maps provide snapshots of a changing landscape
+and are the inputs that drive carbon accumulation and emissions in the model.
+The user must first produce a set of coastal and marine habitat maps via a land
+change model (e.g., SLAMM), a scenario assessment tool, or manual GIS
+processing.  The user must then input the LULC maps into the model with an
+associated year so that the appropriate source and destination transitions may
+be determined.</p>
+<p>The preprocessor tool compares LULC classes across the maps to identify the set
+of all LULC transitions that occur.  The tool then generates a
+transition matrix that indicates whether a transition occurs between two
+habitats (e.g. salt marsh to developed dry land) and whether carbon
+accumulates, is disturbed, or remains unchanged once that transition occurs.
+The nature of carbon accumulation or disturbance is determined according to whether
+the landcover is transitioning to and/or from a coastal blue carbon habitat:</p>
+<ul class="simple">
+<li><p>Other LULC Class <span class="math notranslate nohighlight">\(\Rightarrow\)</span> Coastal Blue Carbon Habitat (<em>Carbon Accumulation</em> in Succeeding Years of Transition Event Until Next Bounding Year)</p></li>
+<li><p>Coastal Blue Carbon Habitat <span class="math notranslate nohighlight">\(\Rightarrow\)</span> Coastal Blue Carbon Habitat (<em>Carbon Accumulation</em> in Succeeding Years of Transition Event Until Next Bounding Year)</p></li>
+<li><p>Coastal Blue Carbon Habitat <span class="math notranslate nohighlight">\(\Rightarrow\)</span> Other LULC Class (<em>Carbon Disturbance</em> in Succeeding Years of Transition Event Until End of Time Series Forecast)</p></li>
+<li><p>Other LULC Class <span class="math notranslate nohighlight">\(\Rightarrow\)</span> Other LULC Class (<em>No Carbon Change</em> in Succeeding Years of Transition Event Until Next Bounding Year)</p></li>
+</ul>
+<p>This transition matrix produced by the coastal blue carbon preprocessor, and
+<strong>subsequently edited by the user</strong>, allows the model to identify where human
+activities and natural events disturb carbon stored by vegetation.   If a
+transition from one LULC class to another does not occur during any of the time
+steps, the cell will be left blank.  For cells in the matrix where transitions
+occur, the tool will populate a cell with ‘accum’ in the cases where a
+non-coastal blue carbon habitat transitions to a coastal blue carbon habitat or
+a coastal blue carbon habitat transitions to another coastal blue carbon
+habitat, ‘disturb’ in the case where a coastal blue carbon habitat transitions
+to a non-coastal blue carbon habitat, or ‘NCC’ (for “no carbon change”) in the
+case where a non-coastal blue carbon habitat transitions to another non-coastal
+blue carbon habitat.  For example, if a salt marsh pixel in <span class="math notranslate nohighlight">\(s_{0}\)</span> is
+converted to developed dry land in <span class="math notranslate nohighlight">\(s_{1}\)</span> then the cell will be
+populated with ‘disturb’.  On the other hand, if a mangrove remains a mangrove
+over this same time period then this cell in the matrix will be populated with
+‘accum’.  It is likely that a mangrove that remains a mangrove will accumulate
+carbon in its soil and biomass.</p>
+<p>The user will then need to modify the ‘disturb’ cells with either
+‘low-impact-disturb’, ‘med-impact-disturb’ or ‘high-impact-disturb’ depending
+on the level of disturbance that occurs as the transition occurs between LULC
+types. This gives the user more fine-grained control over emissions due to
+disturbance.   For example, rather than provide only one development type in an
+LULC map, a user can separate out the type into two development types and
+update the transition matrix accordingly so that the model can more accurately
+quantify and map changes in carbon as a result of natural and anthropogenic
+factors.  Similarly, different species of mangroves may accumulate soil carbon
+at different rates.  If this information is known, it can improve the accuracy
+of the model to provide this species distinction (two different classes in the
+LULC input maps) and then the associated accumulation rates in the Biophysical
+Table.</p>
+</section>
+</section>
+</section>
+<section id="limitations-and-simplifications">
+<h2>Limitations and Simplifications<a class="headerlink" href="#limitations-and-simplifications" title="Link to this heading">¶</a></h2>
+<p>In the absence of detailed knowledge on the dynamics of the carbon cycle in
+coastal and marine systems, we take the simplest accounting approach and draw
+on published carbon stock datasets from neighboring coastlines.  We use carbon
+estimates from the most extensive and up-to-date published global datasets of
+carbon storage and accumulation rates (e.g., Fourqurean et al. 2012 &amp; Silfeet
+et al. 2011).</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>We assume all meaningful storage, accumulation and emission in case of
+impact occurs in the biomass and soil pools.</p></li>
+<li><p>We ignore increases in stock and accumulation with growth and aging of
+habitats.</p></li>
+<li><p>We assume that carbon is stored and accumulated linearly through time
+between transitions.</p></li>
+<li><p>We assume that, after a disturbance event occurs, the disturbed carbon is
+emitted over time at an exponential decay rate.</p></li>
+<li><p>We assume that some human activities that may degrade coastal ecosystems do
+not disturb carbon in the sediments.</p></li>
+<li><p>We assume that landcover transitions happen instantaneously and completely
+in the first moment of the year in which the transition occurs.</p></li>
+</ul>
+</div></blockquote>
+</section>
+<section id="data-needs-and-running-the-model">
+<h2>Data Needs and Running the Model<a class="headerlink" href="#data-needs-and-running-the-model" title="Link to this heading">¶</a></h2>
+<p>Because the Coastal Blue Carbon model relies upon the specific transitions from
+one landcover to another, an optional preprocessor has been provided to make it
+easier to identify the landcover transitions that take place on the lanscape
+and the nature of those transitions. The outputs of this preprocessor, if
+used, must then be edited by the user to indicate the magnitude of disturbances
+before being used as an input to the main model. The inputs for both the
+preprocessor and the main model are described here.</p>
+<section id="step-1-preprocessing-coastal-blue-carbon-preprocessor">
+<h3>Step 1. Preprocessing - Coastal Blue Carbon Preprocessor<a class="headerlink" href="#step-1-preprocessing-coastal-blue-carbon-preprocessor" title="Link to this heading">¶</a></h3>
+<p>The preprocessor tool compares LULC classes across snapshot years in
+chronological order to identify the set of all LULC transitions that occur.
+From this set, the preprocessor generates a transition matrix that indicates
+whether a transition occurs between two habitats (e.g. salt marsh to developed
+dry land) and whether carbon accumulates, is disturbed, or remains unchanged
+once that transition occurs. It also produces a template biophysical table for
+the user to fill in with information quantifying carbon change due to LULC
+transitions. This table must be further edited by the user, and the edited
+table is a required input to the main Coastal Blue Carbon model. See the
+<em>Identifying LULC Transitions with the Preprocessor</em> section above for more
+information.</p>
+<section id="inputs">
+<h4>Inputs<a class="headerlink" href="#inputs" title="Link to this heading">¶</a></h4>
+<ul>
+<li><p><span class="target" id="workspace-dir"></span><p><strong>workspace</strong> (<a class="reference external" href="input_types.html#directory">directory</a>, <em>required</em>): The folder where all the model’s output files will be written. If this folder does not exist, it will be created. If data already exists in the folder, it will be overwritten.</p>
+</p></li>
+<li><p><span class="target" id="results-suffix"></span><p><strong>file suffix</strong> (<a class="reference external" href="input_types.html#text">text</a>, <em>optional</em>): Suffix that will be appended to all output file names. Useful to differentiate between model runs.</p>
+</p></li>
+<li><p><span class="target" id="landcover-snapshot-csv"></span><p><strong>LULC snapshots table</strong> (<a class="reference external" href="input_types.html#csv">CSV</a>, <em>required</em>): A table mapping snapshot years to corresponding LULC maps for each year.</p>
+</p>
+<p>Columns:</p>
+<ul class="simple">
+<li><p><span class="target" id="landcover-snapshot-csv-columns-snapshot-year"></span><p><strong>snapshot_year</strong> (<a class="reference external" href="input_types.html#integer">integer</a>, <em>required</em>): Year to snapshot.</p>
+</p></li>
+<li><p><span class="target" id="landcover-snapshot-csv-columns-raster-path"></span><p><strong>raster_path</strong> (<a class="reference external" href="input_types.html#raster">raster</a>, <em>required</em>): Map of LULC in the snapshot year. All values in this raster must have corresponding entries in the LULC Lookup table.</p>
+ The paths may be either absolute or relative to the location of the snapshots table itself.</p></li>
+</ul>
+</li>
+<li><p><span class="target" id="lulc-lookup-table-path"></span><p><strong>LULC lookup table</strong> (<a class="reference external" href="input_types.html#csv">CSV</a>, <em>required</em>): A table mapping LULC codes from the snapshot rasters to the corresponding LULC class names, and whether or not the class is a coastal blue carbon habitat.</p>
+</p>
+<p>Columns:</p>
+<ul class="simple">
+<li><p><span class="target" id="lulc-lookup-table-path-columns-lucode"></span><p><strong>lucode</strong> (<a class="reference external" href="input_types.html#integer">integer</a>, <em>required</em>): LULC code. Every value in the snapshot LULC maps must have a corresponding entry in this column.</p>
+</p></li>
+<li><p><span class="target" id="lulc-lookup-table-path-columns-lulc-class"></span><p><strong>lulc-class</strong> (<a class="reference external" href="input_types.html#text">text</a>, <em>required</em>): Name of the LULC class.</p>
+</p></li>
+<li><p><span class="target" id="lulc-lookup-table-path-columns-is-coastal-blue-carbon-habitat"></span><p><strong>is_coastal_blue_carbon_habitat</strong> (<a class="reference external" href="input_types.html#truefalse">true/false</a>): Enter TRUE if this LULC class is a coastal blue carbon habitat, FALSE if not.</p>
+</p></li>
+</ul>
+</li>
+</ul>
+</section>
+<section id="outputs">
+<h4>Outputs<a class="headerlink" href="#outputs" title="Link to this heading">¶</a></h4>
+<p>Output files for the preprocessor are located in the folder
+<strong>Workspace/outputs_preprocessor</strong>. “Suffix” in the following file names refers
+to the optional user-defined Suffix input to the model.</p>
+<ul class="simple">
+<li><p><strong>Parameter log</strong>: Each time the model is run, a text (.txt) file will be
+created in the main Workspace folder. The file will list the parameter values
+and output messages for that run and will be named according to the service,
+the date and time. When contacting NatCap about errors in a model run, please
+include this parameter log.</p></li>
+<li><p><strong>transitions_[Suffix].csv</strong>: CSV (.csv, Comma Separated Value) format table,
+which is a transition matrix indicating whether disturbance or accumulation
+occurs in a transition from one LULC class to another.  If the cell is left
+blank, then no transition of that kind occurs between the input Land Use/Land
+Cover Rasters.  The left-most column (<em>lulc-class</em>) represents the source
+LULC class, and the top row (&lt;lulc1&gt;, &lt;lulc2&gt;…) represents the destination
+LULC classes. Depending on the transition type, a cell will be pre-populated
+with one of the following: empty if no such transition occurs, ‘NCC’ (for no
+carbon change), ‘accum’ (for accumulation) or ‘disturb’ (for disturbance).
+You must edit the ‘disturb’ cells with the degree to which disturbance occurs
+due to the LULC change.  This is done by changing ‘disturb’ to either
+‘low-impact-disturb’, ‘med-impact-disturb’, or ‘high-impact-disturb’.</p></li>
+</ul>
+<blockquote>
+<div><p>The edited table is used as input to the main Coastal Blue Carbon model as the
+<strong>LULC Transition Effect of Carbon Table</strong>.</p>
+<blockquote>
+<div><table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>lulc-class</p></th>
+<th class="head"><p>&lt;lulc1&gt;</p></th>
+<th class="head"><p>&lt;lulc2&gt;</p></th>
+<th class="head"><p>…</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>&lt;lulc1&gt;</p></td>
+<td><p>&lt;string&gt;</p></td>
+<td><p>&lt;string&gt;</p></td>
+<td><p>…</p></td>
+</tr>
+<tr class="row-odd"><td><p>&lt;lulc2&gt;</p></td>
+<td><p>&lt;string&gt;</p></td>
+<td><p>&lt;string&gt;</p></td>
+<td><p>…</p></td>
+</tr>
+<tr class="row-even"><td><p>…</p></td>
+<td><p>…</p></td>
+<td><p>…</p></td>
+<td><p>…</p></td>
+</tr>
+</tbody>
+</table>
+</div></blockquote>
+</div></blockquote>
+<ul class="simple">
+<li><p><strong>carbon_pool_transient_template_[Suffix].csv</strong>: CSV (.csv, Comma Separated
+Value) format table, mapping each LULC type to impact and accumulation
+information. You must fill in all columns of this table except the
+‘lulc-class’ and ‘lucode’ columns, which will be pre-populated by the model.
+See <em>Step 2. The Main Model</em> for more information. Accumulation units are
+(Megatonnes of CO<sub>2</sub> e/ha-yr), half-life is in integer years, and
+disturbance is in integer percent.</p></li>
+</ul>
+<blockquote>
+<div><p>The edited table is used as input to the main Coastal Blue Carbon model as the <strong>Biophysical Table</strong>.</p>
+<blockquote>
+<div><table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>lucode</p></th>
+<th class="head"><p>lulc-class</p></th>
+<th class="head"><p>biomass-initial</p></th>
+<th class="head"><p>soil-initial</p></th>
+<th class="head"><p>litter-initial</p></th>
+<th class="head"><p>biomass-half-life</p></th>
+<th class="head"><p>biomass-low-impact-disturb</p></th>
+<th class="head"><p>biomass-med-impact-disturb</p></th>
+<th class="head"><p>biomass-high-impact-disturb</p></th>
+<th class="head"><p>biomass-yearly-accumulation</p></th>
+<th class="head"><p>soil-half-life</p></th>
+<th class="head"><p>soil-low-impact-disturb</p></th>
+<th class="head"><p>soil-med-impact-disturb</p></th>
+<th class="head"><p>soil-high-impact-disturb</p></th>
+<th class="head"><p>soil-yearly-accumulation</p></th>
+<th class="head"><p>litter-yearly-accumulation</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>&lt;int&gt;</p></td>
+<td><p>&lt;lulc1&gt;</p></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr class="row-odd"><td><p>&lt;int&gt;</p></td>
+<td><p>&lt;lulc2&gt;</p></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr class="row-even"><td><p>…</p></td>
+<td><p>…</p></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+</div></blockquote>
+</div></blockquote>
+<ul class="simple">
+<li><p><strong>aligned_lulc_[year]_[Suffix].tif</strong>: Rasters that are the result of aligning
+all of the input LULC rasters with each other.  All rasters are resampled to
+the minimum resolution of the input rasters and cropped to the intersection
+of their bounding boxes.  Any resampling needed is done using
+nearest-neighbor interpolation.  You generally don’t need to do anything with
+these files.</p></li>
+</ul>
+</section>
+</section>
+<section id="step-2-the-main-model-coastal-blue-carbon">
+<h3>Step 2. The Main Model - Coastal Blue Carbon<a class="headerlink" href="#step-2-the-main-model-coastal-blue-carbon" title="Link to this heading">¶</a></h3>
+<p>The main Coastal Blue Carbon model calculates carbon stock and sequestration
+over time, based on the transition and carbon pool information generated by the
+preprocessor and edited by the user. It can also calculate the value of
+sequestration if economic data is provided.</p>
+<section id="id2">
+<h4>Inputs<a class="headerlink" href="#id2" title="Link to this heading">¶</a></h4>
+<ul>
+<li><p><span class="target" id="workspace-dir"></span><p><strong>workspace</strong> (<a class="reference external" href="input_types.html#directory">directory</a>, <em>required</em>): The folder where all the model’s output files will be written. If this folder does not exist, it will be created. If data already exists in the folder, it will be overwritten.</p>
+</p></li>
+<li><p><span class="target" id="results-suffix"></span><p><strong>file suffix</strong> (<a class="reference external" href="input_types.html#text">text</a>, <em>optional</em>): Suffix that will be appended to all output file names. Useful to differentiate between model runs.</p>
+</p></li>
+<li><p><span class="target" id="biophysical-table-path"></span><p><strong>biophysical table</strong> (<a class="reference external" href="input_types.html#csv">CSV</a>, <em>required</em>): Table of biophysical properties for each LULC class.</p>
+ A template of this table is produced by
+the preprocessor (described above), and is also included with the sample data for the model.</p>
+<p>Columns:</p>
+<ul class="simple">
+<li><p><span class="target" id="biophysical-table-path-columns-lucode"></span><p><strong>lucode</strong> (<a class="reference external" href="input_types.html#integer">integer</a>, <em>required</em>): The LULC code that represents this LULC class in the LULC snapshot rasters.</p>
+</p></li>
+<li><p><span class="target" id="biophysical-table-path-columns-lulc-class"></span><p><strong>lulc-class</strong> (<a class="reference external" href="input_types.html#text">text</a>, <em>required</em>): Name of the LULC class. This label must be unique among the all the LULC classes.</p>
+</p></li>
+<li><p><span class="target" id="biophysical-table-path-columns-biomass-initial"></span><p><strong>biomass-initial</strong> (<a class="reference external" href="input_types.html#number">number</a>, units: <strong>Mt/ha</strong>, <em>required</em>): The initial carbon stocks in the biomass pool for this LULC class.</p>
+</p></li>
+<li><p><span class="target" id="biophysical-table-path-columns-soil-initial"></span><p><strong>soil-initial</strong> (<a class="reference external" href="input_types.html#number">number</a>, units: <strong>Mt/ha</strong>, <em>required</em>): The initial carbon stocks in the soil pool for this LULC class.</p>
+</p></li>
+<li><p><span class="target" id="biophysical-table-path-columns-litter-initial"></span><p><strong>litter-initial</strong> (<a class="reference external" href="input_types.html#number">number</a>, units: <strong>Mt/ha</strong>, <em>required</em>): The initial carbon stocks in the litter pool for this LULC class.</p>
+</p></li>
+<li><p><span class="target" id="biophysical-table-path-columns-biomass-half-life"></span><p><strong>biomass-half-life</strong> (<a class="reference external" href="input_types.html#number">number</a>, units: <strong>year</strong>, <em>required</em>): The half-life of carbon in the biomass pool. A value of 0 indicates no emissions.</p>
+</p></li>
+<li><p><span class="target" id="biophysical-table-path-columns-biomass-low-impact-disturb"></span><p><strong>biomass-low-impact-disturb</strong> (<a class="reference external" href="input_types.html#ratio">ratio</a>, <em>required</em>): Proportion of carbon stock in the biomass pool that is disturbed when a cell transitions away from this  LULC class in a low-impact disturbance.</p>
+</p></li>
+<li><p><span class="target" id="biophysical-table-path-columns-biomass-med-impact-disturb"></span><p><strong>biomass-med-impact-disturb</strong> (<a class="reference external" href="input_types.html#ratio">ratio</a>, <em>required</em>): Proportion of carbon stock in the biomass pool that is disturbed when a cell transitions away from this LULC class in a medium-impact disturbance.</p>
+</p></li>
+<li><p><span class="target" id="biophysical-table-path-columns-biomass-high-impact-disturb"></span><p><strong>biomass-high-impact-disturb</strong> (<a class="reference external" href="input_types.html#ratio">ratio</a>, <em>required</em>): Proportion of carbon stock in the biomass pool that is disturbed when a cell transitions away from this LULC class in a high-impact disturbance.</p>
+</p></li>
+<li><p><span class="target" id="biophysical-table-path-columns-biomass-yearly-accumulation"></span><p><strong>biomass-yearly-accumulation</strong> (<a class="reference external" href="input_types.html#number">number</a>, units: <strong>Mt/(ha · year)</strong>, <em>required</em>): Annual rate of CO2E accumulation in the biomass pool.</p>
+</p></li>
+<li><p><span class="target" id="biophysical-table-path-columns-soil-half-life"></span><p><strong>soil-half-life</strong> (<a class="reference external" href="input_types.html#number">number</a>, units: <strong>year</strong>, <em>required</em>): The half-life of carbon in the soil pool. A value of 0 indicates no emissions.</p>
+</p></li>
+<li><p><span class="target" id="biophysical-table-path-columns-soil-low-impact-disturb"></span><p><strong>soil-low-impact-disturb</strong> (<a class="reference external" href="input_types.html#ratio">ratio</a>, <em>required</em>): Proportion of carbon stock in the soil pool that is disturbed when a cell transitions away from this LULC class in a low-impact disturbance.</p>
+</p></li>
+<li><p><span class="target" id="biophysical-table-path-columns-soil-med-impact-disturb"></span><p><strong>soil-med-impact-disturb</strong> (<a class="reference external" href="input_types.html#ratio">ratio</a>, <em>required</em>): Proportion of carbon stock in the soil pool that is disturbed when a cell transitions away from this LULC class in a medium-impact disturbance.</p>
+</p></li>
+<li><p><span class="target" id="biophysical-table-path-columns-soil-high-impact-disturb"></span><p><strong>soil-high-impact-disturb</strong> (<a class="reference external" href="input_types.html#ratio">ratio</a>, <em>required</em>): Proportion of carbon stock in the soil pool that is disturbed when a cell transitions away from this LULC class in a high-impact disturbance.</p>
+</p></li>
+<li><p><span class="target" id="biophysical-table-path-columns-soil-yearly-accumulation"></span><p><strong>soil-yearly-accumulation</strong> (<a class="reference external" href="input_types.html#number">number</a>, units: <strong>Mt/(ha · year)</strong>, <em>required</em>): Annual rate of CO2E accumulation in the soil pool.</p>
+</p></li>
+<li><p><span class="target" id="biophysical-table-path-columns-litter-yearly-accumulation"></span><p><strong>litter-yearly-accumulation</strong> (<a class="reference external" href="input_types.html#number">number</a>, units: <strong>Mt/(ha · year)</strong>, <em>required</em>): Annual rate of CO2E accumulation in the litter pool.</p>
+ This will generally be <code class="docutils literal notranslate"><span class="pre">0</span></code>, but can be adjusted if needed.</p></li>
+</ul>
+</li>
+<li><p><span class="target" id="landcover-transitions-table"></span><p><strong>landcover transitions table</strong> (<a class="reference external" href="input_types.html#csv">CSV</a>, <em>required</em>): A transition matrix mapping the type of carbon action undergone when one LULC type transitions to another.</p>
+
+The Coastal Blue Carbon preprocessor exists to help create this table for you. You must edit the <code class="docutils literal notranslate"><span class="pre">transitions_[suffix].csv</span></code> preprocessor output as described in <em>Step 1 Preprocessing Outputs</em> before it can be used by the main model.</p>
+<p>Columns:</p>
+<ul class="simple">
+<li><p><span class="target" id="landcover-transitions-table-columns-lulc-class"></span><p><strong>lulc-class</strong> (<a class="reference external" href="input_types.html#text">text</a>, <em>required</em>): LULC class names matching those in the biophysical table.</p>
+</p></li>
+<li><p><span class="target" id="landcover-transitions-table-columns-lulc-code"></span><p><strong>[LULC CODE]</strong> (<a class="reference external" href="input_types.html#option">option</a>, <em>required</em>): A transition matrix describing the type of carbon action that occurs when each LULC type transitions to each other type. Values in the first column, ‘lulc-class’, represents the original LULC class that is transitioned away from. Values in the first row represents the LULC class that is transitioned to. Each cell in the matrix is filled with an option indicating the effect on carbon when transitioning from that cell’s row’s LULC class to that cell’s column’s LULC class. The classes in this table must exactly match the classes in the Biophysical Table ‘lulc-class’ column. A cell may be left empty if the transition never occurs.</p>
+<blockquote>
+<div><p>Values must be one of the following text strings:</p>
+<ul>
+<li><p>”<strong>accum</strong>”: a state of carbon accumulation</p></li>
+<li><p>”<strong>high-impact-disturb</strong>”: high carbon disturbance rate</p></li>
+<li><p>”<strong>low-impact-disturb</strong>”: low carbon disturbance rate</p></li>
+<li><p>”<strong>med-impact-disturb</strong>”: medium carbon disturbance rate</p></li>
+<li><p>”<strong>NCC</strong>”: no change in carbon. Defining ‘NCC’ for a transition will halt any in-progress carbon accumulation or emissions at the year of transition, until the class transitions again to a state of accumulation or disturbance.</p></li>
+</ul>
+</div></blockquote>
+</p></li>
+</ul>
+</li>
+<li><p><span class="target" id="landcover-snapshot-csv"></span><p><strong>landcover snapshots table</strong> (<a class="reference external" href="input_types.html#csv">CSV</a>, <em>required</em>): A table mapping snapshot years to corresponding LULC maps.</p>
+ The raster with the earliest chronological year will be used as the baseline raster. If rasters provided in this table have different extents or resolutions, they will be resampled to the minimum resolution of the set of rasters, and clipped to the intersection of all of the bounding boxes. All rasters provided in this table must be in a projected coordinate system with units in meters.</p>
+<p>Columns:</p>
+<ul class="simple">
+<li><p><span class="target" id="landcover-snapshot-csv-columns-snapshot-year"></span><p><strong>snapshot_year</strong> (<a class="reference external" href="input_types.html#integer">integer</a>, <em>required</em>): The snapshot year that this row’s LULC raster represents. Each year in this table must be unique.</p>
+</p></li>
+<li><p><span class="target" id="landcover-snapshot-csv-columns-raster-path"></span><p><strong>raster_path</strong> (<a class="reference external" href="input_types.html#raster">raster</a>, <em>required</em>): Map of LULC in the given snapshot year. All values in this raster must have corresponding entries in the Biophysical Table and Landcover Transitions Table.</p>
+</p></li>
+</ul>
+</li>
+<li><p><span class="target" id="analysis-year"></span><p><strong>analysis year</strong> (<a class="reference external" href="input_types.html#integer">integer</a>, <em>optional</em>): A year that may be used to extend the analysis beyond the last snapshot year. If used, the model assumes that carbon will continue to accumulate or emit after the last snapshot year until the analysis year. This value must be greater than the final snapshot year.</p>
+</p></li>
+<li><p><span class="target" id="do-economic-analysis"></span><p><strong>run valuation</strong> (<a class="reference external" href="input_types.html#truefalse">true/false</a>): Enable net present valuation analysis based on carbon prices from either a yearly price table, or an initial price and yearly interest rate.</p>
+</p></li>
+</ul>
+<blockquote>
+<div><p>The value of carbon sequestration over time is given by:</p>
+<ul class="simple">
+<li><p><strong>Value of a sequestered ton of carbon</strong>: This user’s guide assumes carbon
+is measured in tons of CO<sub>2</sub>. If you have prices in terms of tons of
+elemental carbon, these need to be converted to prices per ton of CO<sub>2</sub>. This requires dividing the price by a factor of 3.67 to reflect
+the difference in the atomic mass between CO<sub>2</sub> and elemental carbon.
+Again, this value can be input using a price schedule over the appropriate
+time horizon, or by supplying a base year carbon price and an annual rate of
+inflation. Any currency may be used, as long as it is consistent across all valuation inputs.</p></li>
+<li><p><strong>Discount rate</strong>: (<span class="math notranslate nohighlight">\(d\)</span> in the net present value equation), which
+reflects time preferences for immediate benefits over future benefits. If
+the rate is set equal to 0% then monetary values are not discounted.</p></li>
+</ul>
+<p>If the <strong>Calculate Net Present Value of Sequestered Carbon</strong> box is checked, you must also provide the following valuation information.</p>
+<ul class="simple">
+<li><p><span class="target" id="use-price-table"></span><p><strong>use price table</strong> (<a class="reference external" href="input_types.html#truefalse">true/false</a>): Use a yearly price table, rather than an initial price and interest rate, to indicate carbon value over time.</p>
+</p></li>
+<li><p><span class="target" id="price"></span><p><strong>price</strong> (<a class="reference external" href="input_types.html#number">number</a>, units: <strong>currency units/Mt</strong>, <em>conditionally required</em>): The price of CO2E at the baseline year. Required if Do Valuation is selected and Use Price Table is not selected.</p>
+ May be any currency, as long as it is consistent across valuation inputs.</p></li>
+<li><p><span class="target" id="inflation-rate"></span><p><strong>interest rate</strong> (<a class="reference external" href="input_types.html#percent">percent</a>, <em>conditionally required</em>): Annual increase in the price of CO2E. Required if Do Valuation is selected and Use Price Table is not selected.</p>
+</p></li>
+<li><p><span class="target" id="price-table-path"></span><p><strong>price table</strong> (<a class="reference external" href="input_types.html#csv">CSV</a>, <em>conditionally required</em>): Table of annual CO2E prices for each year from the baseline year to the final snapshot or analysis year. Required if Do Valuation is selected and Use Price Table is selected.</p>
+ This table can be used in place of the Price and Interest Rate inputs.</p></li>
+</ul>
+<blockquote>
+<div><p>Columns:</p>
+<ul class="simple">
+<li><p><span class="target" id="price-table-path-columns-year"></span><p><strong>year</strong> (<a class="reference external" href="input_types.html#number">number</a>, <em>required</em>): Each year from the snapshot year to analysis year.</p>
+</p></li>
+<li><p><span class="target" id="price-table-path-columns-price"></span><p><strong>price</strong> (<a class="reference external" href="input_types.html#number">number</a>, units: <strong>currency units/Mt</strong>, <em>required</em>): Price of CO2E in that year.</p>
+</p></li>
+</ul>
+</div></blockquote>
+<ul class="simple">
+<li><p><span class="target" id="discount-rate"></span><p><strong>discount rate</strong> (<a class="reference external" href="input_types.html#percent">percent</a>, <em>conditionally required</em>): Annual discount rate on the price of carbon. This is compounded each year after the baseline year. Required if Run Valuation is selected.</p>
+</p></li>
+</ul>
+</div></blockquote>
+</section>
+<section id="id3">
+<h4>Outputs<a class="headerlink" href="#id3" title="Link to this heading">¶</a></h4>
+<ul class="simple">
+<li><p><strong>Parameter log</strong>: Each time the model is run, a text (.txt) file will be
+created in the main Workspace folder. The file will list the parameter values
+and output messages for that run and will be named according to the service,
+the date and time. When contacting NatCap about errors in a model run, please
+include this parameter log.</p></li>
+</ul>
+<p><strong>Workspace/outputs</strong></p>
+<ul class="simple">
+<li><p><strong>carbon-accumulation-between-[year]-and-[year][Suffix].tif</strong>. Amount of
+carbon accumulated between the two specified years. Units: Megatonnes CO<sub>2</sub> e per Hectare</p></li>
+<li><p><strong>carbon-emissions-between-[year]-and-[year][Suffix].tif</strong>. Amount of carbon
+lost to disturbance between the two specified years. Units: Megatonnes CO<sub>2</sub> e per Hectare</p></li>
+<li><p><strong>carbon-stock-at-[year][Suffix].tif</strong>. For the first baseline year, stock = (Sum of the 3 initial carbon pools from the biophysical table). For each year between baseline+1 and first snapshot transition, stock = (stock from previous year + accumulation) for the specified year. For years after the first snapshot transition, stock = (stock from previous year + accumulation - emissions). Note that emissions and accumulation will only be reflected in the output for the year after they begin. Units: Megatonnes CO<sub>2</sub> e per Hectare</p></li>
+<li><p><strong>total-net-carbon-sequestion-between-[year]-and-[year][Suffix].tif</strong>. Total carbon
+sequestration between the two specified years, based on accumulation minus
+emissions during that time period. Units: Megatonnes CO<sub>2</sub> e per
+Hectare</p></li>
+<li><p><strong>total-net-carbon-sequestration[Suffix].tif</strong>. Total carbon sequestration
+over the whole time period between the Baseline and either the latest
+Snapshot Year or the Analysis Year, based on accumulation minus emissions.
+Units: Megatonnes CO<sub>2</sub> e per Hectare</p></li>
+<li><p><strong>net-present-value[Suffix].tif</strong>. Monetary value of carbon sequestration.
+Units: (Currency of provided Prices) per Hectare</p></li>
+</ul>
+<p><strong>Workspace/intermediate</strong></p>
+<p>This folder contains input rasters that have all been resampled and aligned to
+the same bounding box, as intermediate steps in the modeling process.
+Generally, you don’t need to do anything with these files.</p>
+<ul class="simple">
+<li><p><strong>stocks-[pool]-[year][suffix].tif</strong> - the carbon stocks available at the
+Beginning of the year noted in the filename.  Units: Megatonnes CO2E per hectare</p></li>
+<li><p><strong>accumulation-[pool]-[year][suffix].tif</strong> - the spatial distribution of
+rates of carbon accumulation in the given pool at the given year.  Years will
+represent the snapshot years in which the accumulation raster takes effect.
+Units: Megatonnes CO2E per hectare.</p></li>
+<li><p><strong>halflife-[pool]-[year][suffix].tif</strong> - a raster of the spatial distribution
+of the half-lives of carbon in the pool mentioned at the given snapshot year.
+Units: years.</p></li>
+<li><p><strong>disturbance-magnitude-[pool]-[year][suffix].tif</strong> - the magnitude of
+disturbance in the given pool in the given snapshot year.
+Units: 0-1, the percentage of carbon disturbed.</p></li>
+<li><p><strong>disturbance-volume-[pool]-[year][suffix].tif</strong> - the volume of the carbon
+disturbed in the snapshot year.  This is a function of the carbon stocks at
+the year prior and the disturbance magnitude in the given snapshot year.  See
+<a class="reference internal" href="#equation-cbc-disturbance-volume">(13)</a>  Units: Megatonnes CO2E per hectare.</p></li>
+<li><p><strong>year-of-latest-disturbance-[pool]-[year][suffix].tif</strong> - each cell
+indicates the most recent year in which the cell underwent a landcover
+transition.</p></li>
+<li><p><strong>aligned-lulc-[snapshot type]-[year][suffix].tif</strong> - the snapshot landcover
+raster of the given year, aligned to the intersection of the bounding boxes
+of all snapshot rasters, and with consistent cell sizes.  The cell size of
+the aligned landcover rasters is the minimum of the incoming cell sizes.</p></li>
+<li><p><strong>net-sequestration-[pool]-[year][suffix].tif</strong> - the net sequestration in
+the given pool in the given year.  See <a class="reference internal" href="#equation-cbc-net-sequestration">(7)</a>
+Units: Megatonnes CO2E per hectare.</p></li>
+<li><p><strong>total-carbon-stocks-[year][suffix].tif</strong> - the sum of the stocks present
+across all three carbon pool at the given year. Units: Megatonnes CO2E per
+Hectare.</p></li>
+</ul>
+</section>
+</section>
+<section id="advanced-usage-spatially-explicit-biophysical-parameters">
+<h3>Advanced Usage: Spatially-explicit Biophysical Parameters<a class="headerlink" href="#advanced-usage-spatially-explicit-biophysical-parameters" title="Link to this heading">¶</a></h3>
+<p>While the Coastal Blue Carbon’s preprocessor and main model user interfaces are
+helpful for most cases that can be classified into various landcover types, an
+advanced user may desire to provide spatially explicit maps of carbon
+half-lives, rates of accumulation, and other biophysical parameters to the
+model.  This is not possible through the User Interface, but is available as a
+python function that provides lower-level access to the model’s timeseries
+analysis.  Use of this advanced functionality requires a substantial amount of
+data preprocessing and has much more complex data requirements.  Please see the
+model’s source code on github for details:
+<a class="reference external" href="https://github.com/natcap/invest/blob/main/src/natcap/invest/coastal_blue_carbon/coastal_blue_carbon.py">https://github.com/natcap/invest/blob/main/src/natcap/invest/coastal_blue_carbon/coastal_blue_carbon.py</a></p>
+</section>
+</section>
+<section id="example-use-case">
+<h2>Example Use-Case<a class="headerlink" href="#example-use-case" title="Link to this heading">¶</a></h2>
+<section id="freeport-texas">
+<h3>Freeport, Texas<a class="headerlink" href="#freeport-texas" title="Link to this heading">¶</a></h3>
+<section id="id4">
+<h4>Summary<a class="headerlink" href="#id4" title="Link to this heading">¶</a></h4>
+<p>Over the next 100 years, the US Gulf coast has been identified as susceptible to rising sea levels.  The use of the InVEST blue carbon model serves to identify potential changes in the standing stock of carbon in coastal vegetation that sequester carbon.  This approach in Freeport, TX was made possible with rich and resolute elevation and LULC datasets.  We used a 10-meter DEM with sub-meter vertical accuracy to model marsh migration and loss over time as a result of sea level rise (SLR) using Warren Pinnacle’s SLAMM (Sea Level Affected Marsh Model).  Outputs from SLAMM serve as inputs to the InVEST Coastal Blue Carbon model which permits the tool to map, measure, and value carbon sequestration and emissions resulting from changes to coastal land cover over a 94-year period.</p>
+<p>The Sea Level Affecting Marshes Model (SLAMM: <a class="reference external" href="http://www.warrenpinnacle.com/prof/SLAMM/">http://www.warrenpinnacle.com/prof/SLAMM/</a>) models changes in the distribution of 27 different coastal wetland habitat types in response to sea-level rise.  The model relies on the relationship between tidal elevation and coastal wetland habitat type, coupled with information on slope, land use, erosion and accretion to predict changes or loss of habitat.  SLAMM outputs future habitat maps for user-defined time steps and sea-level rise scenarios. These future habitat maps can be utilized with InVEST service models to evaluate resultant changes in ecosystem services under various sea-level rise scenarios (e.g. 1 meter SLR by 2100).</p>
+<p>For example, SLAMM was used to quantify differences in carbon sequestration over a range of sea-level rise projections in Galveston Bay, Texas, USA.  First, SLAMM was used to map changes in the distribution of coastal wetland habitat over time under different sea-level rise projections.  Then, the InVEST Coastal Blue Carbon model was used to evaluate changes in carbon sequestration associated with predicted changes in habitat type.  The 27 land-cover classes modeled by SLAMM were condensed into a subset relevant to carbon sequestration and converted from ASCII to raster format for use with InVEST.  SLAMM results produced LULC maps of future alternative scenarios over 25-year time slices beginning in 2006 and ending in 2100.  The following figure depicts 2006 LULC and a table of disaggregated land class types.</p>
+<figure class="align-default">
+<img alt="_images/freeport_LULC_2006.png" src="_images/freeport_LULC_2006.png" />
+</figure>
+<p>Figure CS1. Current (2006) LULC map of Freeport, Texas</p>
+<p>Carbon stored in the sediment (‘soil’ pool) was the focus of this analysis.  The vast majority of carbon is sequestered in this pool by coastal and marine vegetation.  See the case study limitations for additional information.  To produce maps of carbon storage at the different 25-year time steps, we used the model to perform a simple “look-up” to determine the amount of carbon per 10-by-10 meter pixel based on known storage rates from sampling in the Freeport area (Chmura et al. 2003).</p>
+<p>Next, we provide the InVEST model with a transition matrix in order to identify the amount of carbon gained or lost over each 25-year time step.  Annual accumulation rates in the salt marsh were also obtained from Chmura et al. (2003).  When analyzing the time period from 2025 to 2050, we assume <span class="math notranslate nohighlight">\(t_{2}\)</span> = 2025 and <span class="math notranslate nohighlight">\(t_{3}\)</span> = 2050.  We identify all the possible transitions that will result in either accumulation or loss of carbon.  The model compares the two LULC maps (<span class="math notranslate nohighlight">\(t_{2}\)</span> and <span class="math notranslate nohighlight">\(t_{3}\)</span>) to identify any pixel transitions from one land cover type to another.  We apply these transformations to the standing stock of carbon which is the running carbon tally at <span class="math notranslate nohighlight">\(t_{2}\)</span> (2025).  Once these adjustments are complete, we have a new map of standing carbon for <span class="math notranslate nohighlight">\(t_{3}\)</span> (2050).  We repeat this step for the next time period where <span class="math notranslate nohighlight">\(t_{3}\)</span> = 2050 and <span class="math notranslate nohighlight">\(t_{4}\)</span> = 2075.  This process was repeated until 2100.  The model produces spatially explicit depictions of net sequestration over time as well as summaries of net gain/emission of carbon for the two scenarios at each 25-year time step.  This information was used to determine during which time period for each scenario the rising seas and resulting marsh migration led to net emissions for the study site and the entire Freeport area.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Time Period</p></th>
+<th class="head"><p>Scenario #1: No Management</p></th>
+<th class="head"><p>Scenario #2: High Green</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>2006-2025 (<span class="math notranslate nohighlight">\(t_{1}\)</span>-<span class="math notranslate nohighlight">\(t_{2}\)</span>)</p></td>
+<td><p>+4,031,180</p></td>
+<td><p>+4,172,370</p></td>
+</tr>
+<tr class="row-odd"><td><p>2025-2050 (<span class="math notranslate nohighlight">\(t_{2}\)</span>-<span class="math notranslate nohighlight">\(t_{3}\)</span>)</p></td>
+<td><p>-1,170,580</p></td>
+<td><p>+684,276</p></td>
+</tr>
+<tr class="row-even"><td><p>2050-2075 (<span class="math notranslate nohighlight">\(t_{3}\)</span>-<span class="math notranslate nohighlight">\(t_{4}\)</span>)</p></td>
+<td><p>-7,403,690</p></td>
+<td><p>-5,525,100</p></td>
+</tr>
+<tr class="row-odd"><td><p>2075-2100 (<span class="math notranslate nohighlight">\(t_{4}\)</span>-<span class="math notranslate nohighlight">\(t_{5}\)</span>)</p></td>
+<td><p>-7,609,020</p></td>
+<td><p>-8,663,600</p></td>
+</tr>
+<tr class="row-even"><td><p>100-Year Total:</p></td>
+<td><p>-12,152,100</p></td>
+<td><p>-9,332,050</p></td>
+</tr>
+</tbody>
+</table>
+<p>Table CS1. Carbon sequestration and emissions for each 25-year time period for the two scenarios of the entire Freeport study area.</p>
+<figure class="align-default">
+<img alt="_images/freeport_2006_2010.png" src="_images/freeport_2006_2010.png" />
+</figure>
+<p>Figure CS2. Carbon emissions (red) and sequestration (blue) from 2006 to 2100 for the two scenarios and a subset of the Freeport study area.</p>
+<p>The following is table summarizing how the main inputs, where they were obtained and how they were used in the model:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Input</p></th>
+<th class="head"><p>Source</p></th>
+<th class="head"><p>Use in the InVEST blue carbon model</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>DEM</p></td>
+<td><p>USGS</p></td>
+<td><p>DEM was needed to produce the future LULC maps using the SLAMM tool.</p></td>
+</tr>
+<tr class="row-odd"><td><p>Land use / land cover (LULC)</p></td>
+<td><p>USGS/NOAA</p></td>
+<td><p>Salt marshes store carbon in biomass and soils.  We utilized maps showing the current distribution of salt marshes to establish a baseline coverage of marshes from which we estimate aboveground biomass and soil carbon.</p></td>
+</tr>
+<tr class="row-even"><td><p>Carbon stock in salt marsh systems</p></td>
+<td><p>Natural Capital Project literature review</p></td>
+<td><p>Carbon storage was calculated by summing the carbon stored in biomass and sediments.  Carbon stocks were calculated for all of the areas of functional salt marsh in the study region (Chmura et al. 2003).</p></td>
+</tr>
+<tr class="row-odd"><td><p>Social value of carbon in 2006 US $</p></td>
+<td><p>USIWGSCC 2010</p></td>
+<td><p>The “social cost of carbon” (SCC) is an estimate of the monetized damages associated with an incremental increase in carbon emissions in a given year.  It is intended to include (but is not limited to) changes in net agricultural productivity, human health, property damages from increased flood risk, and the value of ecosystem services.  The social cost of carbon is useful for allowing institutions to incorporate the social benefits of reducing carbon dioxide (CO<sub>2</sub>) emissions into cost benefit analyses of management actions that have small, or “marginal,” impacts on cumulative global emissions.</p></td>
+</tr>
+<tr class="row-even"><td><p>Discount rate</p></td>
+<td><p>USIWGSCC 2010</p></td>
+<td><p>This discount rate reflects society’s preferences for short run versus long term consumption.  Since carbon dioxide emissions are long-lived, subsequent damages occur over many years.  We use the discount rate to adjust the stream of future damages to its present value in the year when the emissions were changed.</p></td>
+</tr>
+</tbody>
+</table>
+<p>Table CS2. Input summary table for using InVEST blue carbon model in Freeport, Texas</p>
+</section>
+<section id="limitations">
+<h4>Limitations<a class="headerlink" href="#limitations" title="Link to this heading">¶</a></h4>
+<ul class="simple">
+<li><p>This analysis did not model change in carbon resulting from growth or loss of aboveground biomass of coastal and marine vegetation.</p></li>
+<li><p>While the spatial resolution of the LULC maps produced by SLAMM was very high (10 meters), the temporal resolution provided by SLAMM was quite coarse (25-year time steps).  The carbon cycle is a dynamic process.  By analyzing change over 25-year time periods, we ignore any changes that are not present at the start and end of each time step.</p></li>
+</ul>
+</section>
+</section>
+</section>
+<section id="appendix-global-database-of-carbon-values">
+<span id="cbc-global-database"></span><h2>Appendix: Global Database of Carbon Values<a class="headerlink" href="#appendix-global-database-of-carbon-values" title="Link to this heading">¶</a></h2>
+<p>If local information on carbon stocks and accumulation rates are not available,
+users may wish to draw on the global database of values for carbon stocks and
+accumulation rates that is included with the InVEST CBC model sample data, and
+is available for download here:
+<a class="reference external" href="https://bitbucket.org/natcap/invest-sample-data/src/master/CoastalBlueCarbon/inputs/BlueCarbon_GlobalDB.xls">https://bitbucket.org/natcap/invest-sample-data/src/master/CoastalBlueCarbon/inputs/BlueCarbon_GlobalDB.xls</a>
+Note that if data from field studies or other local sources are available,
+these values should be used instead of those in this global database.</p>
+<p>This excel spreadsheet includes sheets for carbon stocks and accumulation rates
+for saltmarshes, seagrass and mangroves across biomass and soil pools and also
+carbon accumulation rates.  Carbon biomass stocks are provided in units of
+Tons of CO2e/ha, and carbon accumulation rates are provided in units of Tons of
+CO2e/ha per year.</p>
+<p>Note that in the <code class="docutils literal notranslate"><span class="pre">SaltMarshSoil</span></code> sheet, the <code class="docutils literal notranslate"><span class="pre">T_CO2e_ha</span></code> column is
+calculated from the <code class="docutils literal notranslate"><span class="pre">gC_cm3</span></code> column (representing grams of carbon/cubic
+centimeter)` using the equation:</p>
+<div class="math notranslate nohighlight">
+\[T\_CO2e\_ha = \frac{(gC\_cm^3) \cdot 10^6 \cdot 10^4 \cdot 44}{12*10^6}\]</div>
+<p>Which converts from grams of elemental carbon per cubic centimeter to tons of CO2 per hectare.</p>
+</section>
+<section id="references">
+<h2>References<a class="headerlink" href="#references" title="Link to this heading">¶</a></h2>
+<p>Baumol, W. J. (1968). On the social rate of discount. The American Economic Review, 788-802.</p>
+<p>Bouillon, S., Borges, A. V., Castañeda-Moya, E., Diele, K., Dittmar, T., Duke, N. C., … &amp; Twilley, R. R. (2008). Mangrove production and carbon sinks: a revision of global budget estimates. Global Biogeochemical Cycles, 22(2).</p>
+<p>Chmura, G. L., Anisfeld, S. C., Cahoon, D. R., &amp; Lynch, J. C. (2003). Global carbon sequestration in tidal, saline wetland soils. Global biogeochemical cycles, 17(4).</p>
+<p>Clough, J. S., Park, R., and Fuller, R. (2010). “SLAMM 6 beta Technical Documentation.”  Available
+at <a class="reference external" href="http://warrenpinnacle.com/prof/SLAMM">http://warrenpinnacle.com/prof/SLAMM</a>.</p>
+<p>Fourqurean, J. W., Duarte, C. M., Kennedy, H., Marbà, N., Holmer, M., Mateo, M. A., … &amp; Serrano, O. (2012). Seagrass ecosystems as a globally significant carbon stock. Nature Geoscience, 5(7), 505-509.</p>
+<p>Hope, Chris. (2011) “The PAGE09 Integrated Assessment Model: A Technical Description.” Cambridge Judge Business School Working Paper No. 4/2011 (April). Available at <a class="reference external" href="https://www.jbs.cam.ac.uk/wp-content/uploads/2020/08/wp1104.pdf">https://www.jbs.cam.ac.uk/wp-content/uploads/2020/08/wp1104.pdf</a>.</p>
+<p>Houghton, R. A. (2003). Revised estimates of the annual net flux of carbon to the atmosphere from changes in land use and land management 1850–2000. Tellus B, 55(2), 378-390.</p>
+<p>Pendleton, L., Donato, D. C., Murray, B. C., Crooks, S., Jenkins, W. A., Sifleet, S., … &amp; Baldera, A. (2012). Estimating global “blue carbon” emissions from conversion and degradation of vegetated coastal ecosystems. PLoS One, 7(9), e43542.</p>
+<p>Rosenthal, A., Arkema, K., Verutes, G., Bood, N., Cantor, D., Fish, M., Griffin, R., and Panuncio, M. (In press). Identification and valuation of adaptation options in coastal-marine ecosystems: Test case from Placencia, Belize. Washington, DC: InterAmerican Development Bank. Technical Report.</p>
+<p>Sifleet, S., Pendleton, L., and B. Murray. (2011). State of the Science on Coastal Blue Carbon. Nicholas Institute Report, 1-43.</p>
+<p>United States, Interagency Working Group on Social Costs of Carbon. (2010) “Technical Support Document: Social Cost of Carbon for Regulatory Impact Analysis Under Executive Order 12866.” Available at <a class="reference external" href="https://www.epa.gov/sites/production/files/2016-12/documents/scc_tsd_2010.pdf">https://www.epa.gov/sites/production/files/2016-12/documents/scc_tsd_2010.pdf</a>.</p>
+<p>United States, Interagency Working Group on Social Costs of Carbon. (2013) “Technical Update of the Social Cost of Carbon for Regulatory Impact Analysis Under Executive Order 12866.” Available at <a class="reference external" href="https://environblog.jenner.com/files/technical-update-of-the-social-cost-of-carbon-for-regulatory-impact-analysis-under-executive-order-12866.pdf">https://environblog.jenner.com/files/technical-update-of-the-social-cost-of-carbon-for-regulatory-impact-analysis-under-executive-order-12866.pdf</a>.</p>
+<p>World Bank. (2012). State and Trends of the Carbon Market 2012. Washington DC: The World Bank, 133.</p>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+    <div class="clearer"></div>
+  </div>
+    <div class="footer">
+      &#169;The Natural Capital Project. | Build 3.17.1.post4+ug.g2f0ff94bf.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+    </div>
+
+    
+
+    
+    <script>
+
+      var _gaq = _gaq || [];
+      _gaq.push(['_setAccount', 'UA-787904-8']);
+      _gaq.push(['_setDomainName', 'none']);
+      _gaq.push(['_setAllowLinker', true]);
+      _gaq.push(['_trackPageview']);
+
+      (function() {
+        var ga = document.createElement('script'); ga.async = true;
+        ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'https://www') + '.google-analytics.com/ga.js';
+        var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+      })();
+
+    </script>
+    
+  </body>
+</html>

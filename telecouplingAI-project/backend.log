@@ -1,0 +1,119 @@
+C:\YPHOME\Jianan_Projects\Telecoupling_AI_Project\fulldev\telecouplingAI-project\backend\main.py:59: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  @app.on_event("startup")
+INFO:     Started server process [17036]
+INFO:     Waiting for application startup.
+2026-03-27 11:11:47,805 [INFO] __main__ — CSIS backend started \u2705
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:53384 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52921 - "GET /download/demo_swy/DEM_gura.tif HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56438 - "GET /download/demo_swy/land_use_gura.tif HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56439 - "GET /download/demo_swy/soil_group_gura.tif HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56440 - "GET /download/demo_swy/climate_zones_gura.tif HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56441 - "GET /download/demo_swy/biophysical_table_gura_SWY.csv HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56442 - "GET /download/demo_swy/rain_events_gura.csv HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62952 - "GET /download/demo_swy/climate_zone_table_gura.csv HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60176 - "GET /download/demo_swy/watershed_gura.shp HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60177 - "GET /download/demo_swy/watershed_gura.dbf HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60178 - "GET /download/demo_swy/watershed_gura.prj HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60179 - "GET /download/demo_swy/watershed_gura.shx HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61248 - "GET /download/demo_swy/precip_gura_1.tif HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55252 - "GET /download/demo_swy/precip_gura_2.tif HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50173 - "GET /download/demo_swy/precip_gura_3.tif HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59325 - "GET /download/demo_swy/precip_gura_4.tif HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59326 - "GET /download/demo_swy/precip_gura_5.tif HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59327 - "GET /download/demo_swy/precip_gura_6.tif HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62637 - "GET /download/demo_swy/precip_gura_7.tif HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62638 - "GET /download/demo_swy/precip_gura_8.tif HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61210 - "GET /download/demo_swy/precip_gura_9.tif HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61211 - "GET /download/demo_swy/precip_gura_10.tif HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61212 - "GET /download/demo_swy/precip_gura_11.tif HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59677 - "GET /download/demo_swy/precip_gura_12.tif HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53348 - "GET /download/demo_swy/ET0_gura_1.tif HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54486 - "GET /download/demo_swy/ET0_gura_2.tif HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64991 - "GET /download/demo_swy/ET0_gura_3.tif HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64992 - "GET /download/demo_swy/ET0_gura_4.tif HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56434 - "GET /download/demo_swy/ET0_gura_5.tif HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53170 - "GET /download/demo_swy/ET0_gura_6.tif HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50451 - "GET /download/demo_swy/ET0_gura_7.tif HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53849 - "GET /download/demo_swy/ET0_gura_8.tif HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53850 - "GET /download/demo_swy/ET0_gura_9.tif HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51365 - "GET /download/demo_swy/ET0_gura_10.tif HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51211 - "GET /download/demo_swy/ET0_gura_11.tif HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50656 - "GET /download/demo_swy/ET0_gura_12.tif HTTP/1.1" 200 OK
+2026-03-27 11:13:12,181 [INFO] __main__ — [upload] DEM_gura.tif \u2192 C:\YPHOME\Jianan_Projects\Telecoupling_AI_Project\fulldev\telecouplingAI-project\uploads\csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197\DEM_gura.tif
+2026-03-27 11:13:12,197 [INFO] __main__ — [upload] land_use_gura.tif \u2192 C:\YPHOME\Jianan_Projects\Telecoupling_AI_Project\fulldev\telecouplingAI-project\uploads\csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197\land_use_gura.tif
+2026-03-27 11:13:12,200 [INFO] __main__ — [upload] soil_group_gura.tif \u2192 C:\YPHOME\Jianan_Projects\Telecoupling_AI_Project\fulldev\telecouplingAI-project\uploads\csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197\soil_group_gura.tif
+2026-03-27 11:13:12,202 [INFO] __main__ — [upload] climate_zones_gura.tif \u2192 C:\YPHOME\Jianan_Projects\Telecoupling_AI_Project\fulldev\telecouplingAI-project\uploads\csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197\climate_zones_gura.tif
+2026-03-27 11:13:12,204 [INFO] __main__ — [upload] biophysical_table_gura_SWY.csv \u2192 C:\YPHOME\Jianan_Projects\Telecoupling_AI_Project\fulldev\telecouplingAI-project\uploads\csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197\biophysical_table_gura_SWY.csv
+2026-03-27 11:13:12,206 [INFO] __main__ — [upload] rain_events_gura.csv \u2192 C:\YPHOME\Jianan_Projects\Telecoupling_AI_Project\fulldev\telecouplingAI-project\uploads\csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197\rain_events_gura.csv
+2026-03-27 11:13:12,208 [INFO] __main__ — [upload] climate_zone_table_gura.csv \u2192 C:\YPHOME\Jianan_Projects\Telecoupling_AI_Project\fulldev\telecouplingAI-project\uploads\csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197\climate_zone_table_gura.csv
+2026-03-27 11:13:12,209 [INFO] __main__ — [upload] watershed_gura.shp \u2192 C:\YPHOME\Jianan_Projects\Telecoupling_AI_Project\fulldev\telecouplingAI-project\uploads\csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197\watershed_gura.shp
+2026-03-27 11:13:12,211 [INFO] __main__ — [upload] watershed_gura.dbf \u2192 C:\YPHOME\Jianan_Projects\Telecoupling_AI_Project\fulldev\telecouplingAI-project\uploads\csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197\watershed_gura.dbf
+2026-03-27 11:13:12,213 [INFO] __main__ — [upload] watershed_gura.prj \u2192 C:\YPHOME\Jianan_Projects\Telecoupling_AI_Project\fulldev\telecouplingAI-project\uploads\csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197\watershed_gura.prj
+2026-03-27 11:13:12,215 [INFO] __main__ — [upload] watershed_gura.shx \u2192 C:\YPHOME\Jianan_Projects\Telecoupling_AI_Project\fulldev\telecouplingAI-project\uploads\csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197\watershed_gura.shx
+2026-03-27 11:13:12,222 [INFO] __main__ — [upload] precip_gura_1.tif \u2192 C:\YPHOME\Jianan_Projects\Telecoupling_AI_Project\fulldev\telecouplingAI-project\uploads\csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197\precip_gura_1.tif
+2026-03-27 11:13:12,224 [INFO] __main__ — [upload] precip_gura_2.tif \u2192 C:\YPHOME\Jianan_Projects\Telecoupling_AI_Project\fulldev\telecouplingAI-project\uploads\csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197\precip_gura_2.tif
+2026-03-27 11:13:12,226 [INFO] __main__ — [upload] precip_gura_3.tif \u2192 C:\YPHOME\Jianan_Projects\Telecoupling_AI_Project\fulldev\telecouplingAI-project\uploads\csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197\precip_gura_3.tif
+2026-03-27 11:13:12,228 [INFO] __main__ — [upload] precip_gura_4.tif \u2192 C:\YPHOME\Jianan_Projects\Telecoupling_AI_Project\fulldev\telecouplingAI-project\uploads\csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197\precip_gura_4.tif
+2026-03-27 11:13:12,230 [INFO] __main__ — [upload] precip_gura_5.tif \u2192 C:\YPHOME\Jianan_Projects\Telecoupling_AI_Project\fulldev\telecouplingAI-project\uploads\csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197\precip_gura_5.tif
+2026-03-27 11:13:12,231 [INFO] __main__ — [upload] precip_gura_6.tif \u2192 C:\YPHOME\Jianan_Projects\Telecoupling_AI_Project\fulldev\telecouplingAI-project\uploads\csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197\precip_gura_6.tif
+2026-03-27 11:13:12,234 [INFO] __main__ — [upload] precip_gura_7.tif \u2192 C:\YPHOME\Jianan_Projects\Telecoupling_AI_Project\fulldev\telecouplingAI-project\uploads\csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197\precip_gura_7.tif
+2026-03-27 11:13:12,236 [INFO] __main__ — [upload] precip_gura_8.tif \u2192 C:\YPHOME\Jianan_Projects\Telecoupling_AI_Project\fulldev\telecouplingAI-project\uploads\csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197\precip_gura_8.tif
+2026-03-27 11:13:12,238 [INFO] __main__ — [upload] precip_gura_9.tif \u2192 C:\YPHOME\Jianan_Projects\Telecoupling_AI_Project\fulldev\telecouplingAI-project\uploads\csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197\precip_gura_9.tif
+2026-03-27 11:13:12,240 [INFO] __main__ — [upload] precip_gura_10.tif \u2192 C:\YPHOME\Jianan_Projects\Telecoupling_AI_Project\fulldev\telecouplingAI-project\uploads\csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197\precip_gura_10.tif
+2026-03-27 11:13:12,242 [INFO] __main__ — [upload] precip_gura_11.tif \u2192 C:\YPHOME\Jianan_Projects\Telecoupling_AI_Project\fulldev\telecouplingAI-project\uploads\csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197\precip_gura_11.tif
+2026-03-27 11:13:12,244 [INFO] __main__ — [upload] precip_gura_12.tif \u2192 C:\YPHOME\Jianan_Projects\Telecoupling_AI_Project\fulldev\telecouplingAI-project\uploads\csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197\precip_gura_12.tif
+2026-03-27 11:13:12,248 [INFO] __main__ — [upload] ET0_gura_1.tif \u2192 C:\YPHOME\Jianan_Projects\Telecoupling_AI_Project\fulldev\telecouplingAI-project\uploads\csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197\ET0_gura_1.tif
+2026-03-27 11:13:12,250 [INFO] __main__ — [upload] ET0_gura_2.tif \u2192 C:\YPHOME\Jianan_Projects\Telecoupling_AI_Project\fulldev\telecouplingAI-project\uploads\csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197\ET0_gura_2.tif
+2026-03-27 11:13:12,258 [INFO] __main__ — [upload] ET0_gura_3.tif \u2192 C:\YPHOME\Jianan_Projects\Telecoupling_AI_Project\fulldev\telecouplingAI-project\uploads\csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197\ET0_gura_3.tif
+2026-03-27 11:13:12,261 [INFO] __main__ — [upload] ET0_gura_4.tif \u2192 C:\YPHOME\Jianan_Projects\Telecoupling_AI_Project\fulldev\telecouplingAI-project\uploads\csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197\ET0_gura_4.tif
+2026-03-27 11:13:12,263 [INFO] __main__ — [upload] ET0_gura_5.tif \u2192 C:\YPHOME\Jianan_Projects\Telecoupling_AI_Project\fulldev\telecouplingAI-project\uploads\csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197\ET0_gura_5.tif
+2026-03-27 11:13:12,265 [INFO] __main__ — [upload] ET0_gura_6.tif \u2192 C:\YPHOME\Jianan_Projects\Telecoupling_AI_Project\fulldev\telecouplingAI-project\uploads\csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197\ET0_gura_6.tif
+2026-03-27 11:13:12,267 [INFO] __main__ — [upload] ET0_gura_7.tif \u2192 C:\YPHOME\Jianan_Projects\Telecoupling_AI_Project\fulldev\telecouplingAI-project\uploads\csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197\ET0_gura_7.tif
+2026-03-27 11:13:12,269 [INFO] __main__ — [upload] ET0_gura_8.tif \u2192 C:\YPHOME\Jianan_Projects\Telecoupling_AI_Project\fulldev\telecouplingAI-project\uploads\csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197\ET0_gura_8.tif
+2026-03-27 11:13:12,272 [INFO] __main__ — [upload] ET0_gura_9.tif \u2192 C:\YPHOME\Jianan_Projects\Telecoupling_AI_Project\fulldev\telecouplingAI-project\uploads\csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197\ET0_gura_9.tif
+2026-03-27 11:13:12,273 [INFO] __main__ — [upload] ET0_gura_10.tif \u2192 C:\YPHOME\Jianan_Projects\Telecoupling_AI_Project\fulldev\telecouplingAI-project\uploads\csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197\ET0_gura_10.tif
+2026-03-27 11:13:12,275 [INFO] __main__ — [upload] ET0_gura_11.tif \u2192 C:\YPHOME\Jianan_Projects\Telecoupling_AI_Project\fulldev\telecouplingAI-project\uploads\csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197\ET0_gura_11.tif
+2026-03-27 11:13:12,277 [INFO] __main__ — [upload] ET0_gura_12.tif \u2192 C:\YPHOME\Jianan_Projects\Telecoupling_AI_Project\fulldev\telecouplingAI-project\uploads\csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197\ET0_gura_12.tif
+INFO:     127.0.0.1:54276 - "POST /api/chat HTTP/1.1" 200 OK
+2026-03-27 11:13:14,637 [INFO] agent — [skill] Loaded [PRE_EXECUTION] for run_network_analysis_grouping (1051 chars)
+2026-03-27 11:13:14,637 [INFO] agent — [skill] Loaded [PRE_EXECUTION] for run_coastal_blue_carbon_preprocessor (646 chars)
+2026-03-27 11:13:14,638 [INFO] agent — [skill] Loaded [PRE_EXECUTION] for run_coastal_blue_carbon (979 chars)
+2026-03-27 11:13:14,638 [INFO] agent — [skill] Loaded [PRE_EXECUTION] for run_seasonal_water_yield (1063 chars)
+2026-03-27 11:13:14,638 [INFO] agent — [skill] Loaded [PRE_EXECUTION] for run_crop_production_percentile (943 chars)
+2026-03-27 11:13:14,639 [INFO] agent — [skill] Loaded [PRE_EXECUTION] for run_crop_production_regression (1238 chars)
+2026-03-27 11:13:16,658 [INFO] agent — [agent] iteration=0 session=csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197 model=gemini-2.5-flash
+2026-03-27 11:13:22,252 [INFO] httpx — HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-03-27 11:13:22,272 [INFO] agent — [agent] function_call: run_seasonal_water_yield
+2026-03-27 11:13:28,506 [INFO] agent — [agent] Celery task dispatched: 6554ed49-3b45-41f7-836c-e58d58764ca1
+2026-03-27 11:13:57,610 [INFO] agent — [skill] Loaded [POST_EXECUTION] for run_seasonal_water_yield (1363 chars)
+2026-03-27 11:13:57,611 [INFO] agent — [agent] iteration=1 session=csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197 model=gemini-2.5-flash
+INFO:     127.0.0.1:57871 - "GET /download/csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197/20260327_111332_seasonal_water_yield/L_avail_preview.png HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53687 - "GET /download/csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197/20260327_111332_seasonal_water_yield/L_sum_preview.png HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63234 - "GET /download/csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197/20260327_111332_seasonal_water_yield/L_sum_avail_preview.png HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63210 - "GET /download/csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197/20260327_111332_seasonal_water_yield/QF_preview.png HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61259 - "GET /download/csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197/20260327_111332_seasonal_water_yield/P_preview.png HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51682 - "GET /download/csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197/20260327_111332_seasonal_water_yield/Vri_preview.png HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63210 - "GET /download/csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197/20260327_111332_seasonal_water_yield/aggregated_results_swy_preview.png HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61259 - "GET /download/csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197/20260327_111332_seasonal_water_yield/B_preview.png HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57871 - "GET /download/csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197/20260327_111332_seasonal_water_yield/B_sum_preview.png HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51682 - "GET /download/csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197/20260327_111332_seasonal_water_yield/L_preview.png HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53687 - "GET /download/csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197/20260327_111332_seasonal_water_yield/CN_preview.png HTTP/1.1" 200 OK
+2026-03-27 11:14:00,857 [INFO] httpx — HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:53736 - "GET /download/csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197/20260327_111332_seasonal_water_yield/aggregated_results_swy_preview.png HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60106 - "GET /download/csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197/20260327_111332_seasonal_water_yield/B_preview.png HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64320 - "GET /download/csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197/20260327_111332_seasonal_water_yield/B_sum_preview.png HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53736 - "GET /download/csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197/20260327_111332_seasonal_water_yield/CN_preview.png HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64320 - "GET /download/csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197/20260327_111332_seasonal_water_yield/L_preview.png HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60106 - "GET /download/csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197/20260327_111332_seasonal_water_yield/L_avail_preview.png HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53736 - "GET /download/csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197/20260327_111332_seasonal_water_yield/L_sum_preview.png HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64320 - "GET /download/csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197/20260327_111332_seasonal_water_yield/L_sum_avail_preview.png HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60106 - "GET /download/csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197/20260327_111332_seasonal_water_yield/P_preview.png HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60106 - "GET /download/csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197/20260327_111332_seasonal_water_yield/QF_preview.png HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53736 - "GET /download/csis_c2fd7c11-911f-4db4-8fa9-a1cc29735197/20260327_111332_seasonal_water_yield/Vri_preview.png HTTP/1.1" 200 OK

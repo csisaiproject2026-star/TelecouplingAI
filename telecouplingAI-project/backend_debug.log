@@ -1,0 +1,5 @@
+INFO:     Started server process [25472]
+INFO:     Waiting for application startup.
+2026-03-25 22:09:42,432 [INFO] main — CSIS backend started \u2705
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)

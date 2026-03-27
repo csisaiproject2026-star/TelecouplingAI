@@ -1,0 +1,39 @@
+﻿Input:  C:\YPHOME\Jianan_Projects\Telecoupling_AI_Project\fulldev\telecouplingAI-project\datainput_for_demo\SeasonalWaterYield_input\DEM_gura.tif
+Output: C:\YPHOME\Jianan_Projects\Telecoupling_AI_Project\fulldev\telecouplingAI-project\adhoc_test\manual_test_20260315\outputs\qgis\dem_render.png
+Rendering with QGIS (headless)...
+python : Traceback (most recent call last):
+At line:1 char:1
++ python ..\adhoc_test\manual_test_20260315\test_qgis.py 2>&1 | Out-Fil ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Traceback (most recent call last)::String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  File "C:\YPHOME\Jianan_Projects\Telecoupling_AI_Project\fulldev\telecouplingAI-project\adhoc_test\manual_test_20260315\test_qgis.py", 
+line 32, in <module>
+    asyncio.run(main())
+    ~~~~~~~~~~~^^^^^^^^
+  File "C:\Users\dru18\.conda\envs\TeleCouplingAI\Lib\asyncio\runners.py", line 195, in run
+    return runner.run(main)
+           ~~~~~~~~~~^^^^^^
+  File "C:\Users\dru18\.conda\envs\TeleCouplingAI\Lib\asyncio\runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "C:\Users\dru18\.conda\envs\TeleCouplingAI\Lib\asyncio\base_events.py", line 725, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+  File "C:\YPHOME\Jianan_Projects\Telecoupling_AI_Project\fulldev\telecouplingAI-project\adhoc_test\manual_test_20260315\test_qgis.py", 
+line 22, in main
+    result = await render_file(DEM, OUT_PNG, width=1920, height=1080)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\YPHOME\Jianan_Projects\Telecoupling_AI_Project\fulldev\telecouplingAI-project\backend\renderers\qgis_renderer.py", line 25, in 
+render_file
+    return await _run({
+           ^^^^^^^^^^^^
+    ...<4 lines>...
+    })
+    ^^
+  File "C:\YPHOME\Jianan_Projects\Telecoupling_AI_Project\fulldev\telecouplingAI-project\backend\renderers\qgis_renderer.py", line 97, in 
+_run
+    raise CSISError(f"QGIS render failed:\n{err.decode()[:500]}", "QGIS_FAILED")
+shared.utils.CSISError: QGIS render failed:
+

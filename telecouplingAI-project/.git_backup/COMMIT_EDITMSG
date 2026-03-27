@@ -1,0 +1,8 @@
+fix: never display raw file paths in Gemini text responses
+
+- Add File Path Rules to system instruction: Gemini must only show filenames
+  to users, never raw disk paths (C:\... or /home/...) in its text replies
+- Rename path field to internal_path in result_summary so it is clear these
+  values are for tool calls only (render_spatial_file still resolves them)
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
