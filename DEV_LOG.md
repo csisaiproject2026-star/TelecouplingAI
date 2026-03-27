@@ -1111,10 +1111,62 @@ ENV PYTHONPATH=/app:/opt/conda/envs/TeleCouplingAI/share/qgis/python:/opt/conda/
 
 ---
 
-### 十四、待完成（更新）
+### 十四、Linux 服务器部署规划（2026-03-27）
+
+#### 部署所需文件（镜像已含代码，无需传完整 git 仓库）
+
+Docker 镜像已通过 `COPY . .` 将代码打包进去，Linux 服务器上只需：
+
+1. **Docker 镜像**
+   - `csic_backend:latest`（约 7GB）
+   - `csic_frontend:latest`（约 93MB）
+
+2. **配置文件**
+   - `docker-compose.yml`
+   - `.env`（需将 `HOST_*` 路径改为 Linux 绝对路径）
+   - `.env.docker`
+
+3. **数据目录**
+   - `datainput_for_demo/`（演示输入数据）
+   - `outputs/`、`uploads/`（空目录，运行时写入）
+
+#### 传输流程
+
+```bash
+# Windows → 打包镜像
+docker save csic_backend:latest | gzip > csic_backend.tar.gz
+docker save csic_frontend:latest | gzip > csic_frontend.tar.gz
+
+# 传输到服务器
+scp csic_backend.tar.gz csic_frontend.tar.gz user@server:/opt/csis/
+scp docker-compose.yml .env .env.docker user@server:/opt/csis/
+rsync -av datainput_for_demo/ user@server:/opt/csis/datainput_for_demo/
+
+# Linux 服务器上：加载镜像并启动
+docker load < csic_backend.tar.gz
+docker load < csic_frontend.tar.gz
+docker compose --env-file .env.docker up -d
+```
+
+#### 访问方式
+
+- **内部/合作者使用**：直接用公网 IP（HTTP），功能完整，无 HTTPS 警告顾虑
+- **外部公众使用**：需要域名 + HTTPS（Let's Encrypt 免费证书 + nginx 配置）
+
+#### AWS 方案
+
+- EC2 实例推荐：8核16GB（`c5.2xlarge` 或 `m5.2xlarge`），月费约 $250-350
+- 弹性 IP 绑定（固定公网 IP）
+- SSL：ACM 证书不能直接用于 nginx，需用 Let's Encrypt（`certbot`）
+- 待服务器就绪后，补充 HTTPS 版 `nginx.conf` 和部署脚本
+
+---
+
+### 十五、待完成（更新）
 
 - [ ] CORS 收窄 + `ssl_verify=True`（用户手动测试完毕后）
-- [ ] 部署到真实 Linux 服务器
+- [ ] 部署到 Linux 服务器（AWS EC2，待购买）
+- [ ] 服务器就绪后：补充 HTTPS nginx.conf + certbot 配置 + 前端 API URL 更新
 - [ ] 下次重建镜像后，将 `.env.docker` 中临时保留的 `PYTHONPATH` 行删除（已固化进 Dockerfile）
 
 ---
