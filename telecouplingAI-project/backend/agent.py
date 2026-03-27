@@ -153,7 +153,7 @@ Apply the following rules consistently:
 - Detailed parameter strategies are provided in the skill specifications below
 
 ## File Path Rules (CRITICAL)
-- NEVER display raw file system paths (e.g. C:\..., /home/...) to the user in your text responses
+- NEVER display raw file system paths (e.g. C:\\..., /home/...) to the user in your text responses
 - When listing output files, mention only the filename (e.g. `aligned_lulc_2010.tif`), not the full path
 - internal_path values in tool results are for your internal tool calls only — do NOT echo them to the user
 - Uploaded file paths prepended to messages are for tool parameter resolution only — do NOT repeat them to the user

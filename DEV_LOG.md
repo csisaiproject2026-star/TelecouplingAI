@@ -844,3 +844,178 @@ curl http://localhost:8000/health
 - [ ] 生产部署前：将 `ssl_verify=False` 改回 `True`，`CORS` 收窄到具体域名
 
 ---
+---
+
+# 开发日志 — 2026-03-27
+
+## 本次工作内容：Docker 部署 + 全栈验证
+
+---
+
+### 一、Docker 镜像构建修复
+
+**问题 1：Python 版本不兼容**
+QGIS conda-forge 不支持 Python 3.13，构建时报 `Could not solve for environment specs`。
+
+**修复**：`backend/Dockerfile` 中将 `python=3.13` 改为 `python=3.12`，同时放宽 gdal/geos/proj 的版本固定，让 conda 自动解决 QGIS 依赖约束。
+
+**问题 2：`g++` 找不到（pygeoprocessing C++ 编译失败）**
+错误：`error: command 'g++' failed: No such file or directory`
+
+**修复**：在 conda install 中加入 `gxx_linux-64 gcc_linux-64`，并添加编译器 symlink 步骤：
+```dockerfile
+RUN ln -sf /opt/conda/envs/TeleCouplingAI/bin/x86_64-conda-linux-gnu-g++ \
+           /opt/conda/envs/TeleCouplingAI/bin/g++
+```
+
+**问题 3：缺少 pip 包**
+原 Dockerfile 缺少 `celery[redis]`、`redis`、`aiohttp`、`pydantic-settings`、`loguru`、`google-genai`。
+
+**修复**：统一加入 `RUN pip install` 步骤。
+
+**最终 Dockerfile 新增/修改点**：
+- `python=3.12`
+- 添加：`qgis`, `r-base r-igraph r-dplyr r-jsonlite r-sf r-rcolorbrewer`, `gxx_linux-64 gcc_linux-64`
+- 添加完整 pip 包列表
+- 添加 `COPY . .` 和 `EXPOSE 8000`
+- 添加 `ENV QT_QPA_PLATFORM=offscreen`, `ENV QGIS_PREFIX_PATH`
+- 修复 `CMD`：`uvicorn main:app --host 0.0.0.0 --port 8000`
+
+**构建结果**：
+- `csic_backend:latest` — 7.03 GB
+- `csic_frontend:latest` — 92.7 MB
+
+---
+
+### 二、docker-compose.yml 重写
+
+**主要变更**：
+- 去掉废弃的 `version: '3.8'`
+- 添加 `image: csic_backend:latest` / `image: csic_frontend:latest`（统一镜像命名）
+- 新增 nginx 入口服务（port 80，统一路由 `/api/`、`/health`、`/download/`）
+- `api-server` 添加 `healthcheck`（curl /health，60s start_period）
+- `redis` 添加 `healthcheck`（redis-cli ping）
+- `api-server` / `celery-worker` 改为 `depends_on: redis: condition: service_healthy`
+- `celery-worker`：`--concurrency=8 --pool=prefork --max-tasks-per-child=50`，`memory: 12G`
+- `frontend-ui` 改为 `expose`（不直接暴露端口，通过 nginx）
+- `file-server`：port 8001，挂载 outputs 目录
+
+**卷路径分离**：
+
+原来 `.env` 里的 Windows 路径直接被容器用，发生冲突。解决方案：
+- 新建 `.env.docker`，分离主机挂载路径（`HOST_*` 变量）和容器内路径（Linux 路径）
+- `docker-compose.yml` 卷定义改为 `${HOST_SHARED_DIR:-/data/outputs}:/data/outputs`
+
+---
+
+### 三、`.env.docker` 中发现并修复的 4 个环境变量 Bug
+
+| 变量 | 原因 | 修复 |
+|------|------|------|
+| `PYTHONPATH=/app` | Celery prefork 子进程 sys.path 不含 `/app`，`from tools.xxx import` 失败 | 加入 `.env.docker` |
+| `SSL_CERT_FILE` / `REQUESTS_CA_BUNDLE` | httpx 在 conda 环境使用 conda CA bundle，TLS 握手失败（`httpx.ConnectError`）；curl 正常但 httpx/google-genai SDK 不通 | 指向 certifi 的 `cacert.pem` |
+| `PROJ_DATA` / `PROJ_LIB` | natcap.invest / pygeoprocessing 调用 `transform_bounding_box` 时报 `OGR Error: Corrupt data`，根因是 `/opt/conda/.../share/proj` 未被 PROJ 找到 | 显式设置指向 conda env 下的 proj 数据目录 |
+| `GDAL_DATA` | 同上，防止 GDAL 相关路径问题 | 指向 conda env 下的 gdal 数据目录 |
+
+---
+
+### 四、R 包补全
+
+网络分析工具（Tool 1）的 R 脚本依赖 `dplyr`、`sf`、`jsonlite`、`RColorBrewer`，原 Dockerfile 只有 `r-base r-igraph`。
+
+**修复**：
+- `backend/Dockerfile` 中 conda install 行加入：`r-dplyr r-jsonlite r-sf r-rcolorbrewer`
+- 在运行中的容器里通过 `mamba install` 立即安装并验证
+- 用 `docker commit --change='CMD ["uvicorn", ...]' tele-celery csic_backend:latest` 将修复固化到镜像
+
+**注意**：`docker commit` 必须指定 `--change='CMD [...]'`，否则会将 celery 的 command 保存为镜像默认 CMD，导致 api-server 启动时跑 celery 而非 uvicorn。
+
+---
+
+### 五、测试体系建立
+
+#### 集成测试 `tests/test_integration.py`（11 个测试）
+
+对运行中的 Docker stack 发真实 HTTP 请求：
+
+| 测试 | 验证内容 |
+|------|---------|
+| `test_health` | GET /health → `{"status":"ok"}` |
+| `test_upload_*` | 单文件、自动分配 session、多文件上传 |
+| `test_delete_session` | DELETE /api/sessions/{id} |
+| `test_download_*` | 404 响应、路径遍历攻击拦截 |
+| `test_chat_sse_*` | SSE 流格式、session ID 自动分配 |
+| `test_render_zoom_missing_file` | 404 响应 |
+| `test_celery_*` | Celery/Redis 连通性验证 |
+
+**结果：11/11 通过，耗时 6.33s**
+
+#### Locust 压测 `tests/locustfile.py`
+
+模拟 40 并发用户，运行 2 分钟：
+
+| 接口 | P50 | P95 | 吞吐 | 失败 |
+|------|-----|-----|------|------|
+| GET /health | 6ms | 14ms | 8.6 req/s | 0 |
+| POST /api/upload | 61ms | 77ms | 4.3 req/s | 0 |
+| DELETE /api/sessions | 7ms | 14ms | 2.4 req/s | 0 |
+| POST /api/chat (Gemini) | 1.7s | 2.3s | 1.6 req/s | 0 |
+
+**结果：2148 次请求，0 失败，整体吞吐 18 req/s**
+
+#### E2E 工具测试 `tests/test_e2e_tools.py`（3 个工具）
+
+模拟真实用户：上传文件 → 发 chat 消息触发工具 → 读 SSE 流 → 验证输出文件。
+
+**Tool 1：Network Analysis Grouping（R + igraph）**
+- 上传：`nodes.csv`、`links.csv`
+- 参数：`walktrap` 聚类，`ISO_3_CODE` join
+- 输出：`network_plot.pdf`、`network_stats.csv`、`output.shp` 等 6 个文件
+- 耗时：~7s ✅
+
+**Tool 2：CBC Preprocessor（natcap.invest）**
+- 上传：`snapshots.csv`、`lulc_lookup.csv`、3 个 TIF 栅格
+- 输出：`aligned_lulc_2010/2030/2050.tif`、`carbon_biophysical_table_template.csv` 等 6 个文件
+- 耗时：~3s ✅
+
+**Tool 5：Crop Production Percentile（natcap.invest）**
+- 上传：`landcover_to_crop_table.csv`（参考容器内 `landcover.tif`）
+- 输出：barley/soybean/wheat 各 5 个产量栅格 + `result_table.csv` 共 54 个文件
+- 耗时：~14s ✅
+
+**结果：3/3 通过**
+
+---
+
+### 六、Docker 运维注意事项
+
+1. **`docker commit` 固化包**：在运行容器中 `mamba install` 之后，必须 `docker commit` 固化，否则 `--force-recreate` 会丢失安装的包。
+
+2. **nginx IP 缓存**：`api-server` / `celery-worker` 容器重建（IP 变化）后，`tele-nginx` 必须 `docker compose restart nginx`，否则出现 502。
+
+3. **env_file 变更必须 `--force-recreate`**：`docker compose restart` 不重新读取 `env_file`，必须用 `docker compose up -d --force-recreate` 才能让新环境变量生效。
+
+4. **镜像标签**：`csic_backend` 和 `csic_frontend` 都带 `csic_` 前缀。celery-worker 复用 `csic_backend:latest`，通过 docker-compose 的 `command:` 字段覆盖启动命令。
+
+---
+
+### 七、本次修改文件清单
+
+| 文件 | 操作 | 说明 |
+|------|------|------|
+| `backend/Dockerfile` | 修改 | python 3.12, R 包补全, pip 包补全, 编译器 symlink |
+| `docker-compose.yml` | 重写 | nginx 入口, healthcheck, HOST_* 卷变量, 镜像名统一 |
+| `.env.docker` | 新建 | Docker 专用环境变量（含 HOST_* 路径） |
+| `tests/test_integration.py` | 新建 | 11 个集成测试 |
+| `tests/locustfile.py` | 新建 | Locust 压测脚本 |
+| `tests/test_e2e_tools.py` | 新建 | 3 个工具 E2E 测试 |
+
+---
+
+### 八、待完成
+
+- [ ] Tool 3（CBC Main）、Tool 4（Seasonal Water Yield）、Tool 6（Crop Regression）的 E2E Docker 测试
+- [ ] 将 `.env.docker` 中的环境变量（PROJ_DATA、SSL_CERT_FILE 等）固化进 Dockerfile，避免部署时手动维护
+- [ ] 部署到真实 Linux 服务器（当前在 Windows Docker Desktop 验证完毕）
+
+---

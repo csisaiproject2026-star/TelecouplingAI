@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     FILE_SERVER_URL: str = "http://file-server/download/"
 
     # --- QGIS (Linux, inside Docker; override via .env for local Windows dev) ---
-    QGIS_PYTHON_PATH: str = "/usr/bin/python3"
+    QGIS_PYTHON_PATH: str = "/opt/conda/envs/TeleCouplingAI/bin/python"
     QGIS_MAX_CONCURRENT: int = 3
 
     # --- InVEST model data ---

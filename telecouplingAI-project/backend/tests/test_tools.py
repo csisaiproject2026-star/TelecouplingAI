@@ -123,10 +123,11 @@ class TestSeasonalWaterYield:
 
 class TestCropPercentile:
     def test_required_keys(self):
+        # model_data_path is taken from MODEL_DATA_PATH env var (not user input)
         from tools.crop_percentile import REQUIRED_KEYS
         assert "landcover_raster_path" in REQUIRED_KEYS
         assert "landcover_to_crop_table_path" in REQUIRED_KEYS
-        assert "model_data_path" in REQUIRED_KEYS
+        assert "model_data_path" not in REQUIRED_KEYS
 
     def test_get_supported_crops_from_model_data(self):
         """Dynamically loaded crops should include 172 crops from percentile tables."""

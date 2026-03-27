@@ -1,57 +1,99 @@
-version: '3.8'
-
 services:
-  api-server:
-    build: ./backend
-    container_name: tele-backend
-    env_file: .env
-    volumes:
-      - ./data:/app/data
-      - ./datainput_for_demo:/data/datainput:ro
-      - ${SHARED_DIR:-/data/outputs}:/data/outputs
-      - ${UPLOADS_DIR:-/data/uploads}:/data/uploads
-      - ${MODEL_DATA_PATH:-/data/model_data}:/data/model_data:ro
-    ports:
-      - "8000:8000"
-    depends_on:
-      - redis
-    restart: always
 
-  celery-worker:
-    build: ./backend
-    command: conda run --no-capture-output -n TeleCouplingAI celery -A workers.task_queue worker --concurrency=2 --pool=prefork
-    env_file: .env
-    volumes:
-      - ./data:/app/data
-      - ./datainput_for_demo:/data/datainput:ro
-      - ${SHARED_DIR:-/data/outputs}:/data/outputs
-      - ${UPLOADS_DIR:-/data/uploads}:/data/uploads
-      - ${MODEL_DATA_PATH:-/data/model_data}:/data/model_data:ro
-    depends_on:
-      - redis
-    restart: always
-
-  redis:
-    image: redis:7.2-alpine
-    command: redis-server --maxmemory 2gb --maxmemory-policy allkeys-lru
-    ports:
-      - "6379:6379"
-    restart: always
-
-  frontend-ui:
-    build: ./frontend
-    container_name: tele-frontend
+  # ── Nginx entry point (port 80) ─────────────────────────────────────────
+  nginx:
+    image: nginx:alpine
+    container_name: tele-nginx
     ports:
       - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - api-server
+      - frontend-ui
+    restart: always
+
+  # ── FastAPI backend ──────────────────────────────────────────────────────
+  api-server:
+    build: ./backend
+    image: csic_backend:latest
+    container_name: tele-backend
+    env_file: .env.docker
+    expose:
+      - "8000"
+    volumes:
+      - ${HOST_SHARED_DIR:-/data/outputs}:/data/outputs
+      - ${HOST_UPLOADS_DIR:-/data/uploads}:/data/uploads
+      - ${HOST_MODEL_DATA_PATH:-/data/model_data}:/data/model_data:ro
+      - ./datainput_for_demo:/data/datainput:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: always
+
+  # ── Celery worker (30-50 concurrent users → concurrency=8) ──────────────
+  celery-worker:
+    image: csic_backend:latest
+    container_name: tele-celery
+    command: >
+      celery -A workers.task_queue worker
+      --concurrency=8
+      --pool=prefork
+      --loglevel=info
+      --max-tasks-per-child=50
+    env_file: .env.docker
+    volumes:
+      - ${HOST_SHARED_DIR:-/data/outputs}:/data/outputs
+      - ${HOST_UPLOADS_DIR:-/data/uploads}:/data/uploads
+      - ${HOST_MODEL_DATA_PATH:-/data/model_data}:/data/model_data:ro
+      - ./datainput_for_demo:/data/datainput:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 12G    # InVEST tools are memory-heavy; adjust per server RAM
+
+  # ── Redis ────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:alpine
+    container_name: tele-redis
+    command: redis-server --maxmemory 2gb --maxmemory-policy allkeys-lru
+    expose:
+      - "6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: always
+
+  # ── React frontend (nginx static) ───────────────────────────────────────
+  frontend-ui:
+    build: ./frontend
+    image: csic_frontend:latest
+    container_name: tele-frontend
+    expose:
+      - "80"
     depends_on:
       - api-server
     restart: always
 
+  # ── File server (tool output downloads) ─────────────────────────────────
   file-server:
-    image: nginx:1.25-alpine
+    image: nginx:alpine
+    container_name: tele-fileserver
     ports:
       - "8001:80"
     volumes:
-      - ${SHARED_DIR:-/data/outputs}:/usr/share/nginx/html/download:ro
+      - ${HOST_SHARED_DIR:-/data/outputs}:/usr/share/nginx/html/download:ro
       - ./nginx/file-server.conf:/etc/nginx/nginx.conf:ro
     restart: always
