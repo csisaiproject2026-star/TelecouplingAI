@@ -37,16 +37,23 @@ services:
       start_period: 60s
     restart: always
 
-  # ── Celery worker (30-50 concurrent users → concurrency=8) ──────────────
-  celery-worker:
+  # ── Celery workers — one per tool queue (P1: concurrency=1 per tool) ────
+  # Each InVEST tool gets its own worker process so at most ONE instance of
+  # each tool runs at any time, eliminating GDAL multi-process conflicts.
+  # Users requesting the same tool while it is busy will queue in Redis.
+  # Total max memory: ~14 GB — safe for a 32 GB server.
+
+  celery-worker-net:
     image: csic_backend:latest
-    container_name: tele-celery
+    container_name: tele-celery-net
     command: >
       celery -A workers.task_queue worker
-      --concurrency=8
+      --queues=q_net
+      --concurrency=1
       --pool=prefork
       --loglevel=info
       --max-tasks-per-child=50
+      --hostname=worker-net@%h
     env_file: .env.docker
     volumes:
       - ${HOST_SHARED_DIR:-/data/outputs}:/data/outputs
@@ -60,13 +67,169 @@ services:
     deploy:
       resources:
         limits:
-          memory: 12G    # InVEST tools are memory-heavy; adjust per server RAM
+          memory: 2G
+
+  celery-worker-cbc-pre:
+    image: csic_backend:latest
+    container_name: tele-celery-cbc-pre
+    command: >
+      celery -A workers.task_queue worker
+      --queues=q_cbc_pre
+      --concurrency=1
+      --pool=prefork
+      --loglevel=info
+      --max-tasks-per-child=50
+      --hostname=worker-cbc-pre@%h
+    env_file: .env.docker
+    volumes:
+      - ${HOST_SHARED_DIR:-/data/outputs}:/data/outputs
+      - ${HOST_UPLOADS_DIR:-/data/uploads}:/data/uploads
+      - ${HOST_MODEL_DATA_PATH:-/data/model_data}:/data/model_data:ro
+      - ./datainput_for_demo:/data/datainput:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+
+  celery-worker-cbc-main:
+    image: csic_backend:latest
+    container_name: tele-celery-cbc-main
+    command: >
+      celery -A workers.task_queue worker
+      --queues=q_cbc_main
+      --concurrency=1
+      --pool=prefork
+      --loglevel=info
+      --max-tasks-per-child=50
+      --hostname=worker-cbc-main@%h
+    env_file: .env.docker
+    volumes:
+      - ${HOST_SHARED_DIR:-/data/outputs}:/data/outputs
+      - ${HOST_UPLOADS_DIR:-/data/uploads}:/data/uploads
+      - ${HOST_MODEL_DATA_PATH:-/data/model_data}:/data/model_data:ro
+      - ./datainput_for_demo:/data/datainput:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 3G
+
+  celery-worker-swy:
+    image: csic_backend:latest
+    container_name: tele-celery-swy
+    command: >
+      celery -A workers.task_queue worker
+      --queues=q_swy
+      --concurrency=1
+      --pool=prefork
+      --loglevel=info
+      --max-tasks-per-child=50
+      --hostname=worker-swy@%h
+    env_file: .env.docker
+    volumes:
+      - ${HOST_SHARED_DIR:-/data/outputs}:/data/outputs
+      - ${HOST_UPLOADS_DIR:-/data/uploads}:/data/uploads
+      - ${HOST_MODEL_DATA_PATH:-/data/model_data}:/data/model_data:ro
+      - ./datainput_for_demo:/data/datainput:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+
+  celery-worker-crop-pct:
+    image: csic_backend:latest
+    container_name: tele-celery-crop-pct
+    command: >
+      celery -A workers.task_queue worker
+      --queues=q_crop_pct
+      --concurrency=1
+      --pool=prefork
+      --loglevel=info
+      --max-tasks-per-child=50
+      --hostname=worker-crop-pct@%h
+    env_file: .env.docker
+    volumes:
+      - ${HOST_SHARED_DIR:-/data/outputs}:/data/outputs
+      - ${HOST_UPLOADS_DIR:-/data/uploads}:/data/uploads
+      - ${HOST_MODEL_DATA_PATH:-/data/model_data}:/data/model_data:ro
+      - ./datainput_for_demo:/data/datainput:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+
+  celery-worker-crop-reg:
+    image: csic_backend:latest
+    container_name: tele-celery-crop-reg
+    command: >
+      celery -A workers.task_queue worker
+      --queues=q_crop_reg
+      --concurrency=1
+      --pool=prefork
+      --loglevel=info
+      --max-tasks-per-child=50
+      --hostname=worker-crop-reg@%h
+    env_file: .env.docker
+    volumes:
+      - ${HOST_SHARED_DIR:-/data/outputs}:/data/outputs
+      - ${HOST_UPLOADS_DIR:-/data/uploads}:/data/uploads
+      - ${HOST_MODEL_DATA_PATH:-/data/model_data}:/data/model_data:ro
+      - ./datainput_for_demo:/data/datainput:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+
+  celery-worker-render:
+    image: csic_backend:latest
+    container_name: tele-celery-render
+    command: >
+      celery -A workers.task_queue worker
+      --queues=q_render,q_default
+      --concurrency=2
+      --pool=prefork
+      --loglevel=info
+      --max-tasks-per-child=50
+      --hostname=worker-render@%h
+    env_file: .env.docker
+    volumes:
+      - ${HOST_SHARED_DIR:-/data/outputs}:/data/outputs
+      - ${HOST_UPLOADS_DIR:-/data/uploads}:/data/uploads
+      - ${HOST_MODEL_DATA_PATH:-/data/model_data}:/data/model_data:ro
+      - ./datainput_for_demo:/data/datainput:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 2G
 
   # ── Redis ────────────────────────────────────────────────────────────────
   redis:
     image: redis:alpine
     container_name: tele-redis
-    command: redis-server --maxmemory 2gb --maxmemory-policy allkeys-lru
+    command: redis-server --maxmemory 1gb --maxmemory-policy allkeys-lru
     expose:
       - "6379"
     healthcheck:
@@ -88,6 +251,8 @@ services:
     restart: always
 
   # ── File server (tool output downloads) ─────────────────────────────────
+  # Exposed on 8001 for direct access — restrict in AWS security group
+  # or route through nginx if you prefer single-port setup
   file-server:
     image: nginx:alpine
     container_name: tele-fileserver

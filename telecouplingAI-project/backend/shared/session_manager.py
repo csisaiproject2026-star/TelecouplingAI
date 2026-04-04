@@ -78,6 +78,12 @@ class SessionManager:
         raw = self.r.hget(f"session:{session_id}", "output_files")
         return json.loads(raw.decode()) if raw else []
 
+    def get_uploaded_files(self, session_id: str) -> list[dict]:
+        """Return all uploaded files recorded for this session as filename/path dicts."""
+        raw = self.r.hget(f"session:{session_id}", "uploaded_files")
+        paths = json.loads(raw.decode()) if raw else []
+        return [{"filename": os.path.basename(p), "path": p} for p in paths]
+
     def delete_session(self, session_id: str) -> None:
         """Delete session and clean up output directory."""
         self.r.delete(f"session:{session_id}")

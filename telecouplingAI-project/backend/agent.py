@@ -35,6 +35,35 @@ from config import settings
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
+# Gemini concurrency limiter — max 3 simultaneous API calls
+# ---------------------------------------------------------------------------
+
+_GEMINI_SEMAPHORE = asyncio.Semaphore(3)
+
+async def _generate_with_retry(client, model_name: str, contents, config, max_retries: int = 4):
+    """Call generate_content with semaphore + exponential backoff on 429/503."""
+    import random
+    for attempt in range(max_retries):
+        async with _GEMINI_SEMAPHORE:
+            try:
+                return await client.aio.models.generate_content(
+                    model=model_name,
+                    contents=contents,
+                    config=config,
+                )
+            except Exception as e:
+                err_str = str(e).lower()
+                is_rate_limit = "429" in err_str or "quota" in err_str or "resource_exhausted" in err_str
+                is_server_err = "503" in err_str or "unavailable" in err_str
+                if (is_rate_limit or is_server_err) and attempt < max_retries - 1:
+                    wait = (2 ** attempt) + random.uniform(0, 1)
+                    logger.warning(f"[agent] Gemini {'rate limit' if is_rate_limit else 'server error'} "
+                                   f"(attempt {attempt+1}/{max_retries}), retrying in {wait:.1f}s")
+                    await asyncio.sleep(wait)
+                else:
+                    raise
+
+# ---------------------------------------------------------------------------
 # Gemini client — lazy singleton, created on first use
 # ---------------------------------------------------------------------------
 
@@ -367,6 +396,18 @@ async def run_agent(
     """
     from workers.task_queue import run_tool_task
 
+    # Map each InVEST tool to its dedicated Celery queue (concurrency=1 per queue
+    # prevents GDAL/InVEST multi-process conflicts under concurrent user load).
+    _TOOL_QUEUES = {
+        "run_network_analysis_grouping":        "q_net",
+        "run_coastal_blue_carbon_preprocessor": "q_cbc_pre",
+        "run_coastal_blue_carbon":              "q_cbc_main",
+        "run_seasonal_water_yield":             "q_swy",
+        "run_crop_production_percentile":       "q_crop_pct",
+        "run_crop_production_regression":       "q_crop_reg",
+        "render_spatial_file":                  "q_render",
+    }
+
     client = _get_client()
     model_name = model or settings.DEFAULT_MODEL
 
@@ -400,9 +441,10 @@ async def run_agent(
     for iteration in range(max_iterations):
         logger.info(f"[agent] iteration={iteration} session={session_id} model={model_name}")
 
-        response = await client.aio.models.generate_content(
-            model=model_name,
-            contents=contents,
+        response = await _generate_with_retry(
+            client,
+            model_name,
+            contents,
             config=types.GenerateContentConfig(
                 system_instruction=system_instruction,
                 tools=TOOLS,
@@ -441,7 +483,11 @@ async def run_agent(
             logger.info(f"[agent] function_call: {tool_name}")
 
             # ── Step 1: dispatch Celery to obtain the real task_id ──────────
-            celery_result = run_tool_task.delay(tool_name, tool_input, session_id)
+            queue = _TOOL_QUEUES.get(tool_name, "q_default")
+            celery_result = run_tool_task.apply_async(
+                args=[tool_name, tool_input, session_id],
+                queue=queue,
+            )
             task_id = celery_result.id
             logger.info(f"[agent] Celery task dispatched: {task_id}")
 

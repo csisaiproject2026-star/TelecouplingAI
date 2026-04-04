@@ -134,198 +134,71 @@ PRE_EXECUTION 注入 system prompt，POST_EXECUTION 注入 tool_result context�
 ### 🔴 严重问题修复
 
 **1. agent.py — `_gemini_client` 改为懒初始化**
-原来模块 import 时就创建 client，`GOOGLE_API_KEY` 未设置时直接崩溃。
-改为 `_get_client()` 函数，第一次调用 `run_agent()` 时才初始化。
-
 **2. agent.py — `tool_start` 事件 task_id 修正**
-原来先发 `tool_start`（此时用 tool_name 充当 task_id），再 `delay()`，导致前端 task_id 和 Redis channel 不一致。
-改为先 `run_tool_task.delay()`，拿到真实 Celery task_id 后再发 `tool_start` 事件。
-
 **3. App.jsx — 接入 SSE，替换旧 Gemini 端点**
-原来 `handleSend` 调 `fetch('http://127.0.0.1:8000/chat')` 直接 json()，完全不是 SSE。
-改为调用 `streamChat()`，通过 SSE 事件驱动消息渲染。
-
 **4. App.jsx — 默认模型改为 `gemini-2.5-flash`**
-原来默认是 `gemini-2.0-flash`，与 config.py 默认值不一致，已修正。
 
 ### 🟡 中等问题修复
 
 **5. App.jsx — 6 张 Suggested Prompts 卡片**
-从 2 张旧卡片扩展为 6 张，每张对应一个工具的触发场景，含 hint 标签。
-
-**6. App.jsx — 新消息类型渲染**
-新增 `MessageContent` 组件，支持渲染 `text`、`tool_status`、`warning`、`csv_table`、`chart`、`image`、`file_download` 7 种 block 类型。
-消息结构从 `{role, content}` 扩展为 `{role, blocks: [{type, ...}]}`，支持混合内容。
-
+**6. App.jsx — 新消息类型渲染（7 种 block 类型）**
 **7. main.py — session_manager 改为懒初始化**
-原来模块加载时就 `SessionManager()`，Redis 不可用时后端无法启动。
-改为 `get_session_manager()` 函数，首次请求时才初始化。
-
-**8. agent.py — `asyncio.get_event_loop()` → `asyncio.get_running_loop()`**
-在异步上下文里应用 `get_running_loop()`，消除 Python 3.10+ deprecation 警告。
-
+**8. agent.py — `asyncio.get_running_loop()`**
 **9. main.py — 新增 `/api/render/zoom` 端点**
-Spec Section 7.1 要求的端点，支持传入 file_path、output_path、extent、width、height，调用 QGIS re-render。
 
 ### 🟢 小问题修复
 
 **10. streaming.js — 加入 `model` 参数**
-`streamChat()` 新增 `model` 参数，append 到 FormData，前端模型选择框生效。
-
-**11. 前端组件完整实现**
-- `ToolStatusCard`：进度条 + 完成状态变色（蓝→绿）
-- `WarningCard`：琥珀色警告样式
-- `ImageRenderer`：圆角卡片 + extent 信息
-- `ResultFiles`：带图标的下载列表
-- `CsvRenderer`：固定高度滚动表格
-- `ChartRenderer`：Chart.js 动态加载，支持 bar/line
+**11. 前端组件完整实现（6 个组件）**
 
 ---
 
-## 下次继续
-
-- [x] agent.py 完整实现（Gemini）✅
-- [x] main.py 完整实现 ✅
-- [x] App.jsx 完整改造 ✅
-- [x] streaming.js / session.js ✅
-- [x] 所有前端组件完整实现 ✅
-- [x] requirements.txt 版本修正 ✅
-- [ ] 配置 Redis + 填入 GOOGLE_API_KEY，做端到端真实对话测试
-- [ ] Docker 部署配置验证
-- [ ] test_api.py 补充（Spec 步骤 6 要求）
-
 ---
 
-# 开发日志 — 2026-03-25（端到端测试 + SSL 修复）
+# 开发日志 — 2026-03-25（第五次）
 
-## 本次工作内容
+## 本次工作内容 — Claude Code 测试结果处理 + 环境配置说明
 
-### 一、环境搭建
+### 测试结果（Claude Code 执行）
 
-- Redis：使用 Windows 本机 Redis（tporadowski/redis）而非 Docker，本地开发更轻量。生产部署时直接打进 docker-compose。
-- Gemini API Key：填入 `.env` 的 `GOOGLE_API_KEY` 字段，无需加引号。
+| 测试项 | 结果 |
+|--------|------|
+| conda 环境 TeleCouplingAI | Python 3.13.11 ✅ |
+| 13 模块 import 验证 | 全部 OK ✅ |
+| pytest 单元测试（59 个） | 59/59 全部通过 ✅ |
+| 后端启动 main.py | /health 返回 {"status":"ok"} ✅ |
+| 前端构建 npm run build | 构建成功，1357 模块 ✅ |
+| 前端开发服务器 npm run dev | http://localhost:5173 正常响应 ✅ |
 
-### 二、SDK 兼容性 Bug 修复（agent.py）
+### 发现并修复的问题
 
-**问题**：`google-genai 1.63.0` 的 `Part.from_text()` 改为关键字参数。
+- `aiofiles==3.13.3` → `aiofiles>=23.0.0`
+- `aiohttp` → `aiohttp[speedups]>=3.9.0`
 
-错误信息：`Part.from_text() takes 1 positional argument but 2 were given`
+## ⚙️ 环境配置说明（Claude Code 必读）
 
-**修复**：`agent.py` 中两处调用改为关键字参数：
-```python
-# 修复前
-types.Part.from_text(user_text)
-# 修复后
-types.Part.from_text(text=user_text)
-```
-涉及第 353 行（用户消息构建）和第 460 行（POST_EXECUTION skill 注入）。
+### Redis 配置
 
-### 三、SSL / 代理问题修复（agent.py）
+**代码没有自动检测环境的逻辑**，只认 `.env` 里写的 `REDIS_URL`。
 
-**背景**：开发环境在中国大陆，HTTPS_PROXY 设置为本地代理（Clash/V2Ray，127.0.0.1:29758）以访问 Google API。代理建立 CONNECT 隧道后，Python httpx 的 TLS 握手失败，报错：
+| 环境 | REDIS_URL | 文件 |
+|------|-----------|------|
+| 本地开发 | `redis://localhost:6379/0` | 根目录 `.env` |
+| Docker 部署 | `redis://redis:6379/0` | 服务器上的 `.env` |
 
-```
-[SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol
-```
-
-**根因**：代理做 SSL 中转时证书链不被 Python OpenSSL 信任。
-
-**修复**：在 `_get_client()` 创建 genai Client 时，通过 `HttpOptions` 的 `clientArgs` / `asyncClientArgs` 关闭 SSL 验证：
-
-```python
-_gemini_client = genai.Client(
-    api_key=settings.GOOGLE_API_KEY,
-    http_options=HttpOptions(
-        clientArgs={"verify": False},
-        asyncClientArgs={"verify": False},
-    ),
-)
+本地开发启动 Redis（WSL）：
+```bash
+sudo apt update && sudo apt install redis-server -y
+redis-server --daemonize yes
+redis-cli ping   # 返回 PONG 说明成功
 ```
 
-**⚠️ 生产部署注意**：服务器部署在美国境内，不存在代理问题，Google API 可直连。上线前需将 `verify` 改回 `True`（或直接删除这两个参数），恢复证书验证以保证安全性。
+### Gemini API Key
 
-### 四、端到端测试结果
-
-后端启动后测试 `/api/chat` 端点，Gemini 正常响应：
-
-```
-Hello! I am CSIS Assistant, an expert in ecosystem services modelling (InVEST) ...
-```
-
-基础对话流程验证通过。
-
-## 当前状态
-
-- [x] Redis 配置完成（Windows 本机）
-- [x] GOOGLE_API_KEY 配置完成
-- [x] /api/health 正常
-- [x] /api/chat 端到端对话测试通过
-- [x] 前端启动测试 ✅
-- [ ] /api/upload 文件上传测试
-- [ ] 工具调用（function calling）端到端测试
-- [ ] Docker 部署配置验证
+`.env` 里 `GOOGLE_API_KEY=your-gemini-api-key-here` 是占位符，必须填入真实 key。
+申请地址：https://aistudio.google.com
 
 ---
-
-# 开发日志 — 2026-03-25（前端测试 + UI 修复）
-
-## 本次工作内容
-
-### 一、前端启动脚本
-
-新增 `start.bat`（位于项目根目录），双击后自动弹出 3 个终端窗口分别启动：
-1. FastAPI 后端（`python main.py`）
-2. Celery Worker（`celery -A workers.task_queue worker -P solo`）
-3. Vite 前端（`npm run dev`）
-
-启动后浏览器访问 `http://localhost:5173`。
-
-### 二、前端端到端对话测试
-
-通过预览工具打开页面，输入 "test" 发送，AI 正常返回：
-
-> Hello! I am the CSIS Assistant, an expert in ecosystem services modelling (InVEST) and spatial analysis. How may I help you today?
-
-对话流程、消息气泡、侧边栏历史记录命名均正常。
-
-### 三、UI 问题发现与修复（App.jsx）
-
-**问题 1：移动端侧边栏挤掉主内容**
-
-根因：`isSidebarOpen` 默认 `true`，侧边栏占 288px，在 375px 屏幕上主内容区几乎为零。
-
-修复：
-- 默认值改为 `window.innerWidth >= 768`（小屏默认收起）
-- 侧边栏改为 `fixed md:relative`，移动端 overlay 模式（脱离文档流）
-- 关闭时用 `-translate-x-full`（移动）/ `md:w-0`（桌面）
-
-**问题 2：移动端无遮罩层**
-
-修复：侧边栏打开时在移动端渲染半透明 backdrop，点击即关闭侧边栏。
-
-**问题 3：汉堡菜单按钮仅在侧边栏关闭时显示**
-
-修复：改为顶栏常驻显示，点击切换侧边栏开关。
-
-### 四、跨屏幕验证结果
-
-| 尺寸 | 结果 |
-|------|------|
-| 移动端 375px | 侧边栏默认收起，汉堡菜单可弹出 overlay ✅ |
-| 平板 768px | 侧边栏默认展开，2 列卡片布局正常 ✅ |
-| 桌面 1280px | 侧边栏 + 主内容并排，布局正常 ✅ |
-
-## 当前状态
-
-- [x] Redis 配置完成（Windows 本机）
-- [x] GOOGLE_API_KEY 配置完成
-- [x] /api/health 正常
-- [x] /api/chat 端到端对话测试通过
-- [x] 前端 UI 响应式布局修复完成
-- [x] start.bat 一键启动脚本
-- [ ] /api/upload 文件上传测试
-- [ ] 工具调用（function calling）端到端测试
-- [ ] Docker 部署配置验证
 
 ---
 
@@ -335,838 +208,621 @@ Hello! I am CSIS Assistant, an expert in ecosystem services modelling (InVEST) .
 
 ### 一、端到端工具测试（浏览器 UI）
 
-**测试方法**：每次开新 Chat session，通过浏览器上传真实 demo 文件，用自然语言 prompt 驱动 Gemini Agent 完成工具调用，不使用 param=value 格式。Demo 输入文件统一放在 ，通过  路径访问。
-
-**测试结果**：
-
 | Tool | 状态 | 备注 |
 |------|------|------|
+| Tool 1: Network Analysis | ✅ 通过 | R 崩溃修复验证完成 |
 | Tool 2: CBC Preprocessor | ✅ 通过 | |
-| Tool 3: CBC Main | ✅ 通过 | 修复了 CSV 路径问题（见下） |
+| Tool 3: CBC Main | ✅ 通过 | 修复了 CSV 路径问题 |
+| Tool 4: Seasonal Water Yield | ✅ 通过 | |
 | Tool 5: Crop Production Percentile | ✅ 通过 | 移除 model_data_path 暴露 |
 | Tool 6: Crop Production Regression | ✅ 通过 | 移除 model_data_path 暴露 |
-| Tool 1: Network Analysis | ✅ 通过 | R 崩溃修复验证完成（见本次日志 Bug 6/7） |
-| Tool 4: Seasonal Water Yield | ✅ 通过 | 首次测试通过（见本次日志 Bug 8） |
-
----
-
-### 二、Bug 修复
-
-**Bug 1 — DataTransfer 文件通过 Vite 获取到 HTML 而非实际文件**
-- 现象：浏览器 eval 里用  fetch 文件，拿到的是 （Vite SPA fallback）
-- 根因：Vite dev server 只代理 , , ， 路径未代理
-- 修复：改用  路径，利用后端  端点， 即可访问 
-
-**Bug 2 — CBC Main CSV 解析错误**
-- 现象：
-- 根因： 表头有多余引号，raster 路径为相对路径
-- 修复：重写为无引号表头 + 绝对路径
-
-**Bug 3 — Gemini Agent 跨 session ConnectError**
-- 现象：第二次 Chat session 调用 Gemini API 报 
-- 根因： 全局缓存，SDK 关闭 session 后 httpx.AsyncClient 已失效
-- 修复 ()：移除全局缓存，每次调用创建新 （含新 httpx clients）
-
-**Bug 4 — model_data_path 暴露给用户**
-- 现象：Agent 向用户询问 model_data_path 并在输出中显示服务器绝对路径
-- 修复： /  改为  默认值； tool schema 移除该参数；SKILL.md 添加禁止提及说明
-
-**Bug 5 — Network Analysis R 进程崩溃（Windows 特有）**
-- 现象：Celery Worker 调用 R 脚本返回 exit code （0xC0000005 = STATUS_ACCESS_VIOLATION），stderr 为空
-- 根因： 使用相对路径 Usage: Rscript [options] file [args]
-   or: Rscript [options] -e expr [-e expr2 ...] [args]
-A binary front-end to R, for use in scripting applications.
-
-Options:
-  --help              Print usage and exit
-  --version           Print version and exit
-  --verbose           Print information on progress
-  --default-packages=LIST  Attach these packages on startup;
-                        a comma-separated LIST of package names, or 'NULL'
-and options to R (in addition to --no-echo --no-restore), for example:
-  --save              Do save workspace at the end of the session
-  --no-environ        Don't read the site and user environment files
-  --no-site-file      Don't read the site-wide Rprofile
-  --no-init-file      Don't read the user R profile
-  --restore           Do restore previously saved objects at startup
-  --vanilla           Combine --no-save, --no-restore, --no-site-file,
-                        --no-init-file and --no-environ
-
-Expressions (one or more '-e <expr>') may be used *instead* of 'file'.
-Any additional 'args' can be accessed from R via 'commandArgs(TRUE)'.
-See also  ?Rscript  from within R. + ，Celery Worker 通过  启动后 PATH 环境与直接测试不同，路径解析不稳定
-- 修复 ()：改用  绝对路径 +  绝对脚本路径
-- 状态：修复已提交，待重启 Celery Worker 验证
-
----
-
-### 三、新增 Demo 输入文件（）
-
-| 文件 | 用途 |
-|------|------|
-|  | CBC Main — 快照年份与绝对路径 |
-|  | CBC Main — 土地覆盖转换规则 |
-|  | CBC Main — 生物物理参数表 |
-|  | Crop Percentile — lucode 映射 |
-|  | Network Analysis — 节点属性（列：CODE, larrivals.sender, larrivals.receiver） |
-|  | Network Analysis — 连接表 |
-|  | Network Analysis — 世界国家底图 |
-
----
-找到了！Redis 在 C:\Users\dru18\redis\。
-
-## 下次继续（Phase 2 结束时）
-
-- [x] Tool 1: Network Analysis — 重启 Celery 后重试 ✅
-- [x] Tool 4: Seasonal Water Yield — 首次测试 ✅
-- [ ] 多用户并发场景测试
-- [ ] Docker 化 + Linux 环境验证
-
----
-
----
-
-# 开发日志 — 2026-03-27（端到端集成测试 Phase 3）
-
-## 本次工作内容
-
-### 一、服务启动方式修复
-
-**问题**：`conda run` 在 git bash 下不能正确继承 CWD（Unix 路径 vs Windows 路径不匹配），Celery Worker 的 `_backend_dir` 计算偏差，`from tools.xxx import` 抛出 `ModuleNotFoundError: No module named 'tools'`。
-
-**修复**：改用 conda env 的 Python 可执行文件直接启动，并显式设置 `PYTHONPATH`：
-```
-PYTHONPATH=C:\...\backend  C:\Users\dru18\.conda\envs\TeleCouplingAI\python.exe -m celery -A workers.task_queue worker -P solo
-```
-
----
-
-### 二、UI 端到端测试方法
-
-使用 `preview_eval` 在浏览器上下文中 fetch demo 文件（通过 `/download/demo_xxx/` 路径），用 `DataTransfer` API 注入 React file input，触发完整 UI 流程。
-交互约定：每次提交后用 `AskUserQuestion`（成功/失败）等待确认，失败时截图分析。
-
----
-
-### 三、Bug 修复
-
-**Bug 6 — Celery 旧进程残留（DuplicateNodename）**
-- 现象：存在两个 Celery Worker，任务被旧进程（修复前代码）处理
-- 修复：每次重启前 `Get-Process python | Stop-Process -Force` 杀干净
-
-**Bug 7 — Network Analysis R 脚本路径修复验证**
-- 修复内容（Phase 2 已完成）：`network_analysis.py` 改用 `Path(__file__).parent.parent` 绝对路径
-- 验证结果：Celery `returncode=0`，6 个输出文件（PDF/CSV/SHP/PNG），UI ✅ 100% Completed + 预览地图
-
-**Bug 8 — SWY `prepare_monthly_dir` 同目录多类型文件歧义**
-- 现象：precip 和 ET0 文件在同一 uploads 目录，`glob("*_N.tif")` 返回多个候选，`matches[0]` 可能选错类型
-- 修复（`tools/seasonal_water_yield.py`）：增加 `type_keyword` 优先匹配
-  - `prefix_out="precip_m"` → 优先选文件名含 "precip" 的
-  - `prefix_out="et0_m"` → 优先选文件名含 "et0" 的
-- 验证结果：SWY 输出 B.tif/QF.tif/L.tif/aggregated_results_swy.shp，UI 多张预览图正常渲染 ✅
-
----
-
-### 四、测试结果汇总（截至本次）
-
-| Tool | 状态 | 测试日期 |
-|------|------|----------|
-| Tool 1: Network Analysis | ✅ 通过 | 2026-03-27 |
-| Tool 2: CBC Preprocessor | ✅ 通过 | 2026-03-27 (Phase 2) |
-| Tool 3: CBC Main | ✅ 通过 | 2026-03-27 (Phase 2) |
-| Tool 4: Seasonal Water Yield | ✅ 通过 | 2026-03-27 |
-| Tool 5: Crop Production Percentile | ✅ 通过 | 2026-03-27 (Phase 2) |
-| Tool 6: Crop Production Regression | ✅ 通过 | 2026-03-27 (Phase 2) |
 
 **全部 6 个工具端到端测试通过 ✅**
 
 ---
 
-## 下次继续
-
-- [ ] 多用户并发场景测试
-- [ ] Docker 化 + Linux 环境验证
-- [ ] `/api/render/zoom` QGIS 重渲染端点测试
-- [ ] `start.bat` 更新（改为直接调用 Python 可执行文件，避免 conda run CWD 问题）
-
-**启动方式（当前有效）**：
-```
-1. Redis:   C:\Users\dru18\redis\redis-server.exe redis.windows.conf
-2. 后端:    C:\Users\dru18\.conda\envs\TeleCouplingAI\python.exe main.py
-3. Celery:  PYTHONPATH=C:\...\backend python.exe -m celery -A workers.task_queue worker -P solo
-4. 前端:    npm run dev
-```
-
 ---
 
-# 开发日志 — 2026-03-27（代码审查 + 安全修复 Phase 4）
+# 开发日志 — 2026-03-27（Docker 部署 + 全栈验证）
 
 ## 本次工作内容
 
-### 一、全量代码审查
+### 测试结果汇总
 
-对 `backend/` 下所有源文件（`main.py`、`agent.py`、`workers/task_queue.py`、`config.py`、`shared/`、`tools/` 全部 6 个工具、`renderers/`）进行系统性代码审查，共发现 **25 个问题**，分为 4 个严重级别。
+- 集成测试 `test_integration.py`：11/11 通过
+- Locust 压测（40并发，2分钟）：2148 次请求，0 失败
+- E2E 工具测试：6/6 工具全部通过
+- 多用户并发测试（3用户同时）：3/3 通过，各 session 完全隔离
+
+### 主要修复
+
+- Dockerfile：python 3.12、R 包补全、编译器 symlink、pip 包补全
+- docker-compose.yml：nginx 入口、healthcheck、HOST_* 卷变量
+- 新建 `.env.docker`：Docker 专用环境变量
+- 环境变量固化进 Dockerfile：PROJ_DATA、GDAL_DATA、SSL_CERT_FILE、PYTHONPATH 等
+
+### Docker 运维注意事项
+
+1. `docker commit` 固化包后必须指定 `--change='CMD [...]'`
+2. nginx 容器在 api-server 重建（IP 变化）后必须 `docker compose restart nginx`
+3. env_file 变更必须 `docker compose up -d --force-recreate`
+4. 卷路径变量（HOST_*）必须写在项目根 `.env` 中，不能只在 `.env.docker`
 
 ---
 
-### 二、已修复问题（4 项）
+---
 
-#### Fix 1 — 路径穿越漏洞（`backend/main.py:266`）
+# 开发日志 — 2026-04-04（GCP 服务器部署准备）
 
-**严重程度**：高（安全漏洞）
+## 本次工作内容
 
-**问题**：`/download/{session_id}/{file_path:path}` 端点未校验 `file_path` 是否包含 `../`，攻击者可构造如 `/download/x/../../../etc/passwd` 的 URL 读取服务器任意文件。
+### 一、GCP 服务器创建
 
-```python
-# 修复前
-full_path = os.path.join(settings.SHARED_DIR, session_id, file_path)
-if not os.path.isfile(full_path):
-    raise HTTPException(status_code=404, detail="File not found")
-return FileResponse(full_path, filename=os.path.basename(full_path))
+**选择 GCP 而非 AWS 的原因**：项目使用 Gemini API，部署在 GCP 上调用 Gemini 走 Google 内网，延迟更低、更稳定。未来可升级到 Vertex AI Gemini，有更高 quota 和更好 SLA。
 
-# 修复后
-shared_root = Path(settings.SHARED_DIR).resolve()
-full_path = Path(settings.SHARED_DIR, session_id, file_path).resolve()
-if not str(full_path).startswith(str(shared_root)):
-    raise HTTPException(status_code=403, detail="Access denied")
-if not full_path.is_file():
-    raise HTTPException(status_code=404, detail="File not found")
-return FileResponse(str(full_path), filename=full_path.name)
+**服务器配置**：
+
+| 项目 | 值 |
+|------|-----|
+| 平台 | Google Cloud Platform (GCP) |
+| 项目名 | csis-platform |
+| 实例名 | csis-server |
+| 地区 | us-central1 (Iowa) |
+| Zone | us-central1-a |
+| 机型 | e2-standard-4（4 vCPU / 16GB RAM） |
+| OS | Ubuntu 22.04 LTS |
+| 系统盘 | 50GB SSD |
+| 外网 IP | 35.184.212.119 |
+| 防火墙 | HTTP ✅ HTTPS ✅ |
+| 计费 | ~$0.134/小时（按秒计费） |
+
+**SSH 连接方式**：
+- 本机生成 Ed25519 密钥对（`ssh-keygen -t ed25519 -C "csis-gcp"`）
+- 公钥上传到 GCP VM 的 SSH Keys
+- 连接命令：`ssh -i ~/.ssh/id_ed25519 dru1889@35.184.212.119`
+
+**系统验证结果**：
+```
+Linux csis-server 6.8.0-1053-gcp Ubuntu 22.04
+内存：32GB 总共，30GB 可用
+磁盘：97GB，已用 2.6GB
 ```
 
-**原则**：`Path.resolve()` 展开所有 `..` 符号后，用 `startswith` 校验路径必须在 `SHARED_DIR` 内。
-
----
-
-#### Fix 2 — Gemini 空 candidates 崩溃（`backend/agent.py:413`）
-
-**严重程度**：中（运行时崩溃）
-
-**问题**：当 Gemini API 因安全过滤、限流或异常返回空 `candidates` 列表时，`response.candidates[0]` 抛出 `IndexError`，导致整个 Agent 任务崩溃，前端收到 500 错误。
-
-```python
-# 修复后（在 response 使用前增加守卫）
-if not response.candidates:
-    logger.warning("[agent] Gemini returned no candidates, stopping")
-    break
-```
-
-**位置**：`agent.py` 主循环 `for iteration in range(max_iterations):` 内，紧跟 `generate_content` 调用之后。
-
----
-
-#### Fix 3 — 事件循环冗余代码（`backend/workers/task_queue.py:58`）
-
-**严重程度**：低（代码质量）
-
-**问题**：`execute_tool()` 手动创建新事件循环并设置为全局事件循环，污染线程状态。`asyncio.run()` 是 Python 3.7+ 的官方等效用法，更简洁安全。
-
-```python
-# 修复前（7 行）
-loop = asyncio.new_event_loop()
-asyncio.set_event_loop(loop)
-try:
-    return loop.run_until_complete(
-        func(params, session_id, task_id, progress_callback)
-    )
-finally:
-    loop.close()
-
-# 修复后（1 行）
-return asyncio.run(func(params, session_id, task_id, progress_callback))
-```
-
-**注意**：两者行为等价，均创建全新事件循环运行协程后关闭。修复后代码更清晰，不写入全局线程状态。
-
----
-
-#### Fix 4 — 死代码 `if True:`（`backend/tools/crop_regression.py:100`）
-
-**严重程度**：低（代码质量）
-
-**问题**：`run_crop_regression()` 内有 `if True:` 包裹的验证逻辑块，该条件恒为真，等同于多余的缩进层级，令代码难读且带来误解（是否原本是 `if some_flag:`？）。
-
-```python
-# 修复前
-if os.path.isfile(fert_path_check):
-    supported_check = get_supported_crops(model_data_path)
-    if True:
-        with open(fert_path_check, ...) as f:
-            ...
-
-# 修复后
-if os.path.isfile(fert_path_check):
-    supported_check = get_supported_crops(model_data_path)
-    with open(fert_path_check, ...) as f:
-        ...
-```
-
----
-
-### 三、延期处理的问题（21 项）
-
-以下问题经评估后决定**不在本次修复**，原因是改动风险超过收益，或属于部署环境特有配置，强行修改会破坏已通过的 E2E 测试。
-
-| # | 文件 | 问题 | 延期原因 |
-|---|------|------|----------|
-| 1 | `agent.py` | `content.parts` 可能为 `None` → 列表推导 `AttributeError` | 实际 Gemini API 始终返回 parts；加守卫会引入不必要代码 |
-| 2 | `agent.py` | `ssl_verify=False` 硬编码 | 生产部署在境外，不需代理，届时删除；改动需重新测试 |
-| 3 | `agent.py` | Gemini Client 不缓存（每次调用新建） | 已确认是 Bug 3 的修复，不可回退 |
-| 4 | `config.py` | 默认路径为 Docker 路径（`/data/outputs`） | 生产 Docker 环境确实使用此路径；本地由 `.env` 覆盖 |
-| 5 | `main.py` | `CORS allow_origins=["*"]` | 本地开发便利性需求；生产部署时按域名收窄 |
-| 6 | `main.py` | 会话无超时/自动清理 | 当前是 MVP，不需要自动过期逻辑 |
-| 7 | `shared/session_manager.py` | 内存存储，重启即丢失 | 设计如此，会话状态为瞬态 |
-| 8 | `tools/network_analysis.py` | subprocess 未限制运行时间 | R 脚本超时由 Celery `task_soft_time_limit=1800s` 保护 |
-| 9 | `tools/network_analysis.py` | shapefile 路径用字符串拼接 | 用户上传文件，路径可信；不存在注入风险 |
-| 10 | `tools/cbc_main.py` | CSV 路径未用 `validate_required` | 路径来自上传文件字典，已在上层验证 |
-| 11 | `tools/cbc_preprocessor.py` | 无进度百分比细分 | 工具本身很快，细分无实际意义 |
-| 12 | `tools/seasonal_water_yield.py` | tmpdir 在异常时可能残留 | `finally` 块已处理；极端异常（kill -9）可接受 |
-| 13 | `tools/crop_percentile.py` | `model_data_path` 由 settings 提供而非用户输入 | 这是 Tool 5 的已知设计；model_data 路径不暴露给用户 |
-| 14 | `tools/crop_regression.py` | `_rewrite_crop_csv` 在 workspace 内写文件（workspace 是 InVEST 输出目录） | InVEST 不干扰额外文件；实测通过 |
-| 15 | `workers/task_queue.py` | `r.close()` 在 `finally`，但 `publish()` 异常时 r 可能未初始化 | `redis.from_url()` 失败时 `r` 赋值前就会抛出，不会到 `finally` |
-| 16 | `renderers/qgis_renderer.py` | QGIS 渲染超时无机制 | `/api/render/zoom` 端点尚未进入测试，延期处理 |
-| 17 | `renderers/output_router.py` | `.tif` 文件一律触发渲染，可能对大文件很慢 | 当前 demo 数据文件较小；大文件场景待压测后处理 |
-| 18 | `shared/utils.py` | `scan_output_directory` 递归深度无限制 | InVEST 输出结构固定，不存在深层嵌套 |
-| 19 | `main.py` | 上传文件无大小/类型限制 | MVP 阶段，受信任用户使用；生产前加限制 |
-| 20 | `agent.py` | `max_iterations=10` 硬编码 | 当前工具调用链不超过 2 轮；足够 |
-| 21 | `config.py` | `FILE_SERVER_URL` 默认为 localhost | 生产时通过环境变量覆盖；不需改代码 |
-
----
-
-### 四、修复后状态
-
-- 所有 4 项修复均**向后兼容**，不影响已通过的 E2E 测试
-- Fix 1 (路径穿越)：现有测试路径均在 SHARED_DIR 内，`resolve()` 后 `startswith` 仍通过
-- Fix 2 (空 candidates)：正常响应时 `candidates` 非空，守卫不触发
-- Fix 3 (事件循环)：`asyncio.run()` 与原实现行为等价
-- Fix 4 (`if True:`)：纯缩进调整，逻辑不变
-
-
-
-# 并发架构分析 — 2026-03-27
-
-## 一、同一 Chat 窗口连续调用多个 Tool
-
-**结论：安全，无冲突。**
-
-| 机制 | 说明 |
-|------|------|
-| 输出目录隔离 | `generate_output_dir` 用秒级时间戳生成 `{session_id}/{timestamp}_{tool_name}/`，每次调用独立目录 |
-| Redis 频道隔离 | 每个 Celery 任务有唯一 UUID task_id，订阅 `progress:{session_id}:{task_id}`，不同 tool 的事件不串台 |
-| Agent 串行执行 | `agent.py` 主循环 `for fc in function_calls:` 是顺序 for 循环，必须等当前 tool 收到 `done` 后才 dispatch 下一个 |
-| Celery `-P solo` 兜底 | 即使 Gemini 在同一 response 里返回多个 function_call，Celery 也排队串行执行 |
-
-唯一边缘情况：`generate_output_dir` 时间戳精度为秒，同一秒内同一用户调用同一 tool 两次会复用目录，但输出文件名不同，不会覆盖关键结果。
-
----
-
-## 二、多用户并发（10 人同时在线）
-
-### 安全的组件
-
-| 组件 | 原因 |
-|------|------|
-| FastAPI | 异步处理，多个 SSE 流并发无问题 |
-| Session Manager | 基于 Redis hash 存储（`session:{session_id}`），每用户独立 key，有 TTL 自动过期和 `MAX_SESSIONS` 最大上限保护 |
-| 文件系统 | 输出目录按 `session_id` 隔离，用户间完全不干扰 |
-| Redis pub/sub | 频道按 `progress:{session_id}:{task_id}` 隔离，跨用户无干扰 |
-
-### 核心瓶颈：Celery `-P solo` 是全局单线程队列
-
-10 人同时提交工具调用，所有任务进同一队列，**严格串行**：
-
-```
-用户1 的 SWY 任务     → 立即执行（~5分钟）
-用户2 的 Network 任务 → 等用户1 完成后执行
-...
-用户10 的任务         → 等待约 45 分钟
-```
-
-前端 SSE 连接保持 pending，用户看到长时间转圈，不是 bug，是设计限制。
-
-### 次要问题：session_manager 有小概率竞态
-
-`add_uploaded_file` / `add_tool_run` 是非原子的 read-modify-write（`hget` → `json.loads` → `append` → `hset`）。同一 session_id 并发写入时理论上可能丢一条记录。实际中每个用户 session_id 不同，不共享，触发概率接近零。
-
-### 解决方案（按优先级）
-
-**方案一：Windows 下改用 `-P threads`（中期，改动成本极低）**
+### 二、下一步：安装 Docker
 
 ```bash
-PYTHONPATH=... python.exe -m celery -A workers.task_queue worker -P threads -c 4 --loglevel=info
+sudo apt update && sudo apt install -y docker.io docker-compose-plugin
+sudo usermod -aG docker $USER && newgrp docker
 ```
-允许 4 个工具任务并发执行，10 人场景基本够用，Windows 兼容，无需改任何业务代码。
-
-**方案二：启动多个 Worker 进程（扩展性好，Windows 也可用）**
-
-```bash
-# 终端 A
-PYTHONPATH=... python.exe -m celery -A workers.task_queue worker -P solo -n worker1@%h
-# 终端 B
-PYTHONPATH=... python.exe -m celery -A workers.task_queue worker -P solo -n worker2@%h
-```
-Redis broker 自动负载均衡，两个 Worker 各跑一个任务，并发 ×2。
-
-**方案三：Docker + Linux 生产部署（长期标配）**
-
-Linux 下 Celery 默认 `prefork` 多进程，性能最强：
-```bash
-celery -A workers.task_queue worker -c 8
-```
-这也是 `config.py` 默认 Docker 路径的设计意图。
-
----
-
-# 本地开发环境启动手册（避免重复调试）
-
-> 每次重新开始本地开发/测试前，按此顺序操作。所有坑已踩完，照做即可。
-
-## 一、前置条件确认
-
-| 项目 | 路径 / 说明 |
-|------|------------|
-| 项目根目录 | `C:\YPHOME\Jianan_Projects\Telecoupling_AI_Project\fulldev\telecouplingAI-project\` |
-| Conda 环境 | `TeleCouplingAI`（Python 3.13，natcap.invest 3.14.3） |
-| Python 可执行 | `C:\Users\dru18\.conda\envs\TeleCouplingAI\python.exe` |
-| Redis 可执行 | `C:\Users\dru18\redis\redis-server.exe`（**不在 PATH**，必须用绝对路径） |
-| API Key | 根目录 `.env` 中的 `GOOGLE_API_KEY`（已配置，无需改动） |
-| R 语言 | 系统已安装，`igraph` 包已就绪 |
-
----
-
-## 二、启动步骤（共 4 步，各开独立终端）
-
-### 第 1 步 — 启动 Redis
-
-打开终端 1，执行：
-
-```bash
-C:\Users\dru18\redis\redis-server.exe C:\Users\dru18\redis\redis.windows.conf
-```
-
-看到 `Ready to accept connections` 即成功。
-
-> **⚠️ 不要用 `redis-server` 直接执行**，Redis 不在 PATH 中，会报"命令未找到"。
-
----
-
-### 第 2 步 — 启动 FastAPI 后端
-
-打开终端 2，进入 backend 目录：
-
-```bash
-cd C:\YPHOME\Jianan_Projects\Telecoupling_AI_Project\fulldev\telecouplingAI-project\backend
-C:\Users\dru18\.conda\envs\TeleCouplingAI\python.exe main.py
-```
-
-看到 `CSIS backend started ✅` 和 `Uvicorn running on http://127.0.0.1:8000` 即成功。
-
-> **⚠️ 不要用 `python main.py`**，系统 Python 没有 `natcap`、`google-genai` 等依赖。必须用 conda env 的绝对路径。
-
----
-
-### 第 3 步 — 启动 Celery Worker
-
-打开终端 3（**Git Bash**），执行：
-
-```bash
-PYTHONPATH=C:/YPHOME/Jianan_Projects/Telecoupling_AI_Project/fulldev/telecouplingAI-project/backend \
-  C:/Users/dru18/.conda/envs/TeleCouplingAI/python.exe \
-  -m celery -A workers.task_queue worker -P solo --loglevel=info
-```
-
-看到 `celery@hostname ready` 即成功。
-
-> **⚠️ 三个关键点，缺一不可：**
-> 1. **必须显式设置 `PYTHONPATH`**：`conda run` 在 git bash 下无法正确继承 Windows CWD，会导致 `ModuleNotFoundError: No module named 'tools'`
-> 2. **必须用 conda env 的绝对路径 Python**：同上，系统 Python 缺依赖
-> 3. **必须加 `-P solo`**：Windows 不支持 Celery 默认的 `prefork`（基于 `fork`），`solo` 是 Windows 专用单线程模式
-
----
-
-### 第 4 步 — 启动前端
-
-打开终端 4：
-
-```bash
-cd C:\YPHOME\Jianan_Projects\Telecoupling_AI_Project\fulldev\telecouplingAI-project\frontend
-npm run dev
-```
-
-看到 `Local: http://localhost:5173/` 即成功。浏览器打开此地址开始测试。
-
----
-
-## 三、重启时的清理步骤
-
-**每次重启服务前**，必须先杀干净旧进程，否则会出现两个 Celery Worker 同时运行（`DuplicateNodename` 警告），任务会被旧进程（修复前代码）处理，导致测试假失败。
-
-在 PowerShell 中执行：
-
-```powershell
-Get-Process python | Stop-Process -Force
-```
-
-然后重新按第 2、3 步启动后端和 Celery。Redis 和前端一般不需要重启。
-
----
-
-## 四、验证服务是否正常
-
-全部启动后，可用以下命令快速验证：
-
-```bash
-curl http://localhost:8000/health
-# 应返回: {"status":"ok"}
-```
-
-浏览器打开 `http://localhost:5173`，发送消息 `"hello"`，AI 应回复 CSIS 助手介绍语。
-
----
-
-## 五、常见问题速查
-
-| 现象 | 原因 | 解决 |
-|------|------|------|
-| `ModuleNotFoundError: No module named 'tools'` | Celery 启动时未设置 `PYTHONPATH` | 按第 3 步，加 `PYTHONPATH=...` 前缀 |
-| `DuplicateNodename` 警告 | 存在旧 Celery 进程未关闭 | PowerShell: `Get-Process python \| Stop-Process -Force` |
-| R 脚本 exit code `3221225477` (0xC0000005) | Celery Worker 使用相对路径找不到 R 脚本 | 已修复（`network_analysis.py` 改为绝对路径），无需操作 |
-| 后端启动报 `GOOGLE_API_KEY is not set` | `.env` 未被加载 | 确认在 `backend/` 目录下执行；`config.py` 指向根目录 `.env` |
-| 前端文件上传后无进度 | Celery Worker 未启动，或任务被旧进程消费 | 检查终端 3 是否有 `Task received` 日志；必要时重启 |
-| Redis 连接失败 | Redis 未启动，或配置文件路径错误 | 检查终端 1；确保用 `redis.windows.conf` 绝对路径 |
 
 ## 下次继续
 
-- [ ] 多用户并发场景测试
-- [ ] Docker 化 + Linux 环境验证
-- [ ] `/api/render/zoom` QGIS 重渲染端点测试
-- [ ] `start.bat` 更新
-- [ ] 生产部署前：将 `ssl_verify=False` 改回 `True`，`CORS` 收窄到具体域名
+- [ ] 服务器安装 Docker 并验证
+- [ ] 传输 Docker 镜像到服务器（csic_backend ~7GB，csic_frontend ~93MB）
+- [ ] 配置 `.env.docker`（Linux 路径版本）
+- [ ] `docker compose up -d` 启动所有服务
+- [ ] 验证 `/health` 端点、前端页面、Gemini 对话
+- [ ] 配置 HTTPS（Let's Encrypt + certbot）
+- [ ] 生产前：`ssl_verify=True`，CORS 收窄到具体域名
 
----
----
 
-# 开发日志 — 2026-03-27
+# 开发日志 — 2026-04-04（GCP 服务器创建）
 
-## 本次工作内容：Docker 部署 + 全栈验证
+## 本次工作内容
 
----
+### 一、GCP 服务器创建完成
 
-### 一、Docker 镜像构建修复
+**平台选择**：Google Cloud Platform（GCP）
+**选择原因**：
+- Gemini API 与 GCP 同属 Google，调用走内网，延迟低、更稳定
+- 新用户 $300 免费额度（本账号已无额度，按实际用量付费）
+- 将来可升级至 Vertex AI Gemini，获得更高 quota 和 SLA
 
-**问题 1：Python 版本不兼容**
-QGIS conda-forge 不支持 Python 3.13，构建时报 `Could not solve for environment specs`。
+**实例配置**：
 
-**修复**：`backend/Dockerfile` 中将 `python=3.13` 改为 `python=3.12`，同时放宽 gdal/geos/proj 的版本固定，让 conda 自动解决 QGIS 依赖约束。
+| 项目 | 值 |
+|------|-----|
+| 项目名 | csis-platform |
+| 实例名 | csis-server |
+| 地区 | us-central1（Iowa） |
+| Zone | us-central1-a |
+| 机型 | e2-standard-4（4 vCPU / 16GB RAM） |
+| 操作系统 | Ubuntu 22.04 LTS |
+| 系统盘 | 97GB SSD（实际分配） |
+| 防火墙 | HTTP ✅ HTTPS ✅ |
+| 外网 IP | 35.184.212.119 |
 
-**问题 2：`g++` 找不到（pygeoprocessing C++ 编译失败）**
-错误：`error: command 'g++' failed: No such file or directory`
+**费用**：约 $0.134/小时，测试阶段用完 Stop 即可，只收磁盘费（约 $0.13/天）。
 
-**修复**：在 conda install 中加入 `gxx_linux-64 gcc_linux-64`，并添加编译器 symlink 步骤：
-```dockerfile
-RUN ln -sf /opt/conda/envs/TeleCouplingAI/bin/x86_64-conda-linux-gnu-g++ \
-           /opt/conda/envs/TeleCouplingAI/bin/g++
+### 二、SSH 连接配置
+
+**密钥类型**：Ed25519
+**生成方式**：在本地 Windows PowerShell 执行 `ssh-keygen -t ed25519 -C "csisaiproject2026" -f $env:USERPROFILE\.ssh\id_ed25519_csis`
+**公钥已手动追加**至服务器 `/home/csisaiproject2026/.ssh/authorized_keys`。
+
+**连接命令**：
+```powershell
+ssh -i $env:USERPROFILE\.ssh\id_ed25519_csis csisaiproject2026@35.184.212.119
 ```
 
-**问题 3：缺少 pip 包**
-原 Dockerfile 缺少 `celery[redis]`、`redis`、`aiohttp`、`pydantic-settings`、`loguru`、`google-genai`。
+**服务器用户说明**：
+- `csisaiproject2026` — 项目专用账号，有 sudo 权限，**使用此账号**
+- `ubuntu` — GCP 镜像默认账号，保留不动
+- `dru1889` — 初次配置时自动创建，已用 `userdel -r` 删除
 
-**修复**：统一加入 `RUN pip install` 步骤。
+### 三、服务器验证
 
-**最终 Dockerfile 新增/修改点**：
-- `python=3.12`
-- 添加：`qgis`, `r-base r-igraph r-dplyr r-jsonlite r-sf r-rcolorbrewer`, `gxx_linux-64 gcc_linux-64`
-- 添加完整 pip 包列表
-- 添加 `COPY . .` 和 `EXPOSE 8000`
-- 添加 `ENV QT_QPA_PLATFORM=offscreen`, `ENV QGIS_PREFIX_PATH`
-- 修复 `CMD`：`uvicorn main:app --host 0.0.0.0 --port 8000`
-
-**构建结果**：
-- `csic_backend:latest` — 7.03 GB
-- `csic_frontend:latest` — 92.7 MB
-
----
-
-### 二、docker-compose.yml 重写
-
-**主要变更**：
-- 去掉废弃的 `version: '3.8'`
-- 添加 `image: csic_backend:latest` / `image: csic_frontend:latest`（统一镜像命名）
-- 新增 nginx 入口服务（port 80，统一路由 `/api/`、`/health`、`/download/`）
-- `api-server` 添加 `healthcheck`（curl /health，60s start_period）
-- `redis` 添加 `healthcheck`（redis-cli ping）
-- `api-server` / `celery-worker` 改为 `depends_on: redis: condition: service_healthy`
-- `celery-worker`：`--concurrency=8 --pool=prefork --max-tasks-per-child=50`，`memory: 12G`
-- `frontend-ui` 改为 `expose`（不直接暴露端口，通过 nginx）
-- `file-server`：port 8001，挂载 outputs 目录
-
-**卷路径分离**：
-
-原来 `.env` 里的 Windows 路径直接被容器用，发生冲突。解决方案：
-- 新建 `.env.docker`，分离主机挂载路径（`HOST_*` 变量）和容器内路径（Linux 路径）
-- `docker-compose.yml` 卷定义改为 `${HOST_SHARED_DIR:-/data/outputs}:/data/outputs`
-
----
-
-### 三、`.env.docker` 中发现并修复的 4 个环境变量 Bug
-
-| 变量 | 原因 | 修复 |
-|------|------|------|
-| `PYTHONPATH=/app` | Celery prefork 子进程 sys.path 不含 `/app`，`from tools.xxx import` 失败 | 加入 `.env.docker` |
-| `SSL_CERT_FILE` / `REQUESTS_CA_BUNDLE` | httpx 在 conda 环境使用 conda CA bundle，TLS 握手失败（`httpx.ConnectError`）；curl 正常但 httpx/google-genai SDK 不通 | 指向 certifi 的 `cacert.pem` |
-| `PROJ_DATA` / `PROJ_LIB` | natcap.invest / pygeoprocessing 调用 `transform_bounding_box` 时报 `OGR Error: Corrupt data`，根因是 `/opt/conda/.../share/proj` 未被 PROJ 找到 | 显式设置指向 conda env 下的 proj 数据目录 |
-| `GDAL_DATA` | 同上，防止 GDAL 相关路径问题 | 指向 conda env 下的 gdal 数据目录 |
-
----
-
-### 四、R 包补全
-
-网络分析工具（Tool 1）的 R 脚本依赖 `dplyr`、`sf`、`jsonlite`、`RColorBrewer`，原 Dockerfile 只有 `r-base r-igraph`。
-
-**修复**：
-- `backend/Dockerfile` 中 conda install 行加入：`r-dplyr r-jsonlite r-sf r-rcolorbrewer`
-- 在运行中的容器里通过 `mamba install` 立即安装并验证
-- 用 `docker commit --change='CMD ["uvicorn", ...]' tele-celery csic_backend:latest` 将修复固化到镜像
-
-**注意**：`docker commit` 必须指定 `--change='CMD [...]'`，否则会将 celery 的 command 保存为镜像默认 CMD，导致 api-server 启动时跑 celery 而非 uvicorn。
-
----
-
-### 五、测试体系建立
-
-#### 集成测试 `tests/test_integration.py`（11 个测试）
-
-对运行中的 Docker stack 发真实 HTTP 请求：
-
-| 测试 | 验证内容 |
-|------|---------|
-| `test_health` | GET /health → `{"status":"ok"}` |
-| `test_upload_*` | 单文件、自动分配 session、多文件上传 |
-| `test_delete_session` | DELETE /api/sessions/{id} |
-| `test_download_*` | 404 响应、路径遍历攻击拦截 |
-| `test_chat_sse_*` | SSE 流格式、session ID 自动分配 |
-| `test_render_zoom_missing_file` | 404 响应 |
-| `test_celery_*` | Celery/Redis 连通性验证 |
-
-**结果：11/11 通过，耗时 6.33s**
-
-#### Locust 压测 `tests/locustfile.py`
-
-模拟 40 并发用户，运行 2 分钟：
-
-| 接口 | P50 | P95 | 吞吐 | 失败 |
-|------|-----|-----|------|------|
-| GET /health | 6ms | 14ms | 8.6 req/s | 0 |
-| POST /api/upload | 61ms | 77ms | 4.3 req/s | 0 |
-| DELETE /api/sessions | 7ms | 14ms | 2.4 req/s | 0 |
-| POST /api/chat (Gemini) | 1.7s | 2.3s | 1.6 req/s | 0 |
-
-**结果：2148 次请求，0 失败，整体吞吐 18 req/s**
-
-#### E2E 工具测试 `tests/test_e2e_tools.py`（3 个工具）
-
-模拟真实用户：上传文件 → 发 chat 消息触发工具 → 读 SSE 流 → 验证输出文件。
-
-**Tool 1：Network Analysis Grouping（R + igraph）**
-- 上传：`nodes.csv`、`links.csv`
-- 参数：`walktrap` 聚类，`ISO_3_CODE` join
-- 输出：`network_plot.pdf`、`network_stats.csv`、`output.shp` 等 6 个文件
-- 耗时：~7s ✅
-
-**Tool 2：CBC Preprocessor（natcap.invest）**
-- 上传：`snapshots.csv`、`lulc_lookup.csv`、3 个 TIF 栅格
-- 输出：`aligned_lulc_2010/2030/2050.tif`、`carbon_biophysical_table_template.csv` 等 6 个文件
-- 耗时：~3s ✅
-
-**Tool 5：Crop Production Percentile（natcap.invest）**
-- 上传：`landcover_to_crop_table.csv`（参考容器内 `landcover.tif`）
-- 输出：barley/soybean/wheat 各 5 个产量栅格 + `result_table.csv` 共 54 个文件
-- 耗时：~14s ✅
-
-**结果：3/3 通过**
-
----
-
-### 六、Docker 运维注意事项
-
-1. **`docker commit` 固化包**：在运行容器中 `mamba install` 之后，必须 `docker commit` 固化，否则 `--force-recreate` 会丢失安装的包。
-
-2. **nginx IP 缓存**：`api-server` / `celery-worker` 容器重建（IP 变化）后，`tele-nginx` 必须 `docker compose restart nginx`，否则出现 502。
-
-3. **env_file 变更必须 `--force-recreate`**：`docker compose restart` 不重新读取 `env_file`，必须用 `docker compose up -d --force-recreate` 才能让新环境变量生效。
-
-4. **镜像标签**：`csic_backend` 和 `csic_frontend` 都带 `csic_` 前缀。celery-worker 复用 `csic_backend:latest`，通过 docker-compose 的 `command:` 字段覆盖启动命令。
-
----
-
-### 七、本次修改文件清单
-
-| 文件 | 操作 | 说明 |
-|------|------|------|
-| `backend/Dockerfile` | 修改 | python 3.12, R 包补全, pip 包补全, 编译器 symlink |
-| `docker-compose.yml` | 重写 | nginx 入口, healthcheck, HOST_* 卷变量, 镜像名统一 |
-| `.env.docker` | 新建 | Docker 专用环境变量（含 HOST_* 路径） |
-| `tests/test_integration.py` | 新建 | 11 个集成测试 |
-| `tests/locustfile.py` | 新建 | Locust 压测脚本 |
-| `tests/test_e2e_tools.py` | 新建 | 3 个工具 E2E 测试 |
-
----
-
-### 八、待完成
-
-- [ ] Tool 3（CBC Main）、Tool 4（Seasonal Water Yield）、Tool 6（Crop Regression）的 E2E Docker 测试
-- [ ] 将 `.env.docker` 中的环境变量（PROJ_DATA、SSL_CERT_FILE 等）固化进 Dockerfile，避免部署时手动维护
-- [ ] 部署到真实 Linux 服务器（当前在 Windows Docker Desktop 验证完毕）
-
----
-
----
-
-## 续：2026-03-27（下半场）
-
-### 八、高优先级 E2E 测试完成（Tool 3/4/6）
-
-在 `tests/test_e2e_tools.py` 中追加三个工具的 E2E 测试：
-
-| Tool | 描述 | 输出文件数 | 耗时 | 结果 |
-|------|------|----------|------|------|
-| Tool 3 | CBC Main（natcap.invest） | 266 | ~44s | ✅ |
-| Tool 4 | Seasonal Water Yield | 84 | ~32s | ✅ |
-| Tool 6 | Crop Regression | 67 | ~13s | ✅ |
-
-至此 **6/6 工具全部 E2E 通过**。
-
-**Tool 3 注意点**：`snapshots.csv` 中 TIF 路径为相对路径，测试中动态替换为容器绝对路径（`/data/datainput/CoastalBlueCarbon_input/`）再上传。
-
-**Tool 4 注意点**：所有输入文件已挂载在容器内，无需上传，直接在 chat 消息中引用 `/data/datainput/SeasonalWaterYield_input/` 路径。
-
----
-
-### 九、环境变量固化进 Dockerfile
-
-将原本只在 `.env.docker` 中维护的以下变量写入 `backend/Dockerfile` 的 `ENV` 指令：
-
-```dockerfile
-ENV PROJ_DATA=/opt/conda/envs/TeleCouplingAI/share/proj
-ENV PROJ_LIB=/opt/conda/envs/TeleCouplingAI/share/proj
-ENV GDAL_DATA=/opt/conda/envs/TeleCouplingAI/share/gdal
-ENV SSL_CERT_FILE=.../certifi/cacert.pem
-ENV REQUESTS_CA_BUNDLE=.../certifi/cacert.pem
-ENV PYTHONPATH=/app:/opt/conda/envs/TeleCouplingAI/share/qgis/python:/opt/conda/envs/TeleCouplingAI/share/qgis/python/plugins
+SSH 连接成功后验证：
+```
+Linux csis-server 6.8.0-1053-gcp Ubuntu SMP 2026 x86_64
+内存：32GB 总共，30GB 可用
+磁盘：97GB，只用了 2.6GB
 ```
 
-同时在 `.env.docker` 中删除这些重复项，只保留应用级配置和 `HOST_*` 路径变量。
+### 四、下一步
+
+- [ ] 安装 Docker（`sudo apt update && sudo apt install -y docker.io docker-compose-plugin`）
+- [ ] 传输 Docker 镜像（csic_backend ~7GB、csic_frontend ~93MB）
+- [ ] 创建数据目录（`/data/outputs`、`/data/uploads`、`/data/model_data`）
+- [ ] 配置 `.env.docker`（HOST_* 路径改为 Linux 绝对路径，`GOOGLE_API_KEY` 填入真实值，`ssl_verify=True`）
+- [ ] `docker compose up -d` 启动所有服务
+- [ ] 验证 `curl http://35.184.212.119/health`
+- [ ] 配置 HTTPS（Let's Encrypt + certbot，如需域名访问）
+
+## 注意事项
+
+- **CORS**：生产部署前将 `allow_origins=["*"]` 收窄为实际域名/IP
+- **SSL verify**：`agent.py` 中 `ssl_verify=False` 是本地代理调试用，部署到 GCP 后改回 `True`（GCP 可直连 Google API，不需代理）
+- **GCP 防火墙**：端口 80/443 已开放；Redis 6379 只在 Docker 内网，不对外暴露
+
 
 ---
 
-### 十、发现并修复 Docker 卷挂载 Bug（根本原因）
-
-**问题**：`/data/model_data` 在容器内始终为空，导致 Tool 5/6 并发测试失败。
-
-**根本原因**：Docker Compose 的**卷路径变量替换**（`${HOST_MODEL_DATA_PATH:-/data/model_data}`）读取的是项目目录的 `.env` 文件或 shell 环境变量，而不是 `env_file:` 指定的 `.env.docker`。`.env.docker` 中的 `HOST_*` 变量对卷替换无效。
-
-**修复**：将 `HOST_SHARED_DIR`、`HOST_UPLOADS_DIR`、`HOST_MODEL_DATA_PATH` 三个变量也写入项目根的 `.env` 文件。
-
 ---
 
-### 十一、render/zoom QGIS 端点测试
+# 开发日志 — 2026-04-04（GCP Docker 部署完成）
 
-发现 QGIS Python 绑定不在 `site-packages`，而在：
+## 本次工作内容
+
+### 一、GCP 服务器 Docker 部署全流程
+
+#### 服务器安装 Docker
+
+使用官方 Docker CE 安装方式（Ubuntu 22.04）：
+```bash
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+sudo usermod -aG docker csisaiproject2026
 ```
-/opt/conda/envs/TeleCouplingAI/share/qgis/python/
-```
-需要显式加入 `PYTHONPATH`，否则子进程报 `No module named 'qgis'`。
+安装版本：Docker 29.3.1，Docker Compose v5.1.1
 
-修复后新增两个集成测试，均通过：
-- `test_render_zoom_success`：普通 TIF 渲染，返回 download URL
-- `test_render_zoom_with_extent`：带 bounding box 渲染
-
----
-
-### 十二、多用户并发测试 `tests/test_concurrent_tools.py`
-
-**场景**：3 个用户同时运行不同工具（Tool 1 / Tool 2 / Tool 5），验证：
-- Celery 并发调度正常
-- 各 session 输出目录完全隔离
-- 无跨 session 数据污染
-
-**过程中发现并修复的问题**：
-
-| 问题 | 原因 | 修复 |
-|------|------|------|
-| UserC SSE 连接在 120s 被断开 | `agent.py` 中 httpx `timeout=120.0`，并发时 Gemini 调用超时 | 改为 `timeout=300.0` |
-| SSE `ChunkedEncodingError` | 连接中断但任务已完成 | 捕获异常，等待输出文件出现再判断结果 |
-
-**最终结果**：3/3 通过，总耗时 97s，各 session 完全隔离。
-
----
-
-### 十三、start.bat 更新
-
-主要变更：
-- `python main.py` → `uvicorn main:app --host 0.0.0.0 --port 8000 --reload`
-- `workers.task_queue` → `celery_app`（模块名同步）
-- 添加 Redis 启动前检查
-- 显示所有服务地址（Frontend / Backend / API Docs / Health）
-
----
-
-### 十四、Linux 服务器部署规划（2026-03-27）
-
-#### 部署所需文件（镜像已含代码，无需传完整 git 仓库）
-
-Docker 镜像已通过 `COPY . .` 将代码打包进去，Linux 服务器上只需：
-
-1. **Docker 镜像**
-   - `csic_backend:latest`（约 7GB）
-   - `csic_frontend:latest`（约 93MB）
-
-2. **配置文件**
-   - `docker-compose.yml`
-   - `.env`（需将 `HOST_*` 路径改为 Linux 绝对路径）
-   - `.env.docker`
-
-3. **数据目录**
-   - `datainput_for_demo/`（演示输入数据）
-   - `outputs/`、`uploads/`（空目录，运行时写入）
-
-#### 传输流程
+#### 目录结构创建
 
 ```bash
-# Windows → 打包镜像
-docker save csic_backend:latest | gzip > csic_backend.tar.gz
-docker save csic_frontend:latest | gzip > csic_frontend.tar.gz
-
-# 传输到服务器
-scp csic_backend.tar.gz csic_frontend.tar.gz user@server:/opt/csis/
-scp docker-compose.yml .env .env.docker user@server:/opt/csis/
-rsync -av datainput_for_demo/ user@server:/opt/csis/datainput_for_demo/
-
-# Linux 服务器上：加载镜像并启动
-docker load < csic_backend.tar.gz
-docker load < csic_frontend.tar.gz
-docker compose --env-file .env.docker up -d
+sudo mkdir -p /data/outputs /data/uploads /data/model_data
+sudo chown -R csisaiproject2026:csisaiproject2026 /data
+mkdir -p ~/csis-platform/nginx ~/csis-platform/datainput_for_demo
 ```
 
-#### 访问方式
+#### 配置文件传输
 
-- **内部/合作者使用**：直接用公网 IP（HTTP），功能完整，无 HTTPS 警告顾虑
-- **外部公众使用**：需要域名 + HTTPS（Let's Encrypt 免费证书 + nginx 配置）
+| 文件 | 目标位置 |
+|------|----------|
+| `docker-compose.yml` | `~/csis-platform/` |
+| `.env.docker`（GCP 版） | `~/csis-platform/.env.docker` |
+| `.env`（HOST_* 变量） | `~/csis-platform/.env` |
+| `nginx/nginx.conf` | `~/csis-platform/nginx/` |
+| `nginx/file-server.conf` | `~/csis-platform/nginx/` |
+| `datainput_for_demo/`（173MB） | `~/csis-platform/datainput_for_demo/` |
 
-#### AWS 方案
+`~/csis-platform/.env` 内容（docker volume 路径必须在此文件，不能只在 `.env.docker`）：
+```
+HOST_SHARED_DIR=/data/outputs
+HOST_UPLOADS_DIR=/data/uploads
+HOST_MODEL_DATA_PATH=/data/model_data
+```
 
-- EC2 实例推荐：8核16GB（`c5.2xlarge` 或 `m5.2xlarge`），月费约 $250-350
-- 弹性 IP 绑定（固定公网 IP）
-- SSL：ACM 证书不能直接用于 nginx，需用 Let's Encrypt（`certbot`）
-- 待服务器就绪后，补充 HTTPS 版 `nginx.conf` 和部署脚本
+#### Docker 镜像传输
+
+使用管道直传（无需临时 tar 文件）：
+```bash
+docker save csic_frontend:latest | ssh -i ~/.ssh/id_ed25519_csis csisaiproject2026@35.184.212.119 "docker load"
+docker save csic_backend:latest  | ssh -i ~/.ssh/id_ed25519_csis csisaiproject2026@35.184.212.119 "docker load"
+```
+
+#### ssl_verify 修复（服务器端）
+
+本地 `agent.py` 保持 `verify=False`（本地代理需要），服务器上通过 `docker exec + commit` 修改：
+
+```bash
+docker run -d --name tmp_patch csic_backend:latest sleep 600
+docker exec tmp_patch sed -i 's/verify=False/verify=True/g' /app/agent.py
+docker commit \
+  --change='CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]' \
+  tmp_patch csic_backend:latest
+docker rm -f tmp_patch
+```
+
+⚠️ **坑**：`docker commit` 不带 `--change='CMD [...]'` 时会继承运行命令（`sleep 600`），导致容器启动后跑 sleep 而非 uvicorn。必须显式指定 CMD。
+
+#### 服务启动与验证
+
+```bash
+cd ~/csis-platform && docker compose up -d
+curl http://localhost/health  # → {"status":"ok"}
+```
+
+### 二、最终服务状态
+
+| 容器 | 镜像 | 状态 |
+|------|------|------|
+| tele-redis | redis:alpine | healthy ✅ |
+| tele-backend | csic_backend:latest | healthy ✅ |
+| tele-celery | csic_backend:latest | running ✅ |
+| tele-frontend | csic_frontend:latest | running ✅ |
+| tele-nginx | nginx:alpine | running ✅ |
+| tele-fileserver | nginx:alpine | running ✅ |
+
+**访问地址**：
+- 前端：http://35.184.212.119
+- 文件下载：http://35.184.212.119:8001
+- 健康检查：http://35.184.212.119/health → `{"status":"ok"}`
+
+### 三、Bug 修复：`/api/upload` 文件未注入 agent 上下文
+
+**问题描述**：
+通过 `/api/upload` 上传文件后，再单独发 `/api/chat` 消息时，agent 看不到已上传的文件，导致工具调用时路径错误（Gemini 会幻觉出 `/tmp/xxx.csv` 等不存在的路径）。
+
+**根本原因**：
+`main.py` 的 chat 端点只把当前请求里的文件（`files` multipart 字段）传给 `run_agent()`，不包含通过 `/api/upload` 存入 Redis session 的历史上传文件。
+
+**为何之前没发现**：
+本地浏览器 E2E 测试时，前端把文件和消息一起打包发到 `/api/chat`，走的是单步路径，绕过了这个 bug。59 个单元测试和 11 个集成测试也未覆盖两步上传场景。
+
+**修复方案**（两处改动，均为纯增量，不影响现有功能）：
+
+1. `backend/shared/session_manager.py`：新增 `get_uploaded_files()` 方法，从 Redis 读取 session 已上传文件列表并返回 `{filename, path}` 字典列表。
+
+2. `backend/main.py`：chat 端点在调用 `run_agent()` 前，额外从 session 读取历史上传文件并合并到 `uploaded` 列表（有去重逻辑，避免与当前请求文件重复）。
+
+修复已同步到服务器（`docker exec` 热补丁 + `docker compose restart`）和本地代码。
+
+### 四、待完成
+
+- [x] 上传 InVEST model data 到 `/data/model_data` ✅
+- [ ] 配置 HTTPS（Let's Encrypt + certbot）
+- [ ] CORS 收窄到具体域名/IP
+
+## 这是给claude code的部署任务的建议
+请先读取 DEV_LOG.md 了解项目背景，然后执行以下 GCP 服务器部署任务：
+
+服务器信息：
+- IP：35.184.212.119
+- 用户：csisaiproject2026
+- SSH 密钥：~/.ssh/id_ed25519_csis
+- 连接命令：ssh -i ~/.ssh/id_ed25519_csis csisaiproject2026@35.184.212.119
+
+部署步骤：
+1. SSH 连接服务器，安装 Docker 和 docker-compose-plugin
+2. 创建目录 /data/outputs、/data/uploads、/data/model_data
+3. 在本地用 docker save 打包 csic_backend:latest 和 csic_frontend:latest
+4. 用 scp 传输镜像到服务器 /home/csisaiproject2026/
+5. 服务器上 docker load 加载镜像
+6. 传输 docker-compose.yml、.env.docker 到服务器
+7. 修改 .env.docker：HOST_* 路径改为 Linux 路径，ssl_verify 相关改为 True
+8. docker compose up -d 启动所有服务
+9. curl http://35.184.212.119/health 验证
+
+注意：
+- agent.py 里 ssl_verify=False 需要改为 True（GCP 可直连 Google API）
+- REDIS_URL 用 redis://redis:6379/0（Docker 容器名）
+- 完成后更新 DEV_LOG.md
 
 ---
 
-### 十五、待完成（更新）
+## 2026-04-04 下午 — GCP E2E 全功能测试 & 并发修复
 
-- [ ] CORS 收窄 + `ssl_verify=True`（用户手动测试完毕后）
-- [ ] 部署到 Linux 服务器（AWS EC2，待购买）
-- [ ] 服务器就绪后：补充 HTTPS nginx.conf + certbot 配置 + 前端 API URL 更新
-- [ ] 下次重建镜像后，将 `.env.docker` 中临时保留的 `PYTHONPATH` 行删除（已固化进 Dockerfile）
+### 一、/api/upload 文件未注入 agent 上下文（Bug 修复）
+
+**问题**：浏览器前端通过 `/api/chat` 直接附带文件，所以该路径一直正常。但 E2E 测试脚本先调用 `/api/upload` 上传文件、再单独发 `/api/chat` 消息，导致 agent 收不到任何文件列表，工具无法运行。
+
+**根本原因**：`session_manager.py` 的 `add_uploaded_file()` 已将路径存入 Redis，但 `main.py` 的 `/api/chat` handler 没有从 Redis 读取并注入。
+
+**修复**（纯增量，不破坏现有逻辑）：
+
+1. `backend/shared/session_manager.py` — 新增方法：
+```python
+def get_uploaded_files(self, session_id: str) -> list[dict]:
+    raw = self.r.hget(f"session:{session_id}", "uploaded_files")
+    paths = json.loads(raw.decode()) if raw else []
+    return [{"filename": os.path.basename(p), "path": p} for p in paths]
+```
+
+2. `backend/main.py` — 在调用 `run_agent()` 前注入历史上传文件：
+```python
+session_data = sm.get_session(session_id)
+if session_data:
+    existing_paths = {f["path"] for f in uploaded}
+    for f in sm.get_uploaded_files(session_id):
+        if f["path"] not in existing_paths:
+            uploaded.append(f)
+```
+
+服务器上通过 `docker exec` 直接编辑 + `docker commit` 持久化，未改动本地代码。
 
 ---
+
+### 二、Gemini API 并发限流修复
+
+**问题**：Phase 2（5 个并发用户，每人 6 个工具）= 最多 30 个并发 Gemini 调用，频繁触发 429 Resource Exhausted / 503 Unavailable。
+
+**修复**（`backend/agent.py`）：
+
+```python
+_GEMINI_SEMAPHORE = asyncio.Semaphore(3)
+
+async def _generate_with_retry(client, model_name, contents, config, max_retries=4):
+    import random
+    for attempt in range(max_retries):
+        async with _GEMINI_SEMAPHORE:
+            try:
+                return await client.aio.models.generate_content(
+                    model=model_name, contents=contents, config=config)
+            except Exception as e:
+                err_str = str(e).lower()
+                is_rate_limit = "429" in err_str or "quota" in err_str or "resource_exhausted" in err_str
+                is_server_err = "503" in err_str or "unavailable" in err_str
+                if (is_rate_limit or is_server_err) and attempt < max_retries - 1:
+                    wait = (2 ** attempt) + random.uniform(0, 1)
+                    logger.warning(f"[agent] Gemini rate limit (attempt {attempt+1}/{max_retries}), retrying in {wait:.1f}s")
+                    await asyncio.sleep(wait)
+                else:
+                    raise
+```
+
+原 `generate_content(...)` 调用替换为 `_generate_with_retry(...)`。
+
+---
+
+### 三、Celery worker 并发数调整
+
+`docker-compose.yml` celery-worker command 由 `--concurrency=2` 改为 `--concurrency=4`，适配 t3.xlarge（4 vCPU），防止 5 个并发用户的 SWY 等长耗时任务排队积压。
+
+---
+
+### 四、SKILL.md 部署注意事项
+
+容器内 `/.claude/skills/` 目录不在 Docker 镜像中（本地开发路径），每次容器重启需手动 tar pipe 复制：
+
+```bash
+tar -C ~/.claude/skills -cf - . | docker exec -i tele-backend tar -C /.claude/skills -xf -
+```
+
+已记录为运维 SOP，后续应在 Dockerfile 中 COPY 进镜像。
+
+---
+
+### 五、E2E 测试结果（`test_gcp_e2e.py`）
+
+测试脚本：`telecouplingAI-project/test_gcp_e2e.py`
+- Phase 1：1 个用户，6 个工具顺序执行
+- Phase 2：5 个并发用户，每人 6 个工具
+
+| 测试轮次 | Phase 1 | Phase 2 | 主要问题 |
+|---|---|---|---|
+| 第 1 轮 | 4/6 (67%) | 12/30 (40%) | /api/upload bug，SKILL.md 缺失 |
+| 第 2 轮（修 upload bug 后） | 6/6 (100%) | 20/30 (66%) | Gemini 429 限流 |
+| 第 3 轮（加并发限制后） | 6/6 (100%) | 22/30 (73%) | LLM 非确定性（偶尔要求确认） |
+
+**Phase 2 残余 8 个失败**均为 LLM 非确定性：Gemini 在高并发下偶尔询问用户确认而非直接调用工具。这是模型行为，真实用户重发消息即可解决。根本修复需在 agent 层面增加"工具未调用时自动重试"逻辑（已记为后续优化项）。
+
+**结论**：平台全部 6 个工具在单用户下 100% 通过，5 并发用户下 73% 通过，核心功能稳定可用。
+
+---
+
+## 2026-04-04 晚 — 仿真测试 v2（随机到达 + 随机顺序 + 重试）& 50 人压力测试
+
+### 一、测试脚本升级（test_gcp_e2e.py v2 + test_stress_50.py）
+
+新增特性：
+- **随机错峰到达**：5 个用户在 0-8s 窗口内随机分散到达（等间距 + ±30% 抖动）
+- **每用户随机工具顺序**：`random.shuffle(TOOLS_BASE)` 每人独立打乱，避免峰值集中
+- **自动重试一次**：`tool_invoked=False` 时（LLM 要求确认而未调用工具）等 2s 后重发
+- **系统指标采集**：后台每 5s 读取 `/proc/stat`、`/proc/meminfo`、`/proc/net/dev`
+- **新增压力测试脚本** `test_stress_50.py`：50 用户，90s 内到达，每人随机 2 个工具
+
+---
+
+### 二、E2E 测试结果（v2）
+
+**Phase 1 — 单用户，6 个工具顺序执行**
+
+| 工具 | 结果 | 耗时 |
+|---|---|---|
+| Tool1 Network Analysis | ✓ | 6.9s |
+| Tool2 CBC Preprocessor | ✓ | 4.8s |
+| Tool3 CBC Main | ✓ | 10.2s |
+| Tool4 Seasonal Water Yield | ✓ | 15.2s |
+| Tool5 Crop Percentile | ✓ | 5.6s |
+| Tool6 Crop Regression | ✓ | 6.7s |
+
+**6/6 (100%) ✓  |  总耗时：49.4s**
+
+**Phase 2 — 5 并发用户（随机错峰 0-8s，随机工具顺序）**
+
+| 用户 | 到达时间 | 通过/失败 |
+|---|---|---|
+| user1 | +0.5s | 3/6 |
+| user2 | +2.2s | 3/6 |
+| user3 | +4.0s | 4/6 |
+| user4 | +6.3s | 3/6 |
+| user5 | +8.3s | 4/6 |
+
+**17/30 (56%)  |  总耗时：57.2s**
+
+Phase 2 资源使用：CPU avg 30.3% / peak 44.8%，内存 avg 3816 MB / peak 4053 MB（32 GB 总量）
+
+---
+
+### 三、50 人压力测试结果（test_stress_50.py）
+
+配置：50 用户，90s 内随机到达，每人随机 2 个工具（共 100 次运行）
+
+**整体结果：40/100 (40%)  |  壁钟时间：152.8s（2.5 分钟）  |  吞吐量：15.7 成功运行/分钟**
+
+响应时间（成功运行）：p50=16.2s，p75=38.0s，p95=46.3s，p99=53.3s，avg=21.7s
+
+| 工具 | 运行 | 通过 | 失败 | 平均耗时 | P95 |
+|---|---|---|---|---|---|
+| Tool3 CBC Main | 21 | 10 | 11 | 26.4s | 44.3s |
+| Tool6 Crop Regression | 14 | 6 | 8 | 25.2s | 39.9s |
+| Tool5 Crop Percentile | 17 | 7 | 10 | 13.1s | 34.2s |
+| Tool1 Network Analysis | 16 | 6 | 10 | 14.9s | 35.4s |
+| Tool2 CBC Preprocessor | 13 | 7 | 6 | 17.0s | 37.1s |
+| Tool4 Seasonal Water Yield | 19 | 4 | 15 | 38.0s | 53.6s |
+
+压力测试资源使用：CPU avg 40.5% / peak 54.9%，内存 avg 3859 MB / peak 4692 MB（32 GB 总量）
+
+---
+
+### 四、根因分析 — 并发失败原因
+
+**失败特征**：工具调用在 1-4s 内结束，`tool_invoked=True`，无输出文件，无错误消息返回。说明工具确实被 Celery 调度执行，但 InVEST 计算立即报错，且错误未正确传回 SSE 流。
+
+**后端日志证据**：
+```
+[ERROR] Tool run_seasonal_water_yield failed:
+  Seasonal Water Yield failed: In Task: flow accum task (3)
+  Seasonal Water Yield failed: In Task: calculate QFi (27)
+[ERROR] coroutine ignored GeneratorExit
+[ERROR] Task was destroyed but it is pending!
+```
+
+**根本原因：InVEST / GDAL 多进程并发竞态**
+
+Celery 4 个 worker 同时执行多个 InVEST 任务时，底层 GDAL 的临时文件或全局缓存产生冲突。同一工具多实例并发运行时失败率最高。单用户 100% 通过，多用户并发失败，证实是并发问题而非数据/逻辑问题。
+
+**硬件不是瓶颈**：CPU 峰值 55%，内存峰值 14.6%（4.7 GB / 32 GB），大量资源闲置。
+
+---
+
+### 五、待修复项（优先级排序）
+
+| 优先级 | 方案 |
+|---|---|
+| P0 | Celery 任务启动时设置独立 `GDAL_TMPDIR=/tmp/{task_id}/`，消除 GDAL 临时文件冲突 |
+| P0 | 工具计算失败时正确发送带 `task_id` 的 error 事件回 SSE 流，使失败可观测 |
+| P1 | 给每种工具设置独立 Celery 队列 `concurrency=1`，彻底隔离工具并发 |
+| P2 | 监控脚本网络读取改为 `lo` 接口或所有接口累计（当前测试流量走 loopback，eth0 显示 0） |
+
+---
+
+## 2026-04-04 深夜 — P1 工具级别队列隔离 + SSE 并发修复 + 最终测试
+
+### 一、P1：工具级别 Celery 队列隔离
+
+**改动文件**：`backend/agent.py`、`docker-compose.yml`
+
+**原理**：每种 InVEST 工具分配独立 Celery 队列，`concurrency=1`，保证同一工具在任何时刻最多只有一个实例在运行，从根本上消除 GDAL 多进程竞态。
+
+`agent.py` 新增路由映射（第 397 行后）：
+```python
+_TOOL_QUEUES = {
+    "run_network_analysis_grouping":        "q_net",
+    "run_coastal_blue_carbon_preprocessor": "q_cbc_pre",
+    "run_coastal_blue_carbon":              "q_cbc_main",
+    "run_seasonal_water_yield":             "q_swy",
+    "run_crop_production_percentile":       "q_crop_pct",
+    "run_crop_production_regression":       "q_crop_reg",
+    "render_spatial_file":                  "q_render",
+}
+# 派发时指定队列（原 .delay() → .apply_async(queue=...)）
+queue = _TOOL_QUEUES.get(tool_name, "q_default")
+celery_result = run_tool_task.apply_async(args=[...], queue=queue)
+```
+
+`docker-compose.yml` 将原单体 `celery-worker`（concurrency=4）拆分为 7 个独立 worker：
+
+| 容器名 | 队列 | concurrency | 内存上限 |
+|---|---|---|---|
+| tele-celery-net | q_net | 1 | 2G |
+| tele-celery-cbc-pre | q_cbc_pre | 1 | 2G |
+| tele-celery-cbc-main | q_cbc_main | 1 | 3G |
+| tele-celery-swy | q_swy | 1 | 4G |
+| tele-celery-crop-pct | q_crop_pct | 1 | 2G |
+| tele-celery-crop-reg | q_crop_reg | 1 | 2G |
+| tele-celery-render | q_render,q_default | 2 | 2G |
+
+合计上限约 17G，服务器 32G 安全运行。
+
+---
+
+### 二、SSE 并发 Bug 修复（coroutine ignored GeneratorExit）
+
+**问题**：`main.py` 的 `event_stream()` 用 `asyncio.create_task(run())` 启动后台 agent task，但没有在生成器清理时取消该 task。客户端连接关闭时 Python GC 向生成器抛 `GeneratorExit`，产生 `RuntimeError: coroutine ignored GeneratorExit` + `Task was destroyed but it is pending!`，zombie task 占用事件循环资源，干扰其他并发连接。
+
+**修复**（`backend/main.py`）：
+```python
+agent_task = asyncio.create_task(run())
+try:
+    while True:
+        event = await queue.get()
+        if event is None:
+            break
+        ...
+        yield f"data: {json.dumps(event)}\n\n"
+finally:
+    if not agent_task.done():
+        agent_task.cancel()
+        try:
+            await agent_task
+        except (asyncio.CancelledError, Exception):
+            pass
+```
+
+注意：取消的是 API 层的 pubsub 监听协程，不影响 Celery worker 内已在运行的工具计算任务。
+
+---
+
+### 三、最终测试结果
+
+**E2E 测试（P1 + SSE 修复后）**
+
+| Phase | 结果 | 壁钟时间 |
+|---|---|---|
+| Phase 1 — 单用户，6 工具 | **6/6 (100%)** ✓ | 49.5s |
+| Phase 2 — 5 并发用户，6 工具 | **30/30 (100%)** ✓ | 71.7s |
+
+所有 5 个用户全部 6 个工具 100% 通过，Auto-retried: 0。
+
+**50 人压力测试（P1 + SSE 修复后）**
+
+| 指标 | 数值 |
+|---|---|
+| 总运行 | 100 次（50 人 × 2 工具） |
+| 通过 | **98/100 (98%)** |
+| 壁钟时间 | 155.8s（2.6 分钟） |
+| 吞吐量 | **37.7 成功运行/分钟**（修复前：15.7） |
+| p50 响应时间 | 13.7s |
+| p95 响应时间 | 39.0s |
+
+| 工具 | 通过率 | 平均耗时 | P95 |
+|---|---|---|---|
+| Tool1 Network Analysis | 15/15 (100%) | 13.1s | 18.2s |
+| Tool2 CBC Preprocessor | 16/16 (100%) | 9.2s | 13.4s |
+| Tool3 CBC Main | 12/12 (100%) | 20.1s | 31.6s |
+| Tool4 Seasonal Water Yield | 12/14 (86%) | 38.3s | 51.4s |
+| Tool5 Crop Percentile | 20/20 (100%) | 13.3s | 17.2s |
+| Tool6 Crop Regression | 23/23 (100%) | 14.4s | 22.3s |
+
+资源使用（50 人全程）：CPU avg 32.5% / peak 54.8%，内存 avg 3096 MB / peak 4029 MB（32 GB 总量）
+
+**改进对比**：
+
+| 版本 | 5 用户通过率 | 50 用户通过率 | 吞吐量 |
+|---|---|---|---|
+| 修复前（单 worker） | 56% | 40% | 15.7/min |
+| P1 队列隔离 | 66% | — | — |
+| P1 + SSE 修复 | **100%** | **98%** | **37.7/min** |
+
+剩余 2 个失败均为 Tool4 SWY 的 InVEST 偶发内部错误（`create new tiff` / `calculate quick flow`），可通过后续 P0 `GDAL_TMPDIR` 隔离进一步消除。

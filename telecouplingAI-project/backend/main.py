@@ -110,6 +110,14 @@ async def chat_endpoint(
             uploaded.append({"filename": uf.filename, "path": dest})
             logger.info(f"[upload] {uf.filename} → {dest}")
 
+    # Include files previously uploaded via /api/upload in this session
+    session_data = sm.get_session(session_id)
+    if session_data:
+        existing_paths = {f["path"] for f in uploaded}
+        for f in sm.get_uploaded_files(session_id):
+            if f["path"] not in existing_paths:
+                uploaded.append(f)
+
     async def event_stream():
         queue: asyncio.Queue[dict | None] = asyncio.Queue()
 
@@ -138,24 +146,36 @@ async def chat_endpoint(
             finally:
                 await queue.put(None)  # sentinel
 
-        asyncio.create_task(run())
+        agent_task = asyncio.create_task(run())
 
-        while True:
-            event = await queue.get()
-            if event is None:
-                break
+        try:
+            while True:
+                event = await queue.get()
+                if event is None:
+                    break
 
-            if event.get("type") == "tool_result":
-                event = _enrich_file_urls(event, session_id)
-                # Store output file paths in session for multi-turn context
-                output_files = event.get("files", [])
-                if output_files:
-                    sm.add_output_files(session_id, [
-                        {"filename": f["filename"], "path": f.get("path", "")}
-                        for f in output_files if f.get("path")
-                    ])
+                if event.get("type") == "tool_result":
+                    event = _enrich_file_urls(event, session_id)
+                    # Store output file paths in session for multi-turn context
+                    output_files = event.get("files", [])
+                    if output_files:
+                        sm.add_output_files(session_id, [
+                            {"filename": f["filename"], "path": f.get("path", "")}
+                            for f in output_files if f.get("path")
+                        ])
 
-            yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+        finally:
+            # Client disconnected or stream ended — cancel the agent task to
+            # prevent zombie coroutines and "Task was destroyed but pending" errors.
+            # Note: the Celery worker task keeps running independently in the
+            # background regardless of this cancellation.
+            if not agent_task.done():
+                agent_task.cancel()
+                try:
+                    await agent_task
+                except (asyncio.CancelledError, Exception):
+                    pass
 
     return StreamingResponse(
         event_stream(),
