@@ -826,3 +826,28 @@ finally:
 | P1 + SSE 修复 | **100%** | **98%** | **37.7/min** |
 
 剩余 2 个失败均为 Tool4 SWY 的 InVEST 偶发内部错误（`create new tiff` / `calculate quick flow`），可通过后续 P0 `GDAL_TMPDIR` 隔离进一步消除。
+
+---
+
+## 2026-04-04 — 前端 crypto.randomUUID HTTP 兼容修复
+
+**问题**：用户通过 `http://35.184.212.119`（非 HTTPS）访问时页面空白。Chrome 控制台报错：
+```
+TypeError: crypto.randomUUID is not a function
+```
+原因：`crypto.randomUUID()` 是 Secure Context API，浏览器在非 HTTPS / 非 localhost 环境下不暴露该方法。
+
+**修复**（`frontend/src/lib/session.js`）：添加 fallback，HTTPS 下用原生 API，HTTP 下用 `Math.random` 实现的 UUID v4：
+```js
+function generateUUID() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = Math.random() * 16 | 0;
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+  });
+}
+```
+
+重新构建前端镜像，传输到 GCP 服务器，`docker compose up -d --force-recreate frontend-ui` 完成热更新。平台现在 HTTP 和 HTTPS 均可正常访问。
