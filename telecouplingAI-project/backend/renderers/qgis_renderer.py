@@ -15,6 +15,7 @@ from config import settings
 logger = logging.getLogger(__name__)
 
 QGIS_PYTHON = settings.QGIS_PYTHON_PATH
+QGIS_PYTHON_BINDINGS = settings.QGIS_PYTHON_BINDINGS
 _semaphore = asyncio.Semaphore(int(os.environ.get("QGIS_MAX_CONCURRENT", "3")))
 WORKER_SCRIPT      = str(Path(__file__).parent / "_qgis_render_worker.py")
 ZOOM_WORKER_SCRIPT = str(Path(__file__).parent / "_qgis_zoom_render_worker.py")
@@ -89,7 +90,13 @@ async def _run(params: dict, worker_script: str) -> str:
     Success is determined by valid JSON in stdout (not returncode),
     because QGIS on Windows may exit with non-zero code even on success.
     """
-    env = {**os.environ, "QT_QPA_PLATFORM": "offscreen"}
+    existing_pypath = os.environ.get("PYTHONPATH", "")
+    new_pypath = (
+        QGIS_PYTHON_BINDINGS + os.pathsep + existing_pypath
+        if existing_pypath
+        else QGIS_PYTHON_BINDINGS
+    )
+    env = {**os.environ, "QT_QPA_PLATFORM": "offscreen", "PYTHONPATH": new_pypath}
 
     tmp = tempfile.NamedTemporaryFile(
         mode="w", suffix=".json", delete=False, encoding="utf-8"

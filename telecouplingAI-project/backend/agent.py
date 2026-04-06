@@ -165,6 +165,11 @@ Always respond in the same language as the user.
 - Tool 4: run_seasonal_water_yield — quickflow, baseflow and local recharge modelling
 - Tool 5: run_crop_production_percentile — crop yield for 172 crops based on climate percentiles
 - Tool 6: run_crop_production_regression — crop yield based on fertilizer NPK rates (10 crops)
+- read_file_content — read and analyze any output file (CSV, TXT) to answer user questions
+- render_spatial_file — render a spatial output file (TIF, SHP) to a map image
+
+## File Analysis
+When a user asks to summarize, analyze, or asks questions about a specific output file (e.g. "summarize the CSV", "what are the top nodes?", "which country has the highest degree?"), call read_file_content with the file's internal_path. Then use the returned data to provide a detailed, domain-relevant analysis. Do NOT say you cannot read files.
 
 ## Uploaded File Handling
 When the user uploads files, their paths are listed at the top of the message in the format:
@@ -175,6 +180,26 @@ Apply the following rules consistently:
 - If an uploaded file matches a required input, use its path directly — do NOT ask the user to provide it again
 - Only prompt for file paths that are genuinely missing from the uploaded files
 - If all required files have been uploaded and no other parameters are missing, proceed to call the tool immediately
+
+## Domain Knowledge
+
+### Telecoupling framework
+All tools in CSIS operate within the telecoupling framework — the study of flows (trade, migration, carbon, water, food) between distant coupled human-nature systems. Network communities reveal systemic dependencies across global supply chains and ecosystems.
+
+### Coastal Blue Carbon (Tools 2 & 3)
+Mangroves, salt marshes, and seagrasses sequester carbon 3–5× faster per hectare than tropical forests and store it for centuries. Three carbon pools are tracked: **biomass** (above-ground tissue, fast turnover), **soil** (dominant pool in mangroves; 50–90% of total; slow release), **litter** (surface dead matter). When disturbed, carbon is released via exponential decay based on each pool's half-life. The transitions CSV controls whether each LULC change is `accumulation`, `NCC`, or a disturbance level (`low/med/high-impact-disturb`). NPV is calculated using discounted carbon prices ($15–$150/Mg CO₂e depending on market).
+
+### Seasonal Water Yield (Tool 4)
+Quantifies **quickflow** (surface runoff — unproductive, flood-risk), **baseflow** (slow groundwater release — dry-season water supply), and **local recharge** (precipitation − quickflow − ET). Forests produce high baseflow, low quickflow. Urban/bare land does the opposite. Uses the NRCS Curve Number method combined with soil hydrologic groups (A=sandy/low QF → D=clay/high QF). Key policy metric: baseflow index `qb` per sub-watershed identifies water tower areas to protect.
+
+### Crop Production Percentile (Tool 5)
+Reports yield at 25th/50th/75th/95th climate percentiles for 172 crops based on Monfreda et al. (2008) global dataset. The 25th percentile ≈ low-intensity farming; 95th ≈ near-optimal management. The **yield gap** (95th − observed) quantifies intensification potential without expanding cropland. Includes 33-nutrient analysis. Use when you need broad crop coverage or multi-crop landscapes.
+
+### Crop Production Regression (Tool 6)
+Estimates yield for 10 staple crops (barley, maize, oil palm, potato, rice, soybean, sugar beet, sugar cane, sunflower, wheat) from N/P/K fertilizer rates (kg/ha). Uses **Liebig's Law of the Minimum** — final yield = minimum of N-yield, P-yield, K-yield across pixels. Running at multiple fertilizer levels reveals the response curve and the economically optimal input rate. Compare with Tool 5 percentiles to evaluate fertilizer efficiency.
+
+### Network Analysis (Tool 1)
+Detects community clusters in flow networks using igraph. **Walktrap** (random walks) suits dense, well-separated communities. **Spin glass** suits fuzzy, overlapping communities. Key metrics: degree (hub size), closeness centrality (network reach, ~1.0 = highly central), betweenness centrality (bridge role; 0 = peripheral leaf node).
 
 ## General Rules
 - Always respond in the same language as the user
@@ -302,6 +327,26 @@ TOOLS = [
             ),
         ),
         types.FunctionDeclaration(
+            name="read_file_content",
+            description=(
+                "Read and return the content of an output file (CSV or TXT) so you can analyze, "
+                "summarize, or answer questions about it. Use this whenever the user asks to "
+                "summarize, analyze, explain, or ask questions about a specific output file "
+                "(e.g. a network_stats CSV, a result_table CSV). "
+                "Pass the full absolute internal_path of the file."
+            ),
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "file_path": types.Schema(
+                        type=types.Type.STRING,
+                        description="Absolute path to the file to read (use internal_path from previous tool results).",
+                    ),
+                },
+                required=["file_path"],
+            ),
+        ),
+        types.FunctionDeclaration(
             name="render_spatial_file",
             description=(
                 "Render an existing output spatial file to a PNG image using QGIS. "
@@ -346,7 +391,12 @@ def _build_function_response(
     post_skill_text is appended as extra context for Gemini's final reply.
     """
     files = tool_result_event.get("files", [])
-    if files:
+    content = tool_result_event.get("content", "")
+
+    if content:
+        # read_file_content returns file text for the AI to analyze
+        result_summary = f"File contents:\n\n{content}"
+    elif files:
         # Include internal_path for tool use (e.g. render_spatial_file), but
         # the system instruction tells Gemini never to show paths to the user.
         file_list = "\n".join(
@@ -406,6 +456,7 @@ async def run_agent(
         "run_crop_production_percentile":       "q_crop_pct",
         "run_crop_production_regression":       "q_crop_reg",
         "render_spatial_file":                  "q_render",
+        "read_file_content":                    "q_render",  # fast, share render worker
     }
 
     client = _get_client()
@@ -456,16 +507,21 @@ async def run_agent(
             logger.warning("[agent] Gemini returned no candidates, stopping")
             break
 
-        contents.append(response.candidates[0].content)
+        candidate = response.candidates[0]
+        if candidate.content is None or candidate.content.parts is None:
+            logger.warning("[agent] Gemini returned candidate with no content/parts (safety filter or rate limit), stopping")
+            break
+
+        contents.append(candidate.content)
 
         function_calls = [
             part.function_call
-            for part in response.candidates[0].content.parts
+            for part in candidate.content.parts
             if part.function_call is not None
         ]
 
         # Stream any text parts to frontend
-        for part in response.candidates[0].content.parts:
+        for part in candidate.content.parts:
             if part.text:
                 await _maybe_await(event_callback({
                     "type": "text_chunk",

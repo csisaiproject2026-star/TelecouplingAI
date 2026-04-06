@@ -41,6 +41,7 @@ def execute_tool(tool_name: str, params: dict, session_id: str, task_id: str, pr
     from tools.crop_percentile import run_crop_percentile
     from tools.crop_regression import run_crop_regression
     from tools.render_tif import run_render_tif
+    from tools.read_file import run_read_file
 
     tool_map = {
         "run_network_analysis_grouping":        run_network_analysis,
@@ -50,6 +51,7 @@ def execute_tool(tool_name: str, params: dict, session_id: str, task_id: str, pr
         "run_crop_production_percentile":       run_crop_percentile,
         "run_crop_production_regression":       run_crop_regression,
         "render_spatial_file":                  run_render_tif,
+        "read_file_content":                    run_read_file,
     }
     func = tool_map.get(tool_name)
     if func is None:
@@ -86,8 +88,9 @@ def run_tool_task(self, tool_name: str, params: dict, session_id: str):
         )
         publish(r, session_id, tid, {
             "type": "tool_result",
-            "task_id": tid,                  # ✅ added
+            "task_id": tid,
             "files": result.get("files", []),
+            "content": result.get("content", ""),
         })
         if result.get("warning"):
             publish(r, session_id, tid, {

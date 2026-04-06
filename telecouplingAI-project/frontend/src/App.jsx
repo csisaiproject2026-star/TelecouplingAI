@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import ReactMarkdown from 'react-markdown';
 import {
   MessageSquare, Plus, Send, Paperclip, Settings,
   Trash2, X, Edit2, Menu, Sparkles, Download,
@@ -57,7 +58,24 @@ function MessageContent({ msg }) {
         {msg.blocks && msg.blocks.map((block, i) => {
           switch (block.type) {
             case 'text':
-              return <div key={i} className="whitespace-pre-wrap text-[15px] leading-relaxed">{block.content}</div>;
+              return (
+                <div key={i} className="text-[15px] leading-relaxed markdown-body">
+                  <ReactMarkdown
+                    components={{
+                      h1: ({node, ...p}) => <h1 className="text-xl font-bold mt-3 mb-1" {...p} />,
+                      h2: ({node, ...p}) => <h2 className="text-lg font-bold mt-3 mb-1" {...p} />,
+                      h3: ({node, ...p}) => <h3 className="text-base font-semibold mt-2 mb-1" {...p} />,
+                      strong: ({node, ...p}) => <strong className="font-semibold" {...p} />,
+                      ul: ({node, ...p}) => <ul className="list-disc pl-5 my-1 space-y-0.5" {...p} />,
+                      ol: ({node, ...p}) => <ol className="list-decimal pl-5 my-1 space-y-0.5" {...p} />,
+                      li: ({node, ...p}) => <li className="leading-relaxed" {...p} />,
+                      p: ({node, ...p}) => <p className="mb-2 last:mb-0" {...p} />,
+                      pre: ({node, ...p}) => <pre className="bg-gray-100 p-2 rounded text-sm font-mono my-1 whitespace-pre-wrap overflow-x-auto" {...p} />,
+                      code: ({node, ...p}) => <code className="bg-gray-100 px-1 rounded text-sm font-mono" {...p} />,
+                    }}
+                  >{block.content}</ReactMarkdown>
+                </div>
+              );
             case 'tool_status':
               return <ToolStatusCard key={i} tool={block.tool} message={block.message} progress={block.progress} />;
             case 'warning':

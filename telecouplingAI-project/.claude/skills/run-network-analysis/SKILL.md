@@ -51,11 +51,28 @@ Test data: datainput_for_demo\NetworkAnalysisGrouping_input\Network Analysis Gro
 | output_*_preview.png | Preview image | Map of geographic units colored by community membership, overlaid on satellite basemap |
 | output_*.shp | Download | Shapefile with cluster_id column; can be used for further GIS analysis |
 
-### Result interpretation
-- Tell the user how many community groups were detected
-- High degree nodes = key hubs in the network
-- High betweenness nodes = bridges connecting different communities
+### Domain knowledge — how to interpret results
+
+**Community detection in the telecoupling framework**:
+This tool is grounded in the telecoupling framework, which studies flows (trade, migration, remittances, species movement, information) between distant coupled human-nature systems. Communities in this context are groups of nodes (countries, regions, cities) that are more tightly connected to each other than to the rest of the network — they reveal hidden systemic dependencies.
+
+**Algorithm choice**:
+- **Walktrap**: Detects communities via short random walks. Performs well when communities are dense and well-separated. Recommended for most global trade or migration networks.
+- **Spin Glass**: Uses a statistical physics model (energy minimization). Better when community boundaries are fuzzy or partially overlapping.
+
+**Metrics — what to tell the user**:
+- **Degree**: Number of direct connections. High-degree nodes are network hubs — key trading partners, major migration destinations, or information gateways. A country with degree 200+ participates heavily in the global network.
+- **Closeness centrality**: How quickly a node can reach all other nodes via shortest paths. High values (close to 1.0) indicate highly central, well-connected nodes. Countries like Germany and France typically score high in trade networks because they bridge many regional connections.
+- **Betweenness centrality**: How often a node lies on the shortest path between any two other nodes. High betweenness = critical bridge or gateway. A country with betweenness = 0 is not on any shortest path — it is a peripheral leaf node.
+- **Betweenness = 0**: Not unusual. Peripheral countries (small island states, landlocked developing nations) may be directly connected to just one or two partners and never act as intermediaries.
+
+**Interpreting community structure**:
+- Community membership (cluster_id in the shapefile) reveals trade blocs, regional migration systems, or geopolitical groupings that emerge naturally from the data — without pre-defined regions.
+- Nodes within the same community have stronger mutual flows; nodes in different communities interact more weakly.
+- Visualize the shapefile output in GIS to see geographic patterns of community membership.
 
 ### Suggested next steps
-- Try the other clustering algorithm (walktrap vs spin_glass) to compare results
-- Adjust weight_within_clusters / weight_between_clusters to tune cluster cohesion
+- Use `read_file_content` to analyze the network_stats CSV and identify top hubs, bridges, and peripheral nodes
+- Try the other clustering algorithm (walktrap vs spin_glass) to compare community structures
+- Adjust weight_within_clusters / weight_between_clusters to tune visual cluster separation
+- Overlay the output shapefile with socioeconomic or environmental data in GIS

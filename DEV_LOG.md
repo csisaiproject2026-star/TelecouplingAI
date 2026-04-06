@@ -851,3 +851,62 @@ function generateUUID() {
 ```
 
 重新构建前端镜像，传输到 GCP 服务器，`docker compose up -d --force-recreate frontend-ui` 完成热更新。平台现在 HTTP 和 HTTPS 均可正常访问。
+
+---
+
+## 2026-04-06 — 平台全面升级 & 交互测试
+
+### 一、下载功能修复（PDF / 所有文件类型）
+
+**问题**：文件下载失败，浏览器报 "failed to load"。
+**根本原因**：`FILE_SERVER_URL` 使用旧 IP + 端口 8001，跨域情况下 HTML `download` 属性无效。
+**修复**：
+- `nginx.conf` 新增 `/download/` location，代理到 `file-server:80`，同域访问
+- 添加 `proxy_hide_header Content-Disposition` + `add_header Content-Disposition 'attachment' always` 解决重复 header 问题
+- `nginx.conf` 对 `/api/chat` 添加 `client_max_body_size 500M`，解决上传 shp 文件 HTTP 413 报错
+
+### 二、QGIS 渲染修复（No module named 'tools'）
+
+**问题**：渲染 shp 文件时报 `❌ Error: No module named 'tools'`。
+**根本原因**：Celery prefork worker 启动时 CWD 不是 `/app`，PYTHONPATH override 把 `/app` 从路径中移除。
+**修复**：`qgis_renderer.py` 中 PYTHONPATH 设为 `/app:/opt/conda/envs/TeleCouplingAI/share/qgis/python`，确保 `/app` 始终在前。
+
+### 三、外部 IP 统一配置
+
+`config.py` 新增 `SERVER_BASE_URL` 字段，通过 `@model_validator` 自动推导 `FILE_SERVER_URL`。迁移服务器时只需修改 `.env.docker` 中的 `SERVER_BASE_URL` 一处。
+
+### 四、文件读取工具（read_file_content）
+
+新增 `backend/tools/read_file.py`，支持 CSV / TXT / JSON 文件读取，格式化为对齐文本表格（最多 100 行 / 12000 字符）。AI 可直接读取并分析输出文件，不再说"无法读取文件"。
+
+### 五、Markdown 渲染修复
+
+**问题**：AI 回复中 `**bold**` 显示为原始字符串。
+**修复**：`App.jsx` 引入 `react-markdown`，自定义 h1/h2/h3/strong/ul/ol/li/p/pre/code 组件样式。修复 react-markdown v10 移除 `inline` prop 的兼容问题（用 `pre` 组件区分块级/行内代码）。
+
+### 六、域知识注入（Method 1 + Method 2）
+
+- **Method 1**：`agent.py` `_BASE_SYSTEM_INSTRUCTION` 新增 Domain Knowledge 章节，涵盖全部 6 个工具的核心领域知识
+- **Method 2**：全部 6 个 `SKILL.md` 的 `[POST_EXECUTION]` 章节大幅扩充，包含：
+  - CBC Preprocessor：三大碳库、干扰强度等级
+  - CBC Main：碳库核算公式、半衰期衰减模型、NPV 经济估值
+  - Network Analysis：Telecoupling 框架、walktrap vs spin_glass、度/介数/接近中心性
+  - Seasonal Water Yield：quickflow/baseflow/局部补给解释、NRCS CN 方法、情景分析
+  - Crop Percentile：Monfreda 数据集、百分位含义（集约化水平）、产量差概念
+  - Crop Regression：Liebig 最小值定律、N/P/K 限制营养素、施肥响应曲线
+
+### 七、Playwright 持久化测试框架
+
+新建 `demo_files/playwright_demo/runner.js`：单一浏览器窗口持久运行，轮询 `cmd.json` 执行命令（goto / upload / send / fill / waitDone / screenshot），用于交互式工具测试。
+
+### 八、SSH 密钥清理
+
+- 删除本地旧 `id_ed25519` / `id_ed25519.pub`（原 dru1889 用途）
+- 删除 GCP 服务器 `dru1889` 用户
+- 统一使用 `id_ed25519_csis` + `csisaiproject2026@34.42.83.50`
+- 配置 `~/.ssh/config`，GitHub 默认使用 `id_ed25519_csis`
+
+### 九、Bug 修复
+
+- **agent.py**：`response.candidates[0].content` 为 `None` 时（Gemini safety filter / rate limit）崩溃 → 加 null 检查，优雅 break
+- **GCP 服务器**：部署方式统一为 `scp` + `docker cp` + `docker restart`，无需重建镜像

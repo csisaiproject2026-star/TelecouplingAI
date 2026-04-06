@@ -50,12 +50,42 @@ Test data: datainput_for_demo\CropProductionPercentile_input\
 | *_yield_*percentile_*_preview.png | Preview image | Spatial yield distribution per crop at each climate percentile |
 | *_yield_*percentile_*.tif | Download | Yield raster; unit: t/ha/year |
 
+### Domain knowledge — understanding Crop Percentile outputs
+
+**What percentiles mean — this is not probability, it's intensification level**:
+- The model draws on the **Monfreda et al. (2008) global dataset** of observed crop yields circa year 2000, organized by climate bins (temperature × precipitation zones)
+- **25th percentile**: Low-intensity farming — typical of subsistence agriculture, degraded soils, or minimal inputs. Reflects the bottom quarter of observed yields globally within that climate bin.
+- **50th percentile**: Average yield — roughly what most farmers achieve under conventional management in that climate zone.
+- **75th percentile**: Above-average management — improved varieties, moderate inputs, reasonable extension services.
+- **95th percentile**: Near-optimal yield — best achievable with current technology in that climate zone. Represents the yield gap target for intensification programs.
+- **The yield gap** = 95th percentile − current observed yield. A large gap means the region is significantly underperforming its climate potential — an opportunity for intensification without expanding cropland.
+
+**Climate bins — why geography matters for yield**:
+- Each crop has a unique set of climate bins based on temperature and precipitation zones
+- Yields are benchmarked within each bin — so tropical rice is compared to other tropical rice areas, not to temperate wheat regions
+- This means a "high percentile" for a given pixel reflects performance relative to other farms in a similar climate, not globally
+
+**Observed yield column — use it as a sanity check**:
+- The result_table includes both percentile estimates and observed production (from FAO/sub-national data ~year 2000)
+- If your study area's actual production is near the 25th percentile, there is large room to improve; if it's near the 95th, intensification is already high
+- Large differences between observed and 50th percentile may reflect data quality or land use classification issues
+
+**Nutritional output — 33 macro and micronutrients**:
+- The result_table also reports nutritional content (calories, protein, fat, vitamins, minerals) derived from crop_nutrient.csv
+- Useful for food security analysis: comparing caloric production per hectare across crop types, or assessing micronutrient availability from the landscape
+
+**172 crops coverage**:
+- This tool covers 172 crops globally — far more than the Regression model (10 crops only)
+- Suitable for multi-crop landscapes, biodiversity-rich agroforestry systems, or any analysis where you need broad crop coverage
+- If you need to evaluate fertilizer management for the 10 major staple crops, use Tool 6 (Crop Regression) instead
+
 ### Result interpretation
-- Higher percentile = more favorable climate conditions = higher yield estimate
-- total_production in result_table is the estimated total production within the study area
-- Spatial maps reveal geographic patterns of high-yield and low-yield zones
+- Higher percentile = higher yield target — not a probability statement, but an intensification scenario
+- total_production in result_table is the estimated total production within the study area at each percentile
+- Spatial maps reveal geographic patterns of high-yield and low-yield zones within the study area
 
 ### Suggested next steps
-- Download result_table_*.csv to compare yields across crop types
+- Download result_table_*.csv to compare yields and nutritional output across crop types
+- Compare 25th vs 95th percentile production to quantify the yield gap and identify intensification opportunities
 - To analyze fertilizer effects on yield (10 major crops only), use Tool 6 (Crop Regression)
-- Combine with Tool 4 (Seasonal Water Yield) to analyze agricultural water pressure
+- Combine with Tool 4 (Seasonal Water Yield) to analyze agricultural water pressure and food-water trade-offs
