@@ -4,7 +4,6 @@ Tests for renderers: output_router.py and csv_analyzer.py
 import os
 import sys
 import tempfile
-from unittest.mock import patch, AsyncMock
 
 import pytest
 
@@ -67,9 +66,7 @@ class TestRouteOutputs:
         inter.mkdir()
         (inter / "should_skip.tif").touch()
 
-        # Mock zoom_render so no QGIS subprocess is launched in unit tests
-        with patch("renderers.output_router._generate_preview", new_callable=AsyncMock, return_value=False):
-            results = route_outputs(str(tmp_path), "seasonal_water_yield")
+        results = route_outputs(str(tmp_path), "seasonal_water_yield")
 
         filenames = [r["filename"] for r in results]
         assert "QF_test.tif" in filenames
@@ -79,29 +76,22 @@ class TestRouteOutputs:
         """SHP/TIF files classified as qgis should be returned as 'download'."""
         (tmp_path / "QF_test.tif").touch()
 
-        with patch("renderers.output_router._generate_preview", new_callable=AsyncMock, return_value=False):
-            results = route_outputs(str(tmp_path), "seasonal_water_yield")
+        results = route_outputs(str(tmp_path), "seasonal_water_yield")
 
         tif_entry = next(r for r in results if r["filename"] == "QF_test.tif")
         assert tif_entry["render_type"] == "download"
 
-    def test_qgis_file_generates_preview(self, tmp_path):
-        """A preview PNG should be added when _generate_preview succeeds."""
+    def test_no_auto_preview_generation(self, tmp_path):
+        """Previews are NOT generated automatically; they require explicit render_spatial_file call."""
         tif_path = tmp_path / "QF_test.tif"
         tif_path.touch()
-        preview_path = tmp_path / "QF_test_preview.png"
 
-        async def fake_preview(file_path, output_path):
-            # Simulate successful preview creation
-            open(output_path, "w").close()
-            return True
-
-        with patch("renderers.output_router._generate_preview", side_effect=fake_preview):
-            results = route_outputs(str(tmp_path), "seasonal_water_yield")
+        results = route_outputs(str(tmp_path), "seasonal_water_yield")
 
         render_types = {r["filename"]: r["render_type"] for r in results}
         assert render_types.get("QF_test.tif") == "download"
-        assert render_types.get("QF_test_preview.png") == "image"
+        # No preview file should be created or listed
+        assert not any("_preview.png" in r["filename"] for r in results)
 
     def test_csv_file_unaffected(self, tmp_path):
         """CSV files should not be touched by the preview logic."""
@@ -124,11 +114,10 @@ class TestRouteOutputs:
         assert "render_type" in r
 
     def test_skips_existing_preview_files(self, tmp_path):
-        """Files ending in _preview.png should not be re-processed."""
+        """Files ending in _preview.png should not be included in output scan."""
         (tmp_path / "QF_test_preview.png").touch()
 
-        with patch("renderers.output_router._generate_preview", new_callable=AsyncMock, return_value=False):
-            results = route_outputs(str(tmp_path), "seasonal_water_yield")
+        results = route_outputs(str(tmp_path), "seasonal_water_yield")
 
         # _preview.png files are skipped in the scan, so result should be empty
         assert len(results) == 0

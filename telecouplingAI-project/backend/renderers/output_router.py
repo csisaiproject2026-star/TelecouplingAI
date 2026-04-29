@@ -1,11 +1,9 @@
 """
 Output router — classify tool output files and decide render type.
-For SHP/TIF files (render_type='qgis'), a satellite basemap preview PNG is
-generated alongside the original file. The original is kept as 'download',
-the preview is added as 'image'.
+SHP/TIF files are classified as 'qgis' but returned as 'download' only.
+Preview generation is triggered on-demand via render_spatial_file tool, not automatically.
 """
 from __future__ import annotations
-import asyncio
 import fnmatch
 import logging
 import os
@@ -72,24 +70,6 @@ def classify_file(filename: str, tool_name: str) -> str:
     return EXT_FALLBACK.get(ext, "download")
 
 
-def _preview_path(file_path: str) -> str:
-    """Return the path for the preview PNG alongside the original file."""
-    p = Path(file_path)
-    return str(p.parent / (p.stem + "_preview.png"))
-
-
-async def _generate_preview(file_path: str, output_path: str) -> bool:
-    """
-    Generate a zoom_render preview PNG for a SHP or TIF file.
-    Returns True if successful, False on any error.
-    """
-    try:
-        from renderers.qgis_renderer import zoom_render
-        await zoom_render(file_path, output_path, width=1920, height=1080, padding=0.1)
-        return os.path.exists(output_path)
-    except Exception as e:
-        logger.warning(f"Preview generation failed for {file_path}: {e}")
-        return False
 
 
 async def route_outputs_async(workspace_dir: str, tool_name: str) -> list[dict]:
@@ -99,8 +79,8 @@ async def route_outputs_async(workspace_dir: str, tool_name: str) -> list[dict]:
     {"filename": ..., "path": ..., "render_type": ...} dicts.
 
     For files classified as 'qgis' (SHP/TIF):
-      - The original file is kept with render_type='download' (for user download)
-      - A satellite basemap preview PNG is generated with render_type='image'
+      - The original file is returned with render_type='download'
+      - Preview generation is NOT automatic — use render_spatial_file tool on-demand
 
     Skips directories in SKIP_DIRS and existing *_preview.png files.
     """
@@ -112,52 +92,36 @@ async def route_outputs_async(workspace_dir: str, tool_name: str) -> list[dict]:
                 continue
             full_path = os.path.join(root, filename)
             render_type = classify_file(filename, tool_name)
+            # qgis files (TIF/SHP) are returned as 'download' only
+            if render_type == "qgis":
+                render_type = "download"
             raw_files.append({
                 "filename": filename,
                 "path": full_path,
                 "render_type": render_type,
             })
 
-    results = []
-    preview_tasks = []
-
-    for f in raw_files:
-        if f["render_type"] == "qgis":
-            results.append({**f, "render_type": "download"})
-            preview_out = _preview_path(f["path"])
-            preview_tasks.append((f["path"], preview_out, Path(f["filename"]).stem))
-        else:
-            results.append(f)
-
-    if preview_tasks:
-        task_coroutines = [_generate_preview(src, out) for src, out, _ in preview_tasks]
-        successes = await asyncio.gather(*task_coroutines, return_exceptions=True)
-
-        for (src, out, stem), ok in zip(preview_tasks, successes):
-            if ok and not isinstance(ok, Exception) and os.path.exists(out):
-                results.append({
-                    "filename": Path(out).name,
-                    "path": out,
-                    "render_type": "image",
-                })
-            else:
-                logger.warning(f"Skipping preview for {stem}: generation failed or file missing")
-
-    return results
+    return raw_files
 
 
 def route_outputs(workspace_dir: str, tool_name: str) -> list[dict]:
     """
-    Sync wrapper around route_outputs_async.
-    Use this when called from a non-async context (e.g. tests, task_queue).
+    Scan workspace_dir and classify output files without generating previews.
+    Works in both sync and async contexts via scan_output_directory.
     """
-    try:
-        asyncio.get_running_loop()
-        import concurrent.futures
-        with concurrent.futures.ThreadPoolExecutor() as pool:
-            future = pool.submit(
-                lambda: asyncio.run(route_outputs_async(workspace_dir, tool_name))
-            )
-            return future.result()
-    except RuntimeError:
-        return asyncio.run(route_outputs_async(workspace_dir, tool_name))
+    raw_files = []
+    for root, dirs, files in os.walk(workspace_dir):
+        dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
+        for filename in files:
+            if filename.endswith("_preview.png"):
+                continue
+            full_path = os.path.join(root, filename)
+            render_type = classify_file(filename, tool_name)
+            if render_type == "qgis":
+                render_type = "download"
+            raw_files.append({
+                "filename": filename,
+                "path": full_path,
+                "render_type": render_type,
+            })
+    return raw_files

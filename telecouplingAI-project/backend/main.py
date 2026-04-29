@@ -80,7 +80,7 @@ async def health():
 
 @app.post("/api/chat")
 async def chat_endpoint(
-    message: str = Form(...),
+    message: str = Form(""),
     model: str = Form(None),
     files: list[UploadFile] = File(default=[]),
     x_session_id: str | None = Header(default=None),
@@ -95,14 +95,35 @@ async def chat_endpoint(
     else:
         sm.touch_session(session_id)
 
+    # Validate that user provided a prompt
+    if not message or not message.strip():
+        async def empty_prompt_stream():
+            yield f"data: {json.dumps({'type': 'error', 'message': 'Please input prompt to let me know how to process it', 'error_code': 'EMPTY_PROMPT'}, ensure_ascii=False)}\n\n"
+        return StreamingResponse(
+            empty_prompt_stream(),
+            media_type="text/event-stream",
+            headers={"X-Session-ID": session_id},
+        )
+
     # Save any uploaded files and build file context list
     uploaded = []
+    unsupported_files = []
+    supported_extensions = {'.tif', '.tiff', '.shp', '.geojson', '.gpkg', '.csv', '.dbf', '.prj', '.shx', '.cpg', '.qpj', '.sbx', '.sbn', '.xml'}
+
     if files:
         upload_dir = os.path.join(settings.UPLOADS_DIR, session_id)
         os.makedirs(upload_dir, exist_ok=True)
         for uf in files:
             if not uf.filename:
                 continue
+
+            # Check file extension
+            file_ext = Path(uf.filename).suffix.lower()
+            if file_ext not in supported_extensions:
+                unsupported_files.append(uf.filename)
+                logger.info(f"[upload] Skipped unsupported file: {uf.filename}")
+                continue
+
             dest = os.path.join(upload_dir, uf.filename)
             async with aiofiles.open(dest, "wb") as f:
                 await f.write(await uf.read())
@@ -126,6 +147,14 @@ async def chat_endpoint(
 
         async def run():
             try:
+                # Send warning for unsupported files
+                if unsupported_files:
+                    await queue.put({
+                        "type": "warning",
+                        "message": f"Unsupported file types skipped: {', '.join(unsupported_files)}. Supported formats: .tif, .tiff, .shp, .geojson, .gpkg, .csv",
+                        "skipped_files": unsupported_files,
+                    })
+
                 from agent import run_agent
                 await run_agent(
                     message=message,
