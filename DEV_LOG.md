@@ -910,3 +910,74 @@ function generateUUID() {
 
 - **agent.py**：`response.candidates[0].content` 为 `None` 时（Gemini safety filter / rate limit）崩溃 → 加 null 检查，优雅 break
 - **GCP 服务器**：部署方式统一为 `scp` + `docker cp` + `docker restart`，无需重建镜像
+
+---
+
+# 开发日志 — 2026-04-29 — 禁用自动渲染 + 422错误修复 + 完整部署
+
+## 本次工作内容
+
+### 一、HTTP 422 错误修复（main.py）
+
+**问题**：
+- 上传文件但未提供提示词时返回 HTTP 422
+- 上传 PNG/JPG 等不支持的文件类型时返回 HTTP 422
+
+**修复**：
+- `message` 参数改为 `Form("")` 使其可选（原为 `Form(...)` 强制必需）
+- 添加手动验证：若提示词为空或仅空格，返回友好错误消息 `"Please input prompt to let me know how to process it"`
+- 实现文件扩展名白名单验证：`{'.tif', '.tiff', '.shp', '.geojson', '.gpkg', '.csv', '.dbf', '.prj', '.shx', '.cpg', '.qpj', '.sbx', '.sbn', '.xml'}`
+- 不支持的文件被跳过，后续返回警告消息列出被跳过的文件及支持的格式
+
+### 二、禁用地理文件自动预览（output_router.py）
+
+**问题**：工具运行完成后，TIF/SHP 等地理文件被自动渲染成预览图，应改为只保留下载链接，按需渲染
+
+**修复**：
+- 移除 `_generate_preview()` 和 `_preview_path()` 函数
+- 删除 `asyncio` 导入（不再需要异步预览生成）
+- 简化 `route_outputs_async()` 和 `route_outputs()`：
+  - qgis 类型文件（TIF/SHP）直接返回 `render_type='download'`
+  - 不再在输出处理时生成 `*_preview.png` 文件
+  - 预览图仅在用户通过 `render_spatial_file` 工具明确请求时生成
+
+**更新测试** `test_renderers.py`：
+- 移除对 `_generate_preview` 的 mock
+- 添加 `test_no_auto_preview_generation()` 验证不生成预览
+- 所有 24 个测试通过 ✅
+
+### 三、完整部署到 GCP 服务器（34.42.83.50）
+
+**部署步骤**：
+1. 修改文件通过 ssh tar pipe 传输到服务器
+2. 进入 `backend` 目录重建 Docker 镜像：`docker build -t csic_backend:latest .`
+3. 停止旧容器并启动新容器：`docker compose down && docker compose up -d`
+4. 验证所有 12 个容器启动成功 ✅
+5. 健康检查：`curl http://34.42.83.50/health → {"status":"ok"}` ✅
+
+**验证**：
+- 检查容器内 output_router.py 已更新为禁用预览版本
+- 确认 `_generate_preview()` 和 `_preview_path()` 已移除
+
+### 四、代码推送到 GitHub
+
+- 提交：`1762791` — "fix: disable auto-preview generation for geographic files"
+- 推送到：`dru1889/CSIS_fulldev-backup` master 分支
+- 包含：output_router.py、test_renderers.py、main.py、agent.py 的所有修改
+
+## 工作完成状态
+
+| 项目 | 状态 |
+|------|------|
+| 422 错误修复（缺提示词） | ✅ 完成 |
+| 422 错误修复（不支持文件类型） | ✅ 完成 |
+| 禁用自动预览生成 | ✅ 完成 |
+| 单元测试（24/24） | ✅ 通过 |
+| GCP 服务器部署（34.42.83.50） | ✅ 完成 |
+| GitHub 备份推送 | ✅ 完成 |
+
+## 后续行为
+
+- 工具运行完毕后只显示下载链接（不生成预览）
+- 用户可通过 `render_spatial_file` 工具按需渲染 TIF/SHP 文件
+- 减少服务器 I/O 和 QGIS 渲染开销
