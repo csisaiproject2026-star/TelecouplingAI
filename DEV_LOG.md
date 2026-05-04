@@ -1069,6 +1069,34 @@ pytest tests/test_tools.py tests/test_invest_integration.py -v
 
 ### 七、待办
 
-- [ ] 为 14 个新工具编写 SKILL.md 文件
+- [x] 为 14 个新工具编写 SKILL.md 文件 ✅
 - [ ] 推送到 GCP 服务器（34.42.83.50）
 - [ ] `git push` feature/invest-expansion → GitHub 备份
+
+### 八、SKILL.md 编写完成（同次会话）
+
+为全部 14 个新工具创建了 `.claude/skills/run-{tool-name}/SKILL.md` 文件：
+
+| Skill 目录 | 对应工具 |
+|-----------|---------|
+| run-carbon-storage | Carbon Storage |
+| run-habitat-quality | Habitat Quality |
+| run-annual-water-yield | Annual Water Yield |
+| run-forest-carbon-edge | Forest Carbon Edge Effect |
+| run-crop-pollination | Crop Pollination |
+| run-delineateit | DelineateIt |
+| run-routedem | RouteDEM |
+| run-sdr | SDR |
+| run-ndr | NDR |
+| run-urban-cooling | Urban Cooling |
+| run-urban-flood | Urban Flood Risk Mitigation |
+| run-urban-stormwater | Urban Stormwater Retention |
+| run-urban-nature-access | Urban Nature Access |
+| run-scenario-gen-proximity | Scenario Generator Proximity |
+
+每个文件包含三段：
+- `[DEV ONLY]`：实现路径、invest_args 键名、版本注意事项
+- `[PRE_EXECUTION]`：参数收集指导（必填/选填、何时询问用户）
+- `[POST_EXECUTION]`：输出文件表、领域知识解读、后续建议步骤
+
+Git commit: `fff0a04`
