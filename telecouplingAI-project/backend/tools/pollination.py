@@ -14,7 +14,7 @@ from shared.utils import CSISError, validate_required, generate_output_dir, scan
 
 logger = logging.getLogger(__name__)
 
-REQUIRED_KEYS = ["lulc_path", "guild_table_path", "landcover_biophysical_table_path"]
+REQUIRED_KEYS = ["landcover_raster_path", "guild_table_path", "landcover_biophysical_table_path"]
 
 
 async def run_pollination(
@@ -30,12 +30,12 @@ async def run_pollination(
     progress_callback(10, "Created output directory")
 
     invest_args = {
-        "workspace_dir":                   workspace_dir,
-        "results_suffix":                  params.get("results_suffix", ""),
-        "lulc_path":                       params["lulc_path"],
-        "guild_table_path":                params["guild_table_path"],
+        "workspace_dir":                    workspace_dir,
+        "results_suffix":                   params.get("results_suffix", ""),
+        "landcover_raster_path":            params["landcover_raster_path"],
+        "guild_table_path":                 params["guild_table_path"],
         "landcover_biophysical_table_path": params["landcover_biophysical_table_path"],
-        "farm_vector_path":                params.get("farm_vector_path", ""),
+        "farm_vector_path":                 params.get("farm_vector_path", ""),
     }
 
     progress_callback(20, "Running InVEST Pollination model...")

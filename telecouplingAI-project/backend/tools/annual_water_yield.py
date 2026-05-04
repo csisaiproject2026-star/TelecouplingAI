@@ -48,6 +48,7 @@ async def run_annual_water_yield(
         "eto_path":                       params["eto_path"],
         "watersheds_path":                params["watersheds_path"],
         "biophysical_table_path":         params["biophysical_table_path"],
+        "seasonality_constant":           params.get("seasonality_constant", 15),
         "sub_watersheds_path":            params.get("sub_watersheds_path", ""),
         "demand_table_path":              params.get("demand_table_path", ""),
         "valuation_table_path":           params.get("valuation_table_path", ""),

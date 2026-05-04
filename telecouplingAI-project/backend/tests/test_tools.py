@@ -286,8 +286,8 @@ class TestTaskQueue:
         with pytest.raises(ValueError, match="Unknown tool"):
             execute_tool("nonexistent_tool", {}, "sess", "tid", lambda p, m: None)
 
-    def test_tool_map_has_all_six(self):
-        """Verify all 6 tool names are in the dispatch map."""
+    def test_tool_map_has_all_tools(self):
+        """Verify all 20 tool names are in the dispatch map."""
         from workers.task_queue import execute_tool
         expected_tools = [
             "run_network_analysis_grouping",
@@ -296,6 +296,20 @@ class TestTaskQueue:
             "run_seasonal_water_yield",
             "run_crop_production_percentile",
             "run_crop_production_regression",
+            "run_carbon_storage",
+            "run_habitat_quality",
+            "run_annual_water_yield",
+            "run_forest_carbon_edge_effect",
+            "run_crop_pollination",
+            "run_delineateit",
+            "run_routedem",
+            "run_sdr",
+            "run_ndr",
+            "run_urban_cooling",
+            "run_urban_flood_risk_mitigation",
+            "run_urban_stormwater_retention",
+            "run_urban_nature_access",
+            "run_scenario_gen_proximity",
         ]
         for tool_name in expected_tools:
             try:
@@ -304,3 +318,241 @@ class TestTaskQueue:
                 pytest.fail(f"Tool {tool_name} not found in tool_map")
             except Exception:
                 pass  # Other errors (missing params etc.) are expected
+
+
+# --- New InVEST tools: parameter validation ---
+
+class TestCarbon:
+    def test_required_keys(self):
+        from tools.carbon import REQUIRED_KEYS
+        assert "lulc_cur_path" in REQUIRED_KEYS
+        assert "carbon_pools_path" in REQUIRED_KEYS
+
+    @pytest.mark.asyncio
+    async def test_missing_params_raises(self):
+        from tools.carbon import run_carbon
+        with pytest.raises(CSISError) as exc_info:
+            await run_carbon({}, "sess", "tid", lambda p, m: None)
+        assert exc_info.value.error_code == "MISSING_PARAMS"
+
+    @pytest.mark.asyncio
+    async def test_valuation_missing_params_raises(self, tmp_path):
+        from tools.carbon import run_carbon
+        with pytest.raises(CSISError) as exc_info:
+            await run_carbon(
+                {"lulc_cur_path": "x.tif", "carbon_pools_path": "x.csv",
+                 "lulc_fut_path": "y.tif", "do_valuation": True},
+                "sess", "tid", lambda p, m: None,
+            )
+        assert exc_info.value.error_code in ("MISSING_PARAMS", "INVALID_PARAMS")
+
+
+class TestHabitatQuality:
+    def test_required_keys(self):
+        from tools.habitat_quality import REQUIRED_KEYS
+        assert "lulc_cur_path" in REQUIRED_KEYS
+        assert "threats_table_path" in REQUIRED_KEYS
+        assert "sensitivity_table_path" in REQUIRED_KEYS
+
+    @pytest.mark.asyncio
+    async def test_missing_params_raises(self):
+        from tools.habitat_quality import run_habitat_quality
+        with pytest.raises(CSISError) as exc_info:
+            await run_habitat_quality({}, "sess", "tid", lambda p, m: None)
+        assert exc_info.value.error_code == "MISSING_PARAMS"
+
+
+class TestAnnualWaterYield:
+    def test_required_keys(self):
+        from tools.annual_water_yield import REQUIRED_KEYS
+        assert "lulc_path" in REQUIRED_KEYS
+        assert "watersheds_path" in REQUIRED_KEYS
+        assert "biophysical_table_path" in REQUIRED_KEYS
+
+    @pytest.mark.asyncio
+    async def test_missing_params_raises(self):
+        from tools.annual_water_yield import run_annual_water_yield
+        with pytest.raises(CSISError) as exc_info:
+            await run_annual_water_yield({}, "sess", "tid", lambda p, m: None)
+        assert exc_info.value.error_code == "MISSING_PARAMS"
+
+
+class TestForestCarbonEdge:
+    def test_required_keys(self):
+        from tools.forest_carbon_edge_effect import REQUIRED_KEYS
+        assert "lulc_raster_path" in REQUIRED_KEYS
+        assert "biophysical_table_path" in REQUIRED_KEYS
+        assert "tropical_forest_edge_carbon_model_vector_path" in REQUIRED_KEYS
+
+    @pytest.mark.asyncio
+    async def test_missing_params_raises(self):
+        from tools.forest_carbon_edge_effect import run_forest_carbon_edge
+        with pytest.raises(CSISError) as exc_info:
+            await run_forest_carbon_edge({}, "sess", "tid", lambda p, m: None)
+        assert exc_info.value.error_code == "MISSING_PARAMS"
+
+
+class TestPollination:
+    def test_required_keys(self):
+        from tools.pollination import REQUIRED_KEYS
+        assert "landcover_raster_path" in REQUIRED_KEYS
+        assert "guild_table_path" in REQUIRED_KEYS
+        assert "landcover_biophysical_table_path" in REQUIRED_KEYS
+
+    @pytest.mark.asyncio
+    async def test_missing_params_raises(self):
+        from tools.pollination import run_pollination
+        with pytest.raises(CSISError) as exc_info:
+            await run_pollination({}, "sess", "tid", lambda p, m: None)
+        assert exc_info.value.error_code == "MISSING_PARAMS"
+
+
+class TestDelineateIt:
+    def test_required_keys(self):
+        from tools.delineateit import REQUIRED_KEYS
+        assert "dem_path" in REQUIRED_KEYS
+
+    @pytest.mark.asyncio
+    async def test_missing_outlet_and_no_pour_points_raises(self):
+        from tools.delineateit import run_delineateit
+        with pytest.raises(CSISError) as exc_info:
+            await run_delineateit(
+                {"dem_path": "dem.tif", "detect_pour_points": False},
+                "sess", "tid", lambda p, m: None,
+            )
+        assert exc_info.value.error_code == "INVALID_PARAMS"
+
+
+class TestRouteDEM:
+    def test_required_keys(self):
+        from tools.routedem import REQUIRED_KEYS
+        assert "dem_path" in REQUIRED_KEYS
+
+    @pytest.mark.asyncio
+    async def test_missing_params_raises(self):
+        from tools.routedem import run_routedem
+        with pytest.raises(CSISError) as exc_info:
+            await run_routedem({}, "sess", "tid", lambda p, m: None)
+        assert exc_info.value.error_code == "MISSING_PARAMS"
+
+
+class TestSDR:
+    def test_required_keys(self):
+        from tools.sdr import REQUIRED_KEYS
+        assert "dem_path" in REQUIRED_KEYS
+        assert "erosivity_path" in REQUIRED_KEYS
+        assert "erodibility_path" in REQUIRED_KEYS
+        assert "watersheds_path" in REQUIRED_KEYS
+
+    @pytest.mark.asyncio
+    async def test_missing_params_raises(self):
+        from tools.sdr import run_sdr
+        with pytest.raises(CSISError) as exc_info:
+            await run_sdr({}, "sess", "tid", lambda p, m: None)
+        assert exc_info.value.error_code == "MISSING_PARAMS"
+
+
+class TestNDR:
+    def test_required_keys(self):
+        from tools.ndr import REQUIRED_KEYS
+        assert "dem_path" in REQUIRED_KEYS
+        assert "runoff_proxy_path" in REQUIRED_KEYS
+        assert "watersheds_path" in REQUIRED_KEYS
+
+    @pytest.mark.asyncio
+    async def test_no_nutrient_selected_raises(self):
+        from tools.ndr import run_ndr
+        params = {k: "x" for k in ["dem_path", "lulc_path", "runoff_proxy_path",
+                                     "watersheds_path", "biophysical_table_path",
+                                     "threshold_flow_accumulation"]}
+        params["calc_n"] = False
+        params["calc_p"] = False
+        with pytest.raises(CSISError) as exc_info:
+            await run_ndr(params, "sess", "tid", lambda p, m: None)
+        assert exc_info.value.error_code == "INVALID_PARAMS"
+
+
+class TestUrbanCooling:
+    def test_required_keys(self):
+        from tools.urban_cooling import REQUIRED_KEYS
+        assert "lulc_raster_path" in REQUIRED_KEYS
+        assert "t_ref" in REQUIRED_KEYS
+        assert "uhi_max" in REQUIRED_KEYS
+
+    @pytest.mark.asyncio
+    async def test_missing_params_raises(self):
+        from tools.urban_cooling import run_urban_cooling
+        with pytest.raises(CSISError) as exc_info:
+            await run_urban_cooling({}, "sess", "tid", lambda p, m: None)
+        assert exc_info.value.error_code == "MISSING_PARAMS"
+
+
+class TestUrbanFlood:
+    def test_required_keys(self):
+        from tools.urban_flood import REQUIRED_KEYS
+        assert "aoi_watersheds_path" in REQUIRED_KEYS
+        assert "rainfall_depth" in REQUIRED_KEYS
+        assert "curve_number_table_path" in REQUIRED_KEYS
+
+    @pytest.mark.asyncio
+    async def test_missing_params_raises(self):
+        from tools.urban_flood import run_urban_flood
+        with pytest.raises(CSISError) as exc_info:
+            await run_urban_flood({}, "sess", "tid", lambda p, m: None)
+        assert exc_info.value.error_code == "MISSING_PARAMS"
+
+
+class TestUrbanStormwater:
+    def test_required_keys(self):
+        from tools.urban_stormwater import REQUIRED_KEYS
+        assert "lulc_path" in REQUIRED_KEYS
+        assert "soil_group_path" in REQUIRED_KEYS
+        assert "biophysical_table" in REQUIRED_KEYS
+
+    @pytest.mark.asyncio
+    async def test_adjust_retention_missing_radius_raises(self):
+        from tools.urban_stormwater import run_urban_stormwater
+        params = {k: "x" for k in ["lulc_path", "soil_group_path",
+                                     "precipitation_path", "biophysical_table"]}
+        params["adjust_retention_ratios"] = True
+        with pytest.raises(CSISError) as exc_info:
+            await run_urban_stormwater(params, "sess", "tid", lambda p, m: None)
+        assert exc_info.value.error_code == "INVALID_PARAMS"
+
+
+class TestUrbanNatureAccess:
+    def test_required_keys(self):
+        from tools.urban_nature_access import REQUIRED_KEYS
+        assert "lulc_raster_path" in REQUIRED_KEYS
+        assert "population_raster_path" in REQUIRED_KEYS
+
+    @pytest.mark.asyncio
+    async def test_uniform_mode_missing_radius_raises(self):
+        from tools.urban_nature_access import run_urban_nature_access
+        params = {k: "x" for k in ["lulc_raster_path", "lulc_attribute_table",
+                                     "population_raster_path", "admin_boundaries_vector_path"]}
+        params["search_radius_mode"] = "uniform radius"
+        # search_radius intentionally omitted
+        with pytest.raises(CSISError) as exc_info:
+            await run_urban_nature_access(params, "sess", "tid", lambda p, m: None)
+        assert exc_info.value.error_code == "INVALID_PARAMS"
+
+
+class TestScenarioGenProximity:
+    def test_required_keys(self):
+        from tools.scenario_gen_proximity import REQUIRED_KEYS
+        assert "base_lulc_path" in REQUIRED_KEYS
+        assert "replacement_lucode" in REQUIRED_KEYS
+        assert "area_to_convert" in REQUIRED_KEYS
+
+    @pytest.mark.asyncio
+    async def test_no_conversion_direction_raises(self):
+        from tools.scenario_gen_proximity import run_scenario_gen_proximity
+        params = {k: "x" for k in ["base_lulc_path", "replacement_lucode",
+                                     "area_to_convert", "focal_landcover_codes",
+                                     "convertible_landcover_codes"]}
+        params["convert_nearest_to_edge"]  = False
+        params["convert_farthest_from_edge"] = False
+        with pytest.raises(CSISError) as exc_info:
+            await run_scenario_gen_proximity(params, "sess", "tid", lambda p, m: None)
+        assert exc_info.value.error_code == "INVALID_PARAMS"
