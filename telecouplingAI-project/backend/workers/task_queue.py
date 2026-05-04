@@ -55,6 +55,7 @@ def execute_tool(tool_name: str, params: dict, session_id: str, task_id: str, pr
     from tools.urban_flood import run_urban_flood
     from tools.urban_stormwater import run_urban_stormwater
     from tools.urban_nature_access import run_urban_nature_access
+    from tools.urban_mental_health import run_urban_mental_health
     from tools.scenario_gen_proximity import run_scenario_gen_proximity
 
     tool_map = {
@@ -79,6 +80,7 @@ def execute_tool(tool_name: str, params: dict, session_id: str, task_id: str, pr
         "run_urban_flood_risk_mitigation":      run_urban_flood,
         "run_urban_stormwater_retention":       run_urban_stormwater,
         "run_urban_nature_access":              run_urban_nature_access,
+        "run_urban_mental_health":              run_urban_mental_health,
         "run_scenario_gen_proximity":           run_scenario_gen_proximity,
     }
     func = tool_map.get(tool_name)

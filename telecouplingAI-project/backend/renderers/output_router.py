@@ -131,6 +131,13 @@ PATTERNS: dict[str, dict[str, list[str]]] = {
         "csv": ["admin_boundaries*.csv"],
         "download": ["admin_boundaries*.gpkg"],
     },
+    "urban_mental_health": {
+        "qgis": ["accessible_urban_nature*.tif", "urban_nature_supply_percapita*.tif",
+                 "urban_nature_balance_percapita*.tif",
+                 "urban_nature_balance_totalpop*.tif"],
+        "csv": ["admin_boundaries*.csv"],
+        "download": ["admin_boundaries*.gpkg"],
+    },
     "scenario_gen_proximity": {
         "qgis": ["nearest_to_edge*.tif", "farthest_from_edge*.tif"],
         "csv": ["scenario_proximity_stats*.csv"],

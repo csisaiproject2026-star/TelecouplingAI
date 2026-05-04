@@ -475,6 +475,7 @@ async def run_agent(
         "run_urban_flood_risk_mitigation":      "q_urban_flood",
         "run_urban_stormwater_retention":       "q_urban_stormwater",
         "run_urban_nature_access":              "q_urban_nature",
+        "run_urban_mental_health":              "q_urban_mental_health",
         "run_scenario_gen_proximity":           "q_scenario_gen",
     }
 

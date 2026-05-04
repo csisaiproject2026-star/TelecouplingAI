@@ -287,7 +287,7 @@ class TestTaskQueue:
             execute_tool("nonexistent_tool", {}, "sess", "tid", lambda p, m: None)
 
     def test_tool_map_has_all_tools(self):
-        """Verify all 20 tool names are in the dispatch map."""
+        """Verify all 21 tool names are in the dispatch map."""
         from workers.task_queue import execute_tool
         expected_tools = [
             "run_network_analysis_grouping",
@@ -309,6 +309,7 @@ class TestTaskQueue:
             "run_urban_flood_risk_mitigation",
             "run_urban_stormwater_retention",
             "run_urban_nature_access",
+            "run_urban_mental_health",
             "run_scenario_gen_proximity",
         ]
         for tool_name in expected_tools:
@@ -535,6 +536,25 @@ class TestUrbanNatureAccess:
         # search_radius intentionally omitted
         with pytest.raises(CSISError) as exc_info:
             await run_urban_nature_access(params, "sess", "tid", lambda p, m: None)
+        assert exc_info.value.error_code == "INVALID_PARAMS"
+
+
+class TestUrbanMentalHealth:
+    def test_required_keys(self):
+        from tools.urban_mental_health import REQUIRED_KEYS
+        assert "lulc_raster_path" in REQUIRED_KEYS
+        assert "population_raster_path" in REQUIRED_KEYS
+        assert "admin_boundaries_vector_path" in REQUIRED_KEYS
+
+    @pytest.mark.asyncio
+    async def test_uniform_mode_missing_radius_raises(self):
+        from tools.urban_mental_health import run_urban_mental_health
+        params = {k: "x" for k in ["lulc_raster_path", "lulc_attribute_table",
+                                     "population_raster_path", "admin_boundaries_vector_path"]}
+        params["search_radius_mode"] = "uniform radius"
+        # search_radius intentionally omitted
+        with pytest.raises(CSISError) as exc_info:
+            await run_urban_mental_health(params, "sess", "tid", lambda p, m: None)
         assert exc_info.value.error_code == "INVALID_PARAMS"
 
 

@@ -565,6 +565,32 @@ services:
         limits:
           memory: 2G
 
+  celery-worker-urban-mental-health:
+    image: csic_backend:latest
+    container_name: tele-celery-urban-mental-health
+    command: >
+      celery -A workers.task_queue worker
+      --queues=q_urban_mental_health
+      --concurrency=1
+      --pool=prefork
+      --loglevel=info
+      --max-tasks-per-child=50
+      --hostname=worker-urban-mental-health@%h
+    env_file: .env.docker
+    volumes:
+      - ${HOST_SHARED_DIR:-/data/outputs}:/data/outputs
+      - ${HOST_UPLOADS_DIR:-/data/uploads}:/data/uploads
+      - ${HOST_MODEL_DATA_PATH:-/data/model_data}:/data/model_data:ro
+      - ./datainput_for_demo:/data/datainput:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+
   celery-worker-scenario-gen:
     image: csic_backend:latest
     container_name: tele-celery-scenario-gen
