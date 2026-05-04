@@ -42,6 +42,20 @@ def execute_tool(tool_name: str, params: dict, session_id: str, task_id: str, pr
     from tools.crop_regression import run_crop_regression
     from tools.render_tif import run_render_tif
     from tools.read_file import run_read_file
+    from tools.carbon import run_carbon
+    from tools.habitat_quality import run_habitat_quality
+    from tools.annual_water_yield import run_annual_water_yield
+    from tools.forest_carbon_edge_effect import run_forest_carbon_edge
+    from tools.pollination import run_pollination
+    from tools.delineateit import run_delineateit
+    from tools.routedem import run_routedem
+    from tools.sdr import run_sdr
+    from tools.ndr import run_ndr
+    from tools.urban_cooling import run_urban_cooling
+    from tools.urban_flood import run_urban_flood
+    from tools.urban_stormwater import run_urban_stormwater
+    from tools.urban_nature_access import run_urban_nature_access
+    from tools.scenario_gen_proximity import run_scenario_gen_proximity
 
     tool_map = {
         "run_network_analysis_grouping":        run_network_analysis,
@@ -52,6 +66,20 @@ def execute_tool(tool_name: str, params: dict, session_id: str, task_id: str, pr
         "run_crop_production_regression":       run_crop_regression,
         "render_spatial_file":                  run_render_tif,
         "read_file_content":                    run_read_file,
+        "run_carbon_storage":                   run_carbon,
+        "run_habitat_quality":                  run_habitat_quality,
+        "run_annual_water_yield":               run_annual_water_yield,
+        "run_forest_carbon_edge_effect":        run_forest_carbon_edge,
+        "run_crop_pollination":                 run_pollination,
+        "run_delineateit":                      run_delineateit,
+        "run_routedem":                         run_routedem,
+        "run_sdr":                              run_sdr,
+        "run_ndr":                              run_ndr,
+        "run_urban_cooling":                    run_urban_cooling,
+        "run_urban_flood_risk_mitigation":      run_urban_flood,
+        "run_urban_stormwater_retention":       run_urban_stormwater,
+        "run_urban_nature_access":              run_urban_nature_access,
+        "run_scenario_gen_proximity":           run_scenario_gen_proximity,
     }
     func = tool_map.get(tool_name)
     if func is None:

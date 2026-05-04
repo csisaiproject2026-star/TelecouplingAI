@@ -51,6 +51,90 @@ PATTERNS: dict[str, dict[str, list[str]]] = {
         "csv": ["network_stats_*.csv"],
         "download": ["network_plot_*.pdf"],
     },
+    "carbon": {
+        "qgis": ["tot_c_cur*.tif", "tot_c_fut*.tif", "tot_c_redd*.tif",
+                 "delta_cur_fut*.tif", "delta_cur_redd*.tif",
+                 "npv_fut*.tif", "npv_redd*.tif",
+                 "c_above_*.tif", "c_below_*.tif", "c_soil_*.tif", "c_dead_*.tif"],
+        "download": ["carbon_results*.html"],
+        "csv": [],
+    },
+    "habitat_quality": {
+        "qgis": ["deg_sum_c*.tif", "deg_sum_f*.tif", "deg_sum_b*.tif",
+                 "quality_c*.tif", "quality_f*.tif", "quality_b*.tif",
+                 "rarity_c*.tif", "rarity_f*.tif"],
+        "csv": [],
+    },
+    "annual_water_yield": {
+        "qgis": ["per_pixel_aet*.tif", "per_pixel_wyield*.tif"],
+        "csv": ["watershed_results_wyield*.csv", "subwatershed_results_wyield*.csv"],
+        "download": ["watershed_results_wyield*.shp", "subwatershed_results_wyield*.shp"],
+    },
+    "forest_carbon_edge_effect": {
+        "qgis": ["tropical_forest_edge_carbon_stocks*.tif",
+                 "biomass_per_pixel*.tif", "carbon_map*.tif"],
+        "csv": ["aggregated_carbon_stocks*.csv"],
+    },
+    "pollination": {
+        "qgis": ["pollinator_abundance_*.tif", "total_pollinator_abundance*.tif",
+                 "pollinator_supply_*.tif"],
+        "csv": ["farm_results*.csv"],
+    },
+    "delineateit": {
+        "qgis": ["watersheds*.gpkg", "watersheds*.shp",
+                 "snapped_outlets*.gpkg", "snapped_outlets*.shp",
+                 "detected_pour_points*.gpkg"],
+        "csv": [],
+    },
+    "routedem": {
+        "qgis": ["flow_direction*.tif", "flow_accumulation*.tif",
+                 "slope*.tif", "stream*.tif", "stream_order*.tif",
+                 "downstream_distance*.tif"],
+        "csv": [],
+    },
+    "sdr": {
+        "qgis": ["rkls*.tif", "usle*.tif", "sed_deposition*.tif",
+                 "sed_export*.tif", "avoided_export*.tif",
+                 "avoided_erosion*.tif", "stream*.tif", "e_prime*.tif",
+                 "ic*.tif", "sdr_factor*.tif", "watershed_results_sdr*.shp"],
+        "csv": ["watershed_results_sdr*.csv"],
+    },
+    "ndr": {
+        "qgis": ["n_export*.tif", "p_export*.tif",
+                 "n_surface_export*.tif", "n_subsurface_export*.tif",
+                 "p_surface_export*.tif", "runoff_proxy_index*.tif",
+                 "watershed_results_ndr*.shp"],
+        "csv": ["watershed_results_ndr*.csv"],
+    },
+    "urban_cooling": {
+        "qgis": ["uhi_results_*.tif", "hm_*.tif", "cc_*.tif",
+                 "T_air*.tif", "T_air_nomix*.tif", "uhi_index*.tif"],
+        "csv": ["uhi_results_*.csv"],
+        "download": ["uhi_results_*.html"],
+    },
+    "urban_flood": {
+        "qgis": ["Runoff_retention_m3*.tif", "Runoff_retention*.tif",
+                 "Q_mm*.tif", "flood_risk_service*.tif"],
+        "csv": ["flood_risk_service*.csv"],
+    },
+    "urban_stormwater": {
+        "qgis": ["retention_ratio*.tif", "runoff_ratio*.tif",
+                 "retention_volume*.tif", "runoff_volume*.tif",
+                 "infiltration_ratio*.tif", "infiltration_volume*.tif",
+                 "avoided_pollutant_load_*.tif", "pollutant_load_*.tif"],
+        "csv": ["aggregate_results*.csv"],
+    },
+    "urban_nature_access": {
+        "qgis": ["accessible_urban_nature*.tif", "urban_nature_supply_percapita*.tif",
+                 "urban_nature_balance_percapita*.tif",
+                 "urban_nature_balance_totalpop*.tif"],
+        "csv": ["admin_boundaries*.csv"],
+        "download": ["admin_boundaries*.gpkg"],
+    },
+    "scenario_gen_proximity": {
+        "qgis": ["nearest_to_edge*.tif", "farthest_from_edge*.tif"],
+        "csv": ["scenario_proximity_stats*.csv"],
+    },
 }
 
 EXT_FALLBACK: dict[str, str] = {

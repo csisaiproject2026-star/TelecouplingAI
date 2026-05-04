@@ -225,6 +225,372 @@ services:
         limits:
           memory: 2G
 
+  # ── New InVEST tool workers ───────────────────────────────────────────────
+
+  celery-worker-carbon:
+    image: csic_backend:latest
+    container_name: tele-celery-carbon
+    command: >
+      celery -A workers.task_queue worker
+      --queues=q_carbon
+      --concurrency=1
+      --pool=prefork
+      --loglevel=info
+      --max-tasks-per-child=50
+      --hostname=worker-carbon@%h
+    env_file: .env.docker
+    volumes:
+      - ${HOST_SHARED_DIR:-/data/outputs}:/data/outputs
+      - ${HOST_UPLOADS_DIR:-/data/uploads}:/data/uploads
+      - ${HOST_MODEL_DATA_PATH:-/data/model_data}:/data/model_data:ro
+      - ./datainput_for_demo:/data/datainput:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+
+  celery-worker-habitat-quality:
+    image: csic_backend:latest
+    container_name: tele-celery-habitat-quality
+    command: >
+      celery -A workers.task_queue worker
+      --queues=q_habitat_quality
+      --concurrency=1
+      --pool=prefork
+      --loglevel=info
+      --max-tasks-per-child=50
+      --hostname=worker-habitat-quality@%h
+    env_file: .env.docker
+    volumes:
+      - ${HOST_SHARED_DIR:-/data/outputs}:/data/outputs
+      - ${HOST_UPLOADS_DIR:-/data/uploads}:/data/uploads
+      - ${HOST_MODEL_DATA_PATH:-/data/model_data}:/data/model_data:ro
+      - ./datainput_for_demo:/data/datainput:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 3G
+
+  celery-worker-awy:
+    image: csic_backend:latest
+    container_name: tele-celery-awy
+    command: >
+      celery -A workers.task_queue worker
+      --queues=q_awy
+      --concurrency=1
+      --pool=prefork
+      --loglevel=info
+      --max-tasks-per-child=50
+      --hostname=worker-awy@%h
+    env_file: .env.docker
+    volumes:
+      - ${HOST_SHARED_DIR:-/data/outputs}:/data/outputs
+      - ${HOST_UPLOADS_DIR:-/data/uploads}:/data/uploads
+      - ${HOST_MODEL_DATA_PATH:-/data/model_data}:/data/model_data:ro
+      - ./datainput_for_demo:/data/datainput:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 3G
+
+  celery-worker-forest-carbon:
+    image: csic_backend:latest
+    container_name: tele-celery-forest-carbon
+    command: >
+      celery -A workers.task_queue worker
+      --queues=q_forest_carbon
+      --concurrency=1
+      --pool=prefork
+      --loglevel=info
+      --max-tasks-per-child=50
+      --hostname=worker-forest-carbon@%h
+    env_file: .env.docker
+    volumes:
+      - ${HOST_SHARED_DIR:-/data/outputs}:/data/outputs
+      - ${HOST_UPLOADS_DIR:-/data/uploads}:/data/uploads
+      - ${HOST_MODEL_DATA_PATH:-/data/model_data}:/data/model_data:ro
+      - ./datainput_for_demo:/data/datainput:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 3G
+
+  celery-worker-pollination:
+    image: csic_backend:latest
+    container_name: tele-celery-pollination
+    command: >
+      celery -A workers.task_queue worker
+      --queues=q_pollination
+      --concurrency=1
+      --pool=prefork
+      --loglevel=info
+      --max-tasks-per-child=50
+      --hostname=worker-pollination@%h
+    env_file: .env.docker
+    volumes:
+      - ${HOST_SHARED_DIR:-/data/outputs}:/data/outputs
+      - ${HOST_UPLOADS_DIR:-/data/uploads}:/data/uploads
+      - ${HOST_MODEL_DATA_PATH:-/data/model_data}:/data/model_data:ro
+      - ./datainput_for_demo:/data/datainput:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+
+  celery-worker-delineateit:
+    image: csic_backend:latest
+    container_name: tele-celery-delineateit
+    command: >
+      celery -A workers.task_queue worker
+      --queues=q_delineateit
+      --concurrency=1
+      --pool=prefork
+      --loglevel=info
+      --max-tasks-per-child=50
+      --hostname=worker-delineateit@%h
+    env_file: .env.docker
+    volumes:
+      - ${HOST_SHARED_DIR:-/data/outputs}:/data/outputs
+      - ${HOST_UPLOADS_DIR:-/data/uploads}:/data/uploads
+      - ${HOST_MODEL_DATA_PATH:-/data/model_data}:/data/model_data:ro
+      - ./datainput_for_demo:/data/datainput:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+
+  celery-worker-routedem:
+    image: csic_backend:latest
+    container_name: tele-celery-routedem
+    command: >
+      celery -A workers.task_queue worker
+      --queues=q_routedem
+      --concurrency=1
+      --pool=prefork
+      --loglevel=info
+      --max-tasks-per-child=50
+      --hostname=worker-routedem@%h
+    env_file: .env.docker
+    volumes:
+      - ${HOST_SHARED_DIR:-/data/outputs}:/data/outputs
+      - ${HOST_UPLOADS_DIR:-/data/uploads}:/data/uploads
+      - ${HOST_MODEL_DATA_PATH:-/data/model_data}:/data/model_data:ro
+      - ./datainput_for_demo:/data/datainput:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+
+  celery-worker-sdr:
+    image: csic_backend:latest
+    container_name: tele-celery-sdr
+    command: >
+      celery -A workers.task_queue worker
+      --queues=q_sdr
+      --concurrency=1
+      --pool=prefork
+      --loglevel=info
+      --max-tasks-per-child=50
+      --hostname=worker-sdr@%h
+    env_file: .env.docker
+    volumes:
+      - ${HOST_SHARED_DIR:-/data/outputs}:/data/outputs
+      - ${HOST_UPLOADS_DIR:-/data/uploads}:/data/uploads
+      - ${HOST_MODEL_DATA_PATH:-/data/model_data}:/data/model_data:ro
+      - ./datainput_for_demo:/data/datainput:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 3G
+
+  celery-worker-ndr:
+    image: csic_backend:latest
+    container_name: tele-celery-ndr
+    command: >
+      celery -A workers.task_queue worker
+      --queues=q_ndr
+      --concurrency=1
+      --pool=prefork
+      --loglevel=info
+      --max-tasks-per-child=50
+      --hostname=worker-ndr@%h
+    env_file: .env.docker
+    volumes:
+      - ${HOST_SHARED_DIR:-/data/outputs}:/data/outputs
+      - ${HOST_UPLOADS_DIR:-/data/uploads}:/data/uploads
+      - ${HOST_MODEL_DATA_PATH:-/data/model_data}:/data/model_data:ro
+      - ./datainput_for_demo:/data/datainput:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 3G
+
+  celery-worker-urban-cooling:
+    image: csic_backend:latest
+    container_name: tele-celery-urban-cooling
+    command: >
+      celery -A workers.task_queue worker
+      --queues=q_urban_cooling
+      --concurrency=1
+      --pool=prefork
+      --loglevel=info
+      --max-tasks-per-child=50
+      --hostname=worker-urban-cooling@%h
+    env_file: .env.docker
+    volumes:
+      - ${HOST_SHARED_DIR:-/data/outputs}:/data/outputs
+      - ${HOST_UPLOADS_DIR:-/data/uploads}:/data/uploads
+      - ${HOST_MODEL_DATA_PATH:-/data/model_data}:/data/model_data:ro
+      - ./datainput_for_demo:/data/datainput:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 3G
+
+  celery-worker-urban-flood:
+    image: csic_backend:latest
+    container_name: tele-celery-urban-flood
+    command: >
+      celery -A workers.task_queue worker
+      --queues=q_urban_flood
+      --concurrency=1
+      --pool=prefork
+      --loglevel=info
+      --max-tasks-per-child=50
+      --hostname=worker-urban-flood@%h
+    env_file: .env.docker
+    volumes:
+      - ${HOST_SHARED_DIR:-/data/outputs}:/data/outputs
+      - ${HOST_UPLOADS_DIR:-/data/uploads}:/data/uploads
+      - ${HOST_MODEL_DATA_PATH:-/data/model_data}:/data/model_data:ro
+      - ./datainput_for_demo:/data/datainput:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+
+  celery-worker-urban-stormwater:
+    image: csic_backend:latest
+    container_name: tele-celery-urban-stormwater
+    command: >
+      celery -A workers.task_queue worker
+      --queues=q_urban_stormwater
+      --concurrency=1
+      --pool=prefork
+      --loglevel=info
+      --max-tasks-per-child=50
+      --hostname=worker-urban-stormwater@%h
+    env_file: .env.docker
+    volumes:
+      - ${HOST_SHARED_DIR:-/data/outputs}:/data/outputs
+      - ${HOST_UPLOADS_DIR:-/data/uploads}:/data/uploads
+      - ${HOST_MODEL_DATA_PATH:-/data/model_data}:/data/model_data:ro
+      - ./datainput_for_demo:/data/datainput:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+
+  celery-worker-urban-nature:
+    image: csic_backend:latest
+    container_name: tele-celery-urban-nature
+    command: >
+      celery -A workers.task_queue worker
+      --queues=q_urban_nature
+      --concurrency=1
+      --pool=prefork
+      --loglevel=info
+      --max-tasks-per-child=50
+      --hostname=worker-urban-nature@%h
+    env_file: .env.docker
+    volumes:
+      - ${HOST_SHARED_DIR:-/data/outputs}:/data/outputs
+      - ${HOST_UPLOADS_DIR:-/data/uploads}:/data/uploads
+      - ${HOST_MODEL_DATA_PATH:-/data/model_data}:/data/model_data:ro
+      - ./datainput_for_demo:/data/datainput:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+
+  celery-worker-scenario-gen:
+    image: csic_backend:latest
+    container_name: tele-celery-scenario-gen
+    command: >
+      celery -A workers.task_queue worker
+      --queues=q_scenario_gen
+      --concurrency=1
+      --pool=prefork
+      --loglevel=info
+      --max-tasks-per-child=50
+      --hostname=worker-scenario-gen@%h
+    env_file: .env.docker
+    volumes:
+      - ${HOST_SHARED_DIR:-/data/outputs}:/data/outputs
+      - ${HOST_UPLOADS_DIR:-/data/uploads}:/data/uploads
+      - ${HOST_MODEL_DATA_PATH:-/data/model_data}:/data/model_data:ro
+      - ./datainput_for_demo:/data/datainput:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+
   # ── Redis ────────────────────────────────────────────────────────────────
   redis:
     image: redis:alpine

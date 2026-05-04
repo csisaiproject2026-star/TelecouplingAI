@@ -461,7 +461,21 @@ async def run_agent(
         "run_crop_production_percentile":       "q_crop_pct",
         "run_crop_production_regression":       "q_crop_reg",
         "render_spatial_file":                  "q_render",
-        "read_file_content":                    "q_render",  # fast, share render worker
+        "read_file_content":                    "q_render",
+        "run_carbon_storage":                   "q_carbon",
+        "run_habitat_quality":                  "q_habitat_quality",
+        "run_annual_water_yield":               "q_awy",
+        "run_forest_carbon_edge_effect":        "q_forest_carbon",
+        "run_crop_pollination":                 "q_pollination",
+        "run_delineateit":                      "q_delineateit",
+        "run_routedem":                         "q_routedem",
+        "run_sdr":                              "q_sdr",
+        "run_ndr":                              "q_ndr",
+        "run_urban_cooling":                    "q_urban_cooling",
+        "run_urban_flood_risk_mitigation":      "q_urban_flood",
+        "run_urban_stormwater_retention":       "q_urban_stormwater",
+        "run_urban_nature_access":              "q_urban_nature",
+        "run_scenario_gen_proximity":           "q_scenario_gen",
     }
 
     client = _get_client()
