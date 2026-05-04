@@ -1,0 +1,84 @@
+Telecoupling Toolbox:
+
+1. water-energy-food (WEF) Nexus framework: New model. need to learn
+2. llm 会反复陈述提醒，即时上传文件或者进展看不到，就是上下文跨度很小或者没有设置，这个地方调节一下！memory的问题。
+3. 新的工具，我来整理一个工具的list，然后贾来check。tool pool!! 然后后面有新的话可以增加。
+4. 实际跑tool过程中，可能会有一些tool相应很长时间，这个要考虑一下，用job的模式，发email提醒。
+5. 服务器，要用学校的服务器。gcp是过渡的平台。
+
+
+普渡：
+Invest 的workflow 建设的时候：（ -> 31th May.）
+1. pudu 普渡不做什么
+2. 我们  把invest的所有~28个tool 增加到网站中
+3. 我们 把一些大模型的功能完善
+
+Invest 的workflow 建设完成后：（ 1st June.-> 1st July）
+1. Pudu   testing: 提交测试Invest Tool报告： 1. 用了什么样的操作方式。 2. error的方式是什么，不满意的点在哪里。 3. 他们期望的展示方式。
+2.  我们     改进这些Invest 的tool的功能和网站的功能。
+
+
+Invest 的workflow 完成之后：（1st July -->）
+1. Pudu   给一些新tool的idea。把 tool打包成py文件，或者function，提交给我们，我们考虑整合？ + py包或者function的说明文档？.md文件写一下。
+2. 我们   把这些新Tool添加到网站中
+3. Pudu   在网站中 testing 所提交的tool: 提交测试报告： 1. 用了什么样的操作方式。 2. error的方式是什么，不满意的点在哪里。 3. 他们期望的展示方式。
+4.  我们    根据普渡的测试进行改进完善
+
+
+
+Project Roadmap: InVEST Workflow Development & Integration
+
+Phase 1 — InVEST Workflow Construction
+Timeline: Now → May 31st
+ResponsibleTaskPurdueNo development obligations in this phase — focus shifts to preparation for upcoming testingOur TeamIntegrate all ~28 InVEST tools into the platform websiteOur TeamEnhance and refine existing large language model (LLM) capabilities
+
+Phase 2 — Testing & Iteration
+Timeline: June 1st → July 1st
+ResponsibleTaskPurdueConduct structured testing of InVEST tools and submit a formal Test Report covering: (1) workflows and interaction methods used; (2) errors encountered and pain points identified; (3) expected or preferred display and interaction behaviorOur TeamReview submitted test reports and implement targeted improvements to both the InVEST tool functionalities and the platform website
+
+Phase 3 — Tool Expansion & Continuous Improvement
+Timeline: July 1st → Ongoing
+ResponsibleTaskPurduePropose ideas for new tools; package each tool as a .py file or standalone Python function, accompanied by documentation (.md file describing usage, inputs, outputs, and dependencies), and submit to our team for integration reviewOur TeamEvaluate and integrate submitted tools into the platformPurdueTest newly integrated tools on the platform and submit a Test Report covering: (1) workflows and interaction methods used; (2) errors encountered and pain points identified; (3) expected or preferred display and interaction behaviorOur TeamRefine and improve tools based on Purdue's feedback
+
+Tool Submission Guidelines (Phase 3)
+When Purdue submits a new tool, each submission should include:
+
+tool_name.py — Self-contained Python script or importable function
+tool_name.md — Documentation file including:
+
+Tool purpose and use case
+Input parameters and data format requirements
+Expected outputs
+Dependencies / environment requirements
+Example usage
+
+
+
+3. 智能学情：
+
+1. 部署在阿里云。
+2. 前端要什么样子，简单直接的。
+3. 后端就是deepseek. v4. 申请一个api key 
+4. live 2个月。
+5. 5 月11 号。
+6. 使用场景： 你上传一个学生作业的样本，然后让llm根据规则评价，给出整体分数，和分项分数。 然后给出整体的评价和各个模块的改进意见。增加一点visulizaiton，和数据的衡量指标。
+7. 页面炫一些，表面工作！
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
