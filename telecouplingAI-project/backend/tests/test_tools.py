@@ -287,7 +287,7 @@ class TestTaskQueue:
             execute_tool("nonexistent_tool", {}, "sess", "tid", lambda p, m: None)
 
     def test_tool_map_has_all_tools(self):
-        """Verify all 21 tool names are in the dispatch map."""
+        """Verify all 24 tool names are in the dispatch map."""
         from workers.task_queue import execute_tool
         expected_tools = [
             "run_network_analysis_grouping",
@@ -310,6 +310,9 @@ class TestTaskQueue:
             "run_urban_stormwater_retention",
             "run_urban_nature_access",
             "run_urban_mental_health",
+            "run_scenic_quality",
+            "run_habitat_risk_assessment",
+            "run_wave_energy_production",
             "run_scenario_gen_proximity",
         ]
         for tool_name in expected_tools:
@@ -575,4 +578,85 @@ class TestScenarioGenProximity:
         params["convert_farthest_from_edge"] = False
         with pytest.raises(CSISError) as exc_info:
             await run_scenario_gen_proximity(params, "sess", "tid", lambda p, m: None)
+        assert exc_info.value.error_code == "INVALID_PARAMS"
+
+
+class TestScenicQuality:
+    def test_required_keys(self):
+        from tools.scenic_quality import REQUIRED_KEYS
+        assert "aoi_vector_path" in REQUIRED_KEYS
+        assert "structure_vector_path" in REQUIRED_KEYS
+        assert "dem_path" in REQUIRED_KEYS
+
+    @pytest.mark.asyncio
+    async def test_missing_params_raises(self):
+        from tools.scenic_quality import run_scenic_quality
+        with pytest.raises(CSISError) as exc_info:
+            await run_scenic_quality({}, "sess", "tid", lambda p, m: None)
+        assert exc_info.value.error_code == "MISSING_PARAMS"
+
+    @pytest.mark.asyncio
+    async def test_valuation_missing_param_raises(self):
+        from tools.scenic_quality import run_scenic_quality
+        params = {k: "x" for k in ["aoi_vector_path", "structure_vector_path", "dem_path"]}
+        params["do_valuation"] = True
+        # valuation_function missing
+        with pytest.raises(CSISError) as exc_info:
+            await run_scenic_quality(params, "sess", "tid", lambda p, m: None)
+        assert exc_info.value.error_code == "INVALID_PARAMS"
+
+
+class TestHRA:
+    def test_required_keys(self):
+        from tools.hra import REQUIRED_KEYS
+        assert "info_table_path" in REQUIRED_KEYS
+        assert "criteria_table_path" in REQUIRED_KEYS
+        assert "aoi_vector_path" in REQUIRED_KEYS
+        assert "risk_eq" in REQUIRED_KEYS
+
+    @pytest.mark.asyncio
+    async def test_missing_params_raises(self):
+        from tools.hra import run_hra
+        with pytest.raises(CSISError) as exc_info:
+            await run_hra({}, "sess", "tid", lambda p, m: None)
+        assert exc_info.value.error_code == "MISSING_PARAMS"
+
+    @pytest.mark.asyncio
+    async def test_invalid_risk_eq_raises(self):
+        from tools.hra import run_hra
+        params = {k: "x" for k in ["info_table_path", "criteria_table_path",
+                                     "resolution", "max_rating", "risk_eq",
+                                     "decay_eq", "n_overlapping_stressors",
+                                     "aoi_vector_path"]}
+        params["risk_eq"] = "InvalidEq"
+        params["decay_eq"] = "linear"
+        with pytest.raises(CSISError) as exc_info:
+            await run_hra(params, "sess", "tid", lambda p, m: None)
+        assert exc_info.value.error_code == "INVALID_PARAMS"
+
+
+class TestWaveEnergy:
+    def test_required_keys(self):
+        from tools.wave_energy import REQUIRED_KEYS
+        assert "wave_base_data_path" in REQUIRED_KEYS
+        assert "analysis_area" in REQUIRED_KEYS
+        assert "machine_perf_path" in REQUIRED_KEYS
+        assert "bathymetry_path" in REQUIRED_KEYS
+
+    @pytest.mark.asyncio
+    async def test_missing_params_raises(self):
+        from tools.wave_energy import run_wave_energy
+        with pytest.raises(CSISError) as exc_info:
+            await run_wave_energy({}, "sess", "tid", lambda p, m: None)
+        assert exc_info.value.error_code == "MISSING_PARAMS"
+
+    @pytest.mark.asyncio
+    async def test_invalid_analysis_area_raises(self):
+        from tools.wave_energy import run_wave_energy
+        params = {k: "x" for k in ["wave_base_data_path", "analysis_area",
+                                     "machine_perf_path", "machine_param_path",
+                                     "bathymetry_path"]}
+        params["analysis_area"] = "InvalidArea"
+        with pytest.raises(CSISError) as exc_info:
+            await run_wave_energy(params, "sess", "tid", lambda p, m: None)
         assert exc_info.value.error_code == "INVALID_PARAMS"

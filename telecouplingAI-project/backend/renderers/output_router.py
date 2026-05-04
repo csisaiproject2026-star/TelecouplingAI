@@ -142,6 +142,21 @@ PATTERNS: dict[str, dict[str, list[str]]] = {
         "qgis": ["nearest_to_edge*.tif", "farthest_from_edge*.tif"],
         "csv": ["scenario_proximity_stats*.csv"],
     },
+    "scenic_quality": {
+        "qgis": ["vshed*.tif", "vshed_qual*.tif", "viewshed*.tif"],
+        "csv": ["vshed_stats*.csv"],
+    },
+    "hra": {
+        "qgis": ["RECLASS_RISK_*.tif", "RISK_*.tif", "EXPOSURE_*.tif",
+                 "CONSEQUENCE_*.tif", "ECOSYSTEM_RISK*.tif"],
+        "csv": ["SUMMARY_STATISTICS*.csv"],
+        "download": ["RECLASS_RISK_*.geojson", "RISK_*.geojson"],
+    },
+    "wave_energy": {
+        "qgis": ["wp_kw*.tif", "capwe_mwh*.tif", "npv_usd*.tif",
+                 "wp_rc*.tif", "capwe_rc*.tif", "npv_rc*.tif"],
+        "csv": ["capwe_mwh*.csv", "wp_kw*.csv"],
+    },
 }
 
 EXT_FALLBACK: dict[str, str] = {
