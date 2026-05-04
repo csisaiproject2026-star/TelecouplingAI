@@ -981,3 +981,94 @@ function generateUUID() {
 - 工具运行完毕后只显示下载链接（不生成预览）
 - 用户可通过 `render_spatial_file` 工具按需渲染 TIF/SHP 文件
 - 减少服务器 I/O 和 QGIS 渲染开销
+
+---
+
+# 开发日志 — 2026-05-04
+
+## 本次工作内容：InVEST 工具扩展（14 个新工具）+ 全量测试通过
+
+### 一、背景
+
+POC 验证成功后，本次将 InVEST 所有可行模型作为新工具集成到平台。
+
+**策略**：
+- 创建 `feature/invest-expansion` 分支，master 保持 POC 基准
+- 本机调试完成后再推到 GCP（34.42.83.50）
+- 平台使用 **natcap.invest 3.14.3**（conda + Docker），与 Workbench 3.17.2 下载的样本数据存在格式差异
+
+### 二、新增的 14 个 InVEST 工具
+
+| 工具名 | 模块路径 | Celery 队列 |
+|--------|---------|------------|
+| Carbon Storage | `tools/carbon.py` | q_carbon |
+| Habitat Quality | `tools/habitat_quality.py` | q_habitat_quality |
+| Annual Water Yield | `tools/annual_water_yield.py` | q_awy |
+| Forest Carbon Edge Effect | `tools/forest_carbon_edge_effect.py` | q_forest_carbon |
+| Crop Pollination | `tools/pollination.py` | q_pollination |
+| DelineateIt | `tools/delineateit.py` | q_delineateit |
+| RouteDEM | `tools/routedem.py` | q_routedem |
+| SDR | `tools/sdr.py` | q_sdr |
+| NDR | `tools/ndr.py` | q_ndr |
+| Urban Cooling | `tools/urban_cooling.py` | q_urban_cooling |
+| Urban Flood Risk Mitigation | `tools/urban_flood.py` | q_urban_flood |
+| Urban Stormwater Retention | `tools/urban_stormwater.py` | q_urban_stormwater |
+| Urban Nature Access | `tools/urban_nature_access.py` | q_urban_nature |
+| Scenario Generator Proximity | `tools/scenario_gen_proximity.py` | q_scenario_gen |
+
+**排除模型**：Recreation（依赖远程服务器），HRA/Coastal Vulnerability/Wave Energy/Wind Energy/Scenic Quality（数据准备复杂度过高）
+
+### 三、修改的核心文件
+
+- `backend/workers/task_queue.py` — tool_map 新增 14 条目
+- `backend/agent.py` — _TOOL_QUEUES 新增 14 条目
+- `backend/renderers/output_router.py` — 新增 14 个模型的输出分类规则
+- `docker-compose.yml` — 新增 14 个 Celery worker 服务（2~3G 内存限制）
+
+### 四、版本兼容性问题与修复（3.14.3 vs 3.17.x）
+
+| 问题 | 原因 | 修复方式 |
+|------|------|---------|
+| HQ: sensitivity table 报错找不到 lulc 列 | 3.17.x 样本数据用 `lucode`，3.14.3 期望 `lulc` | 集成测试中动态重命名列 |
+| AWY: KeyError 'seasonality_constant' | 3.14.3 将此参数设为必填（Zhang Z 参数） | tool 和集成测试均添加默认值 15 |
+| NDR: ValueError load_type_n 无法解析为数值 | 3.17.x 样本数据有 load_type_n/load_type_p 列，3.14.3 尝试按数值读取 | 集成测试中动态剔除这两列 |
+| Pollination: KeyError 'landcover_raster_path' | 3.14.3 用 `landcover_raster_path`，3.17.x 改为 `lulc_path` | tool 和集成测试均改用 3.14.3 key |
+| SDR/NDR: StopIteration | 关键字搜索 tif 文件名不匹配 | 改为硬编码精确文件名 |
+
+### 五、测试结果（全部通过 ✅）
+
+**环境**：conda `TeleCouplingAI`，natcap.invest 3.14.3，样本数据 `C:/YPHOME/NatCapInvest_SampleData/`
+
+```
+pytest tests/test_tools.py tests/test_invest_integration.py -v
+62 passed, 2 warnings in 64.65s
+```
+
+**单元测试（53/53）** — `test_tools.py`：
+- 全部 20 个工具的参数验证测试通过
+- TestTaskQueue：tool_map 包含所有 20 个工具确认通过
+
+**集成测试（9/9）** — `test_invest_integration.py`（直接调用 `natcap.invest.xxx.execute()`）：
+
+| 测试 | 验证输出 |
+|------|---------|
+| Carbon basic run | `tot_c_cur.tif` ✅ |
+| Carbon sequestration | `delta_cur_fut.tif` ✅ |
+| Habitat Quality current only | `quality_c.tif` + `deg_sum_c.tif` ✅ |
+| Annual Water Yield | `wyield` / `aet` 文件 ✅ |
+| Pollination | 至少 1 个 TIF ✅ |
+| SDR | `sed_export` / `usle` / `rkls` TIF ✅ |
+| NDR nitrogen | `n_export` / `export` TIF ✅ |
+| RouteDEM | `flow_direction` / `flow_accumulation` TIF ✅ |
+| DelineateIt | `.gpkg` 或 `.shp` 向量文件 ✅ |
+
+### 六、Git 提交记录
+
+- `e3718a0` — feat: 14 个新工具全部文件（tools、task_queue、agent、router、docker-compose）
+- `7a6131b` — test: 修复 3.14.3 兼容性问题，62 个测试全部通过
+
+### 七、待办
+
+- [ ] 为 14 个新工具编写 SKILL.md 文件
+- [ ] 推送到 GCP 服务器（34.42.83.50）
+- [ ] `git push` feature/invest-expansion → GitHub 备份
