@@ -303,7 +303,7 @@ class TestTaskQueue:
             "run_crop_pollination",
             "run_delineateit",
             "run_routedem",
-            "run_sdr",
+            "run_Sediment_Delivery_Ratio_SDR",
             "run_ndr",
             "run_urban_cooling",
             "run_urban_flood_risk_mitigation",

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import {
   MessageSquare, Plus, Send, Paperclip, Settings,
-  Trash2, X, Edit2, Menu, Sparkles, Download,
+  Trash2, X, Edit2, Menu, Sparkles, Download, Upload,
 } from 'lucide-react';
 import { streamChat } from './lib/streaming';
 import { getOrCreateSessionId } from './lib/session';
@@ -124,6 +124,8 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [tempTitle, setTempTitle] = useState('');
+
+  const [isDragging, setIsDragging] = useState(false);
 
   const chatEndRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -356,6 +358,31 @@ function App() {
   };
 
   // ---------------------------------------------------------------------------
+  // Drag-and-drop handlers
+  // ---------------------------------------------------------------------------
+
+  const handleDragEnter = (e) => {
+    e.preventDefault();
+    if (e.dataTransfer.types.includes('Files')) setIsDragging(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    // Only hide overlay when cursor truly leaves the main area,
+    // not when moving between child elements inside it.
+    if (!e.currentTarget.contains(e.relatedTarget)) setIsDragging(false);
+  };
+
+  const handleDragOver = (e) => { e.preventDefault(); };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length > 0) setSelectedFiles(prev => [...prev, ...files]);
+  };
+
+  // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
 
@@ -410,7 +437,19 @@ function App() {
       </div>
 
       {/* Main Area */}
-      <div className="flex-1 flex flex-col h-full bg-white rounded-tl-3xl shadow-sm mt-2 overflow-hidden relative">
+      <div className="flex-1 flex flex-col h-full bg-white rounded-tl-3xl shadow-sm mt-2 overflow-hidden relative"
+        onDragEnter={handleDragEnter}
+        onDragLeave={handleDragLeave}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
+      >
+        {isDragging && (
+          <div className="absolute inset-0 z-50 bg-blue-50/80 backdrop-blur-sm border-2 border-dashed border-blue-400 rounded-tl-3xl flex flex-col items-center justify-center pointer-events-none">
+            <Upload size={48} className="text-blue-400 mb-4" />
+            <p className="text-blue-600 font-semibold text-lg">Drop files to attach</p>
+            <p className="text-blue-400 text-sm mt-1">Release to add to your message</p>
+          </div>
+        )}
         <div className="flex items-center p-4">
           <button onClick={() => setIsSidebarOpen(v => !v)} className="p-2 hover:bg-gray-100 rounded-full mr-2">
             <Menu size={20} />

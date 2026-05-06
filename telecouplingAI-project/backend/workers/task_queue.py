@@ -60,6 +60,9 @@ def execute_tool(tool_name: str, params: dict, session_id: str, task_id: str, pr
     from tools.hra import run_hra
     from tools.wave_energy import run_wave_energy
     from tools.scenario_gen_proximity import run_scenario_gen_proximity
+    from tools.coastal_vulnerability import run_coastal_vulnerability
+    from tools.wind_energy import run_offshore_wind_energy
+    from tools.recreation import run_recreation
 
     tool_map = {
         "run_network_analysis_grouping":        run_network_analysis,
@@ -77,7 +80,7 @@ def execute_tool(tool_name: str, params: dict, session_id: str, task_id: str, pr
         "run_crop_pollination":                 run_pollination,
         "run_delineateit":                      run_delineateit,
         "run_routedem":                         run_routedem,
-        "run_sdr":                              run_sdr,
+        "run_Sediment_Delivery_Ratio_SDR":      run_sdr,
         "run_ndr":                              run_ndr,
         "run_urban_cooling":                    run_urban_cooling,
         "run_urban_flood_risk_mitigation":      run_urban_flood,
@@ -88,6 +91,9 @@ def execute_tool(tool_name: str, params: dict, session_id: str, task_id: str, pr
         "run_habitat_risk_assessment":          run_hra,
         "run_wave_energy_production":           run_wave_energy,
         "run_scenario_gen_proximity":           run_scenario_gen_proximity,
+        "run_coastal_vulnerability":            run_coastal_vulnerability,
+        "run_offshore_wind_energy":             run_offshore_wind_energy,
+        "run_recreation_tourism":               run_recreation,
     }
     func = tool_map.get(tool_name)
     if func is None:

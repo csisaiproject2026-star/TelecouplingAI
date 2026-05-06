@@ -78,6 +78,23 @@ class SessionManager:
         raw = self.r.hget(f"session:{session_id}", "output_files")
         return json.loads(raw.decode()) if raw else []
 
+    def add_chat_turn(self, session_id: str, role: str, text: str) -> None:
+        """Append one turn to the session's conversation history."""
+        if not text.strip():
+            return
+        raw = self.r.hget(f"session:{session_id}", "chat_history")
+        history = json.loads(raw.decode()) if raw else []
+        history.append({"role": role, "text": text})
+        if len(history) > 40:          # keep last 20 exchanges (40 turns)
+            history = history[-40:]
+        self.r.hset(f"session:{session_id}", "chat_history", json.dumps(history))
+        self.touch_session(session_id)
+
+    def get_chat_history(self, session_id: str) -> list[dict]:
+        """Return stored conversation turns as [{role, text}, ...]."""
+        raw = self.r.hget(f"session:{session_id}", "chat_history")
+        return json.loads(raw.decode()) if raw else []
+
     def get_uploaded_files(self, session_id: str) -> list[dict]:
         """Return all uploaded files recorded for this session as filename/path dicts."""
         raw = self.r.hget(f"session:{session_id}", "uploaded_files")

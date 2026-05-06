@@ -39,21 +39,21 @@ async def run_scenic_quality(
     progress_callback(10, "Created output directory")
 
     invest_args = {
-        "workspace_dir":          workspace_dir,
-        "results_suffix":         params.get("results_suffix", ""),
-        "aoi_vector_path":        params["aoi_vector_path"],
-        "structure_vector_path":  params["structure_vector_path"],
-        "dem_path":               params["dem_path"],
-        "refractivity_coefficient": params.get("refractivity_coefficient", 0.13),
-        "do_valuation":           do_valuation,
+        "workspace_dir":  workspace_dir,
+        "results_suffix": params.get("results_suffix", ""),
+        "aoi_path":       params["aoi_vector_path"],
+        "structure_path": params["structure_vector_path"],
+        "dem_path":       params["dem_path"],
+        "refraction":     params.get("refractivity_coefficient", 0.13),
+        "do_valuation":   do_valuation,
     }
 
     if do_valuation:
         invest_args.update({
-            "valuation_function":    params["valuation_function"],
-            "a_coef":                params["a_coef"],
-            "b_coef":                params["b_coef"],
-            "max_valuation_radius":  params.get("max_valuation_radius", ""),
+            "valuation_function":   params["valuation_function"],
+            "a_coef":               params["a_coef"],
+            "b_coef":               params["b_coef"],
+            "max_valuation_radius": params.get("max_valuation_radius", ""),
         })
 
     progress_callback(20, "Running InVEST Scenic Quality model...")

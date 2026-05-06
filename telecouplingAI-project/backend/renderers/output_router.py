@@ -157,6 +157,26 @@ PATTERNS: dict[str, dict[str, list[str]]] = {
                  "wp_rc*.tif", "capwe_rc*.tif", "npv_rc*.tif"],
         "csv": ["capwe_mwh*.csv", "wp_kw*.csv"],
     },
+    "coastal_vulnerability": {
+        "qgis": ["coastal_exposure*.gpkg", "coastal_exposure*.shp"],
+        "download": ["coastal_vulnerability_report*.html"],
+        "csv": [],
+    },
+    "wind_energy": {
+        "qgis": ["wind_energy_points*.shp", "wind_energy_points*.gpkg",
+                 "harvested_energy_MWhr_per_yr*.tif",
+                 "carbon_emissions_tons*.tif"],
+        "csv": [],
+    },
+    "recreation": {
+        "qgis": ["pud_results*.shp", "pud_results*.gpkg",
+                 "tud_results*.shp", "tud_results*.gpkg",
+                 "regression_data*.shp", "regression_data*.gpkg",
+                 "scenario_results*.shp", "scenario_results*.gpkg"],
+        "csv": ["monthly_table*.csv", "PUD_monthly_table*.csv",
+                "TUD_monthly_table*.csv", "regression_coefficients*.csv"],
+        "download": ["regression_summary*.txt"],
+    },
 }
 
 EXT_FALLBACK: dict[str, str] = {

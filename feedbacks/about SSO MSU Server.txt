@@ -1,0 +1,23 @@
+  Hi [Name],
+
+  Thank you for the detailed explanation. To answer your first question — we are no longer planning to move to AWS; we would prefer to keep the application on the MSU server with public access if possible.
+
+  Here are the details for the public access request:
+
+  - Description of application: CSIS (Coupled Social-Innovation System) is a web-based AI platform for ecosystem service analysis. It allows researchers to run InVEST ecological models through a conversational
+   AI interface, upload spatial datasets, and download analysis outputs.
+  - Intended audience/user base: Academic researchers, graduate students, and conference participants in the fields of ecology, sustainability, and land-use science. Expected concurrent users: ~10–30 during
+  demo periods.
+  - Project term: Ongoing research project; actively used for the foreseeable future.
+  - Security measures: HTTPS/SSL will be enabled once a public URL is assigned. The application does not implement SSO or MFA at this stage — access is open to workshop/conference participants by design.
+  - Will application store/transmit/access sensitive data?: No. The application processes publicly available ecological/geospatial datasets (raster and vector files). No personal data, health data, or other
+  sensitive information is collected or stored.
+
+  For the desired URL, we would suggest something like: csis.msu.edu or telecoupling-ai.msu.edu — please let us know what fits your naming conventions.
+
+  Regarding the VLAN change timing — that works for us; we will plan accordingly around the conference schedule. Please let us know the estimated timeline once you have more details.
+
+  Thank you again for your help!
+
+  Best regards,
+  Nan

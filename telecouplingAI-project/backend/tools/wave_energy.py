@@ -33,6 +33,15 @@ VALID_ANALYSIS_AREAS = {
     "West Coast of North America and Hawaii",
 }
 
+_AREA_CODE = {
+    "Australia":                               "australia",
+    "East Coast of North America and Puerto Rico": "eastcoast",
+    "Global":                                  "global",
+    "North Sea 10 meter resolution":           "northsea10",
+    "North Sea 4 meter resolution":            "northsea4",
+    "West Coast of North America and Hawaii":  "westcoast",
+}
+
 
 async def run_wave_energy(
     params: dict,
@@ -65,16 +74,16 @@ async def run_wave_energy(
         "workspace_dir":       workspace_dir,
         "results_suffix":      params.get("results_suffix", ""),
         "wave_base_data_path": params["wave_base_data_path"],
-        "analysis_area":       analysis_area,
+        "analysis_area":       _AREA_CODE[analysis_area],
         "machine_perf_path":   params["machine_perf_path"],
         "machine_param_path":  params["machine_param_path"],
-        "bathymetry_path":     params["bathymetry_path"],
-        "aoi_vector_path":     params.get("aoi_vector_path", ""),
-        "do_valuation":        do_valuation,
+        "dem_path":            params["bathymetry_path"],
+        "aoi_path":            params.get("aoi_vector_path", ""),
+        "valuation_container": do_valuation,
     }
 
     if do_valuation:
-        invest_args["grid_points_path"]   = params["grid_points_path"]
+        invest_args["land_gridPts_path"]  = params["grid_points_path"]
         invest_args["machine_econ_path"]  = params["machine_econ_path"]
         invest_args["number_of_machines"] = int(params.get("number_of_machines", 28))
 

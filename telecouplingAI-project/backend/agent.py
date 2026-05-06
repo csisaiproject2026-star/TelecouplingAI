@@ -95,6 +95,27 @@ TOOL_TO_SKILL: dict[str, str] = {
     "run_seasonal_water_yield":               "run-seasonal-water-yield",
     "run_crop_production_percentile":         "run-crop-percentile",
     "run_crop_production_regression":         "run-crop-regression",
+    "run_carbon_storage":                     "run-carbon-storage",
+    "run_habitat_quality":                    "run-habitat-quality",
+    "run_annual_water_yield":                 "run-annual-water-yield",
+    "run_forest_carbon_edge_effect":          "run-forest-carbon-edge",
+    "run_crop_pollination":                   "run-crop-pollination",
+    "run_delineateit":                        "run-delineateit",
+    "run_routedem":                           "run-routedem",
+    "run_Sediment_Delivery_Ratio_SDR":        "run-sdr",
+    "run_ndr":                                "run-ndr",
+    "run_urban_cooling":                      "run-urban-cooling",
+    "run_urban_flood_risk_mitigation":        "run-urban-flood",
+    "run_urban_stormwater_retention":         "run-urban-stormwater",
+    "run_urban_nature_access":                "run-urban-nature-access",
+    "run_urban_mental_health":                "run-urban-mental-health",
+    "run_scenic_quality":                     "run-scenic-quality",
+    "run_habitat_risk_assessment":            "run-habitat-risk-assessment",
+    "run_wave_energy_production":             "run-wave-energy-production",
+    "run_scenario_gen_proximity":             "run-scenario-gen-proximity",
+    "run_coastal_vulnerability":              "run-coastal-vulnerability",
+    "run_offshore_wind_energy":               "run-offshore-wind-energy",
+    "run_recreation_tourism":                 "run-recreation-tourism",
 }
 
 # ---------------------------------------------------------------------------
@@ -331,6 +352,434 @@ TOOLS = [
                           "fertilization_rate_table_path"],
             ),
         ),
+        # ── 20 additional InVEST tools ─────────────────────────────────────────
+        types.FunctionDeclaration(
+            name="run_carbon_storage",
+            description="Run InVEST Carbon Storage and Sequestration. Use when user asks about carbon stocks, LULC carbon pools, carbon sequestration, REDD, or valuation of carbon storage.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "lulc_cur_path":         types.Schema(type=types.Type.STRING, description="Path to current LULC raster"),
+                    "carbon_pools_path":     types.Schema(type=types.Type.STRING, description="CSV with columns: lucode, C_above, C_below, C_soil, C_dead"),
+                    "lulc_fut_path":         types.Schema(type=types.Type.STRING, description="Future LULC raster (for sequestration)"),
+                    "lulc_redd_path":        types.Schema(type=types.Type.STRING, description="REDD scenario LULC raster"),
+                    "do_valuation":          types.Schema(type=types.Type.BOOLEAN, description="Enable economic valuation, default false"),
+                    "price_per_metric_ton_of_c": types.Schema(type=types.Type.NUMBER),
+                    "discount_rate":         types.Schema(type=types.Type.NUMBER),
+                    "rate_change":           types.Schema(type=types.Type.NUMBER),
+                    "lulc_cur_year":         types.Schema(type=types.Type.INTEGER),
+                    "lulc_fut_year":         types.Schema(type=types.Type.INTEGER),
+                },
+                required=["lulc_cur_path", "carbon_pools_path"],
+            ),
+        ),
+        types.FunctionDeclaration(
+            name="run_habitat_quality",
+            description="Run InVEST Habitat Quality to map habitat degradation and quality from threats. Use when user asks about habitat quality, biodiversity, threat analysis, or degradation index.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "lulc_cur_path":           types.Schema(type=types.Type.STRING, description="Current LULC raster"),
+                    "threats_table_path":      types.Schema(type=types.Type.STRING, description="CSV describing threats: threat, max_dist, weight, decay"),
+                    "sensitivity_table_path":  types.Schema(type=types.Type.STRING, description="CSV with columns: lulc, habitat, plus one column per threat"),
+                    "lulc_fut_path":           types.Schema(type=types.Type.STRING, description="Future LULC raster"),
+                    "lulc_bas_path":           types.Schema(type=types.Type.STRING, description="Baseline LULC raster"),
+                    "access_vector_path":      types.Schema(type=types.Type.STRING, description="Shapefile of protection/access areas"),
+                    "half_saturation_constant": types.Schema(type=types.Type.NUMBER, description="Half-saturation constant k, default 0.5"),
+                },
+                required=["lulc_cur_path", "threats_table_path", "sensitivity_table_path"],
+            ),
+        ),
+        types.FunctionDeclaration(
+            name="run_annual_water_yield",
+            description="Run InVEST Annual Water Yield (Budyko curve) to estimate water yield per watershed. Use when user asks about annual water yield, AWY, Budyko, water supply, or watershed water balance.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "lulc_path":                    types.Schema(type=types.Type.STRING),
+                    "eto_path":                     types.Schema(type=types.Type.STRING, description="Reference evapotranspiration raster"),
+                    "precipitation_path":           types.Schema(type=types.Type.STRING),
+                    "depth_to_root_rest_layer_path": types.Schema(type=types.Type.STRING, description="Depth-to-root-restricting-layer raster (mm)"),
+                    "pawc_path":                    types.Schema(type=types.Type.STRING, description="Plant available water content raster"),
+                    "biophysical_table_path":       types.Schema(type=types.Type.STRING),
+                    "watersheds_path":              types.Schema(type=types.Type.STRING),
+                    "sub_watersheds_path":          types.Schema(type=types.Type.STRING),
+                    "seasonality_constant":         types.Schema(type=types.Type.NUMBER, description="Zhang seasonality constant, default 15"),
+                    "demand_table_path":            types.Schema(type=types.Type.STRING),
+                    "valuation_table_path":         types.Schema(type=types.Type.STRING),
+                },
+                required=["lulc_path", "eto_path", "precipitation_path",
+                          "depth_to_root_rest_layer_path", "pawc_path",
+                          "biophysical_table_path", "watersheds_path"],
+            ),
+        ),
+        types.FunctionDeclaration(
+            name="run_forest_carbon_edge_effect",
+            description="Run InVEST Forest Carbon Edge Effect to estimate above-ground carbon in tropical forests accounting for edge effects. Use when user asks about forest carbon, tropical carbon, edge effect, or above-ground biomass.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "lulc_raster_path":           types.Schema(type=types.Type.STRING),
+                    "biophysical_table_path":     types.Schema(type=types.Type.STRING),
+                    "tropical_forest_edge_carbon_model_vector_path": types.Schema(type=types.Type.STRING, description="Carbon model vector from InVEST data"),
+                    "aoi_vector_path":            types.Schema(type=types.Type.STRING),
+                    "pools_to_calculate":         types.Schema(type=types.Type.STRING, description="'all' or 'above_ground', default 'all'"),
+                    "compute_forest_edge_effects": types.Schema(type=types.Type.BOOLEAN, description="Default true"),
+                    "n_nearest_model_points":     types.Schema(type=types.Type.INTEGER, description="Default 10"),
+                    "biomass_to_carbon_conversion_factor": types.Schema(type=types.Type.NUMBER, description="Default 0.47"),
+                },
+                required=["lulc_raster_path", "biophysical_table_path",
+                          "tropical_forest_edge_carbon_model_vector_path"],
+            ),
+        ),
+        types.FunctionDeclaration(
+            name="run_crop_pollination",
+            description="Run InVEST Pollination model to estimate wild bee pollination services on farms. Use when user asks about pollination, pollinators, bees, farm pollination, or crop pollination services.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "landcover_raster_path":           types.Schema(type=types.Type.STRING),
+                    "guild_table_path":                types.Schema(type=types.Type.STRING, description="CSV describing pollinator species: species, nesting, foraging columns"),
+                    "landcover_biophysical_table_path": types.Schema(type=types.Type.STRING, description="CSV: lucode + nesting/foraging suitability columns per species"),
+                    "farm_vector_path":                types.Schema(type=types.Type.STRING, description="Shapefile of farm polygons"),
+                },
+                required=["landcover_raster_path", "guild_table_path", "landcover_biophysical_table_path"],
+            ),
+        ),
+        types.FunctionDeclaration(
+            name="run_delineateit",
+            description="Run InVEST DelineateIt to delineate watersheds from a DEM and outlet points. Use when user asks about watershed delineation, catchment boundaries, or outlet snapping.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "dem_path":             types.Schema(type=types.Type.STRING, description="Digital elevation model raster"),
+                    "outlet_vector_path":   types.Schema(type=types.Type.STRING, description="Shapefile of outlet/pour points"),
+                    "detect_pour_points":   types.Schema(type=types.Type.BOOLEAN, description="Auto-detect pour points from DEM, default false"),
+                    "snap_points":          types.Schema(type=types.Type.BOOLEAN, description="Snap outlets to nearest stream, default false"),
+                    "flow_threshold":       types.Schema(type=types.Type.INTEGER, description="Flow accumulation threshold for snapping, default 1000"),
+                    "snap_distance":        types.Schema(type=types.Type.INTEGER, description="Max snap distance in pixels, default 20"),
+                },
+                required=["dem_path"],
+            ),
+        ),
+        types.FunctionDeclaration(
+            name="run_routedem",
+            description="Run InVEST RouteDEM to compute flow direction, flow accumulation, streams, and slope from a DEM. Use when user asks about flow direction, flow accumulation, stream extraction, or DEM routing.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "dem_path":                      types.Schema(type=types.Type.STRING),
+                    "algorithm":                     types.Schema(type=types.Type.STRING, description="'D8' or 'MFD', default 'D8'"),
+                    "calculate_flow_direction":      types.Schema(type=types.Type.BOOLEAN, description="Default true"),
+                    "calculate_flow_accumulation":   types.Schema(type=types.Type.BOOLEAN, description="Default true"),
+                    "calculate_stream_threshold":    types.Schema(type=types.Type.BOOLEAN, description="Default false"),
+                    "threshold_flow_accumulation":   types.Schema(type=types.Type.INTEGER, description="Required if calculate_stream_threshold=true"),
+                    "calculate_slope":               types.Schema(type=types.Type.BOOLEAN, description="Default false"),
+                    "calculate_stream_order":        types.Schema(type=types.Type.BOOLEAN, description="Default false"),
+                    "calculate_downstream_distance": types.Schema(type=types.Type.BOOLEAN, description="Default false"),
+                },
+                required=["dem_path"],
+            ),
+        ),
+        types.FunctionDeclaration(
+            name="run_Sediment_Delivery_Ratio_SDR",
+            description="Run InVEST Sediment Delivery Ratio (SDR) to estimate soil erosion and sediment export. Use when user asks about SDR, sediment delivery, erosion, RUSLE, or soil retention.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "dem_path":                    types.Schema(type=types.Type.STRING),
+                    "erosivity_path":              types.Schema(type=types.Type.STRING, description="Rainfall erosivity raster (R factor)"),
+                    "erodibility_path":            types.Schema(type=types.Type.STRING, description="Soil erodibility raster (K factor)"),
+                    "lulc_path":                   types.Schema(type=types.Type.STRING),
+                    "watersheds_path":             types.Schema(type=types.Type.STRING),
+                    "biophysical_table_path":      types.Schema(type=types.Type.STRING, description="CSV with usle_c, usle_p per lucode"),
+                    "threshold_flow_accumulation": types.Schema(type=types.Type.INTEGER, description="Flow accumulation threshold, default 1000"),
+                    "k_param":                     types.Schema(type=types.Type.NUMBER, description="Borselli K parameter, default 2"),
+                    "sdr_max":                     types.Schema(type=types.Type.NUMBER, description="Max SDR value, default 0.8"),
+                    "ic_0_param":                  types.Schema(type=types.Type.NUMBER, description="Borselli IC0, default 0.5"),
+                    "l_max":                       types.Schema(type=types.Type.NUMBER, description="Max slope length, default 122"),
+                    "drainage_path":               types.Schema(type=types.Type.STRING, description="Optional drainage channel raster"),
+                },
+                required=["dem_path", "erosivity_path", "erodibility_path", "lulc_path",
+                          "watersheds_path", "biophysical_table_path", "threshold_flow_accumulation"],
+            ),
+        ),
+        types.FunctionDeclaration(
+            name="run_ndr",
+            description="Run InVEST Nutrient Delivery Ratio (NDR) to estimate nitrogen and phosphorus export from watersheds. Use when user asks about NDR, nutrient delivery, nitrogen export, phosphorus, or water quality nutrients.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "dem_path":                    types.Schema(type=types.Type.STRING),
+                    "lulc_path":                   types.Schema(type=types.Type.STRING),
+                    "runoff_proxy_path":           types.Schema(type=types.Type.STRING, description="Runoff proxy raster (e.g. precipitation)"),
+                    "watersheds_path":             types.Schema(type=types.Type.STRING),
+                    "biophysical_table_path":      types.Schema(type=types.Type.STRING),
+                    "threshold_flow_accumulation": types.Schema(type=types.Type.INTEGER, description="Default 1000"),
+                    "k_param":                     types.Schema(type=types.Type.NUMBER, description="Default 2"),
+                    "calc_n":                      types.Schema(type=types.Type.BOOLEAN, description="Calculate nitrogen, default true"),
+                    "calc_p":                      types.Schema(type=types.Type.BOOLEAN, description="Calculate phosphorus, default false"),
+                    "subsurface_critical_length_n": types.Schema(type=types.Type.INTEGER, description="Default 150"),
+                    "subsurface_eff_n":            types.Schema(type=types.Type.NUMBER, description="Default 0.8"),
+                    "subsurface_critical_length_p": types.Schema(type=types.Type.INTEGER),
+                    "subsurface_eff_p":            types.Schema(type=types.Type.NUMBER),
+                },
+                required=["dem_path", "lulc_path", "runoff_proxy_path", "watersheds_path",
+                          "biophysical_table_path", "threshold_flow_accumulation"],
+            ),
+        ),
+        types.FunctionDeclaration(
+            name="run_urban_cooling",
+            description="Run InVEST Urban Cooling Island model to estimate urban heat mitigation from green spaces. Use when user asks about urban heat island, cooling effect, urban green space, UHI, or city temperature.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "lulc_raster_path":           types.Schema(type=types.Type.STRING),
+                    "ref_eto_raster_path":        types.Schema(type=types.Type.STRING, description="Reference ET0 raster"),
+                    "aoi_vector_path":            types.Schema(type=types.Type.STRING, description="AOI polygon shapefile"),
+                    "biophysical_table_path":     types.Schema(type=types.Type.STRING, description="CSV with Kc, albedo, green_area columns"),
+                    "t_ref":                      types.Schema(type=types.Type.NUMBER, description="Reference air temperature (°C) in rural area"),
+                    "uhi_max":                    types.Schema(type=types.Type.NUMBER, description="Maximum UHI effect (°C)"),
+                    "green_area_cooling_distance": types.Schema(type=types.Type.NUMBER, description="Distance (m) over which green areas cool surroundings, default 100"),
+                    "t_air_average_radius":       types.Schema(type=types.Type.INTEGER, description="Radius (m) to average air temperature, default 2000"),
+                    "cc_method":                  types.Schema(type=types.Type.STRING, description="'factors' (default) or 'intensity'"),
+                    "avg_rel_humidity":           types.Schema(type=types.Type.INTEGER, description="Average relative humidity %, default 30"),
+                    "building_vector_path":       types.Schema(type=types.Type.STRING),
+                    "energy_consumption_table_path": types.Schema(type=types.Type.STRING),
+                },
+                required=["lulc_raster_path", "ref_eto_raster_path", "aoi_vector_path",
+                          "biophysical_table_path", "t_ref", "uhi_max", "green_area_cooling_distance"],
+            ),
+        ),
+        types.FunctionDeclaration(
+            name="run_urban_flood_risk_mitigation",
+            description="Run InVEST Urban Flood Risk Mitigation to estimate stormwater runoff and flood risk using curve numbers. Use when user asks about urban flood, stormwater runoff, curve number, SCS-CN, or flood mitigation.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "aoi_watersheds_path":             types.Schema(type=types.Type.STRING, description="AOI/watershed shapefile"),
+                    "rainfall_depth":                  types.Schema(type=types.Type.NUMBER, description="Rainfall depth (mm)"),
+                    "lulc_path":                       types.Schema(type=types.Type.STRING),
+                    "soils_hydrological_group_raster_path": types.Schema(type=types.Type.STRING, description="Hydrological soil group raster (values 1-4 for A-D)"),
+                    "curve_number_table_path":         types.Schema(type=types.Type.STRING, description="CSV with lucode and curve number columns for soil groups A-D"),
+                    "built_infrastructure_vector_path": types.Schema(type=types.Type.STRING),
+                    "infrastructure_damage_loss_table_path": types.Schema(type=types.Type.STRING),
+                },
+                required=["aoi_watersheds_path", "rainfall_depth", "lulc_path",
+                          "soils_hydrological_group_raster_path", "curve_number_table_path"],
+            ),
+        ),
+        types.FunctionDeclaration(
+            name="run_urban_stormwater_retention",
+            description="Run InVEST Urban Stormwater Retention model to estimate runoff retention and recharge. Use when user asks about urban stormwater retention, infiltration, pervious surfaces, or retention ratios.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "lulc_path":               types.Schema(type=types.Type.STRING),
+                    "soil_group_path":         types.Schema(type=types.Type.STRING, description="Hydrological soil group raster"),
+                    "precipitation_path":      types.Schema(type=types.Type.STRING, description="Annual precipitation raster (mm)"),
+                    "biophysical_table":       types.Schema(type=types.Type.STRING, description="CSV with lucode, EMC_*, RC_* columns"),
+                    "adjust_retention_ratios": types.Schema(type=types.Type.BOOLEAN, description="Default false"),
+                    "retention_radius":        types.Schema(type=types.Type.NUMBER, description="Required if adjust_retention_ratios=true"),
+                    "road_centerlines_path":   types.Schema(type=types.Type.STRING),
+                    "aggregate_areas_path":    types.Schema(type=types.Type.STRING),
+                    "replacement_cost":        types.Schema(type=types.Type.STRING),
+                },
+                required=["lulc_path", "soil_group_path", "precipitation_path", "biophysical_table"],
+            ),
+        ),
+        types.FunctionDeclaration(
+            name="run_urban_nature_access",
+            description="Run InVEST Urban Nature Access to estimate population access to urban green space. Use when user asks about urban nature access, urban green equity, greenspace accessibility, or UNA.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "lulc_raster_path":         types.Schema(type=types.Type.STRING),
+                    "lulc_attribute_table":     types.Schema(type=types.Type.STRING, description="CSV mapping lucode to is_green_space and other attrs"),
+                    "population_raster_path":   types.Schema(type=types.Type.STRING),
+                    "admin_boundaries_vector_path": types.Schema(type=types.Type.STRING, description="Administrative boundary polygons"),
+                    "search_radius_mode":       types.Schema(type=types.Type.STRING, description="'uniform radius' (default) | 'radius per population group' | 'radius per urban nature class'"),
+                    "decay_function":           types.Schema(type=types.Type.STRING, description="'gaussian' (default) | 'exponential' | 'linear' | 'power' | 'uniform'"),
+                    "search_radius":            types.Schema(type=types.Type.INTEGER, description="Radius in meters (required for uniform radius mode)"),
+                    "population_group_radii_table": types.Schema(type=types.Type.STRING),
+                },
+                required=["lulc_raster_path", "lulc_attribute_table",
+                          "population_raster_path", "admin_boundaries_vector_path"],
+            ),
+        ),
+        types.FunctionDeclaration(
+            name="run_urban_mental_health",
+            description="Run Urban Mental Health model (extended Urban Nature Access) to estimate mental health benefits from urban greenspace. Use when user asks about mental health, urban mental wellness, greenspace benefits, or psychological well-being.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "lulc_raster_path":         types.Schema(type=types.Type.STRING),
+                    "lulc_attribute_table":     types.Schema(type=types.Type.STRING),
+                    "population_raster_path":   types.Schema(type=types.Type.STRING),
+                    "admin_boundaries_vector_path": types.Schema(type=types.Type.STRING),
+                    "search_radius_mode":       types.Schema(type=types.Type.STRING, description="'uniform radius' (default)"),
+                    "decay_function":           types.Schema(type=types.Type.STRING, description="'gaussian' (default)"),
+                    "search_radius":            types.Schema(type=types.Type.INTEGER, description="Default 300 m"),
+                    "population_group_radii_table": types.Schema(type=types.Type.STRING),
+                },
+                required=["lulc_raster_path", "lulc_attribute_table",
+                          "population_raster_path", "admin_boundaries_vector_path"],
+            ),
+        ),
+        types.FunctionDeclaration(
+            name="run_scenic_quality",
+            description="Run InVEST Scenic Quality to compute viewshed visibility from structure points. Use when user asks about scenic quality, viewshed, visual impact, sight lines, or landscape aesthetics.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "aoi_vector_path":           types.Schema(type=types.Type.STRING, description="Area of interest polygon"),
+                    "structure_vector_path":     types.Schema(type=types.Type.STRING, description="Shapefile of structures/viewpoints"),
+                    "dem_path":                  types.Schema(type=types.Type.STRING, description="Digital elevation model"),
+                    "refractivity_coefficient":  types.Schema(type=types.Type.NUMBER, description="Atmospheric refraction coefficient, default 0.13"),
+                    "do_valuation":              types.Schema(type=types.Type.BOOLEAN, description="Enable valuation, default false"),
+                    "valuation_function":        types.Schema(type=types.Type.STRING, description="'linear' | 'logarithmic' | 'exponential' (required if do_valuation=true)"),
+                    "a_coef":                    types.Schema(type=types.Type.NUMBER),
+                    "b_coef":                    types.Schema(type=types.Type.NUMBER),
+                    "max_valuation_radius":      types.Schema(type=types.Type.STRING),
+                },
+                required=["aoi_vector_path", "structure_vector_path", "dem_path"],
+            ),
+        ),
+        types.FunctionDeclaration(
+            name="run_habitat_risk_assessment",
+            description="Run InVEST Habitat Risk Assessment (HRA) to evaluate cumulative risk to habitats from multiple stressors. Use when user asks about habitat risk, HRA, stressor impact, cumulative impact, or marine risk assessment.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "info_table_path":          types.Schema(type=types.Type.STRING, description="CSV listing habitats and stressors with file paths"),
+                    "criteria_table_path":      types.Schema(type=types.Type.STRING, description="CSV/Excel with ratings for each habitat-stressor pair"),
+                    "resolution":               types.Schema(type=types.Type.INTEGER, description="Output raster resolution in meters"),
+                    "max_rating":               types.Schema(type=types.Type.INTEGER, description="Maximum rating value used in criteria table (e.g. 3)"),
+                    "risk_eq":                  types.Schema(type=types.Type.STRING, description="'Euclidean' or 'Multiplicative'"),
+                    "decay_eq":                 types.Schema(type=types.Type.STRING, description="'exponential', 'linear', or 'none'"),
+                    "n_overlapping_stressors":  types.Schema(type=types.Type.INTEGER, description="Number of stressors overlapping at once to normalize risk"),
+                    "aoi_vector_path":          types.Schema(type=types.Type.STRING, description="AOI polygon shapefile"),
+                    "visualize_outputs":        types.Schema(type=types.Type.BOOLEAN, description="Default false"),
+                },
+                required=["info_table_path", "criteria_table_path", "resolution",
+                          "max_rating", "risk_eq", "decay_eq",
+                          "n_overlapping_stressors", "aoi_vector_path"],
+            ),
+        ),
+        types.FunctionDeclaration(
+            name="run_wave_energy_production",
+            description="Run InVEST Wave Energy Production to estimate wave energy potential. Use when user asks about wave energy, offshore wave power, wave resource assessment, or marine renewable energy.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "wave_base_data_path":  types.Schema(type=types.Type.STRING, description="Path to InVEST wave base data directory"),
+                    "analysis_area":        types.Schema(type=types.Type.STRING, description="One of: 'Australia', 'East Coast of North America and Puerto Rico', 'Global', 'North Sea 10 meter resolution', 'North Sea 4 meter resolution', 'West Coast of North America and Hawaii'"),
+                    "machine_perf_path":    types.Schema(type=types.Type.STRING, description="Wave energy machine performance CSV"),
+                    "machine_param_path":   types.Schema(type=types.Type.STRING, description="Wave energy machine parameters CSV"),
+                    "bathymetry_path":      types.Schema(type=types.Type.STRING, description="Bathymetry raster (DEM)"),
+                    "aoi_vector_path":      types.Schema(type=types.Type.STRING),
+                    "do_valuation":         types.Schema(type=types.Type.BOOLEAN, description="Default false"),
+                    "grid_points_path":     types.Schema(type=types.Type.STRING, description="Required if do_valuation=true"),
+                    "machine_econ_path":    types.Schema(type=types.Type.STRING, description="Required if do_valuation=true"),
+                    "number_of_machines":   types.Schema(type=types.Type.INTEGER, description="Default 28"),
+                },
+                required=["wave_base_data_path", "analysis_area", "machine_perf_path",
+                          "machine_param_path", "bathymetry_path"],
+            ),
+        ),
+        types.FunctionDeclaration(
+            name="run_scenario_gen_proximity",
+            description="Run InVEST Scenario Generator: Proximity-Based to generate LULC conversion scenarios. Use when user asks about scenario generation, LULC conversion, proximity-based scenarios, or land use change scenarios.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "base_lulc_path":              types.Schema(type=types.Type.STRING, description="Base LULC raster to convert"),
+                    "replacement_lucode":          types.Schema(type=types.Type.INTEGER, description="LULC code to convert pixels to"),
+                    "area_to_convert":             types.Schema(type=types.Type.NUMBER, description="Area (ha) to convert"),
+                    "focal_landcover_codes":       types.Schema(type=types.Type.STRING, description="Comma-separated LULC codes to measure distance from"),
+                    "convertible_landcover_codes": types.Schema(type=types.Type.STRING, description="Comma-separated LULC codes eligible for conversion"),
+                    "convert_nearest_to_edge":     types.Schema(type=types.Type.BOOLEAN, description="Convert pixels nearest to focal LULC, default true"),
+                    "convert_farthest_from_edge":  types.Schema(type=types.Type.BOOLEAN, description="Convert pixels farthest from focal LULC, default false"),
+                    "aoi_path":                    types.Schema(type=types.Type.STRING),
+                    "n_steps":                     types.Schema(type=types.Type.INTEGER, description="Number of conversion steps, default 1"),
+                },
+                required=["base_lulc_path", "replacement_lucode", "area_to_convert",
+                          "focal_landcover_codes", "convertible_landcover_codes"],
+            ),
+        ),
+        types.FunctionDeclaration(
+            name="run_coastal_vulnerability",
+            description="Run InVEST Coastal Vulnerability to assess shoreline exposure and risk from waves, wind, and sea level. Use when user asks about coastal vulnerability, shoreline risk, CV index, coastal exposure, or coastal hazard.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "aoi_vector_path":          types.Schema(type=types.Type.STRING, description="AOI polygon shapefile"),
+                    "bathymetry_raster_path":   types.Schema(type=types.Type.STRING),
+                    "dem_path":                 types.Schema(type=types.Type.STRING),
+                    "geomorphology_vector_path": types.Schema(type=types.Type.STRING, description="Shoreline geomorphology shapefile"),
+                    "geomorphology_fill_value": types.Schema(type=types.Type.INTEGER, description="Fill value for geomorphology rank"),
+                    "landmass_vector_path":     types.Schema(type=types.Type.STRING, description="Global landmass polygon shapefile"),
+                    "wwiii_vector_path":        types.Schema(type=types.Type.STRING, description="WAVEWATCH III wave data shapefile"),
+                    "model_resolution":         types.Schema(type=types.Type.INTEGER, description="Resolution of model in meters"),
+                    "max_fetch_distance":       types.Schema(type=types.Type.INTEGER, description="Maximum fetch distance (m), default 12000"),
+                    "dem_averaging_radius":     types.Schema(type=types.Type.INTEGER, description="DEM averaging radius in meters"),
+                    "habitat_table_path":       types.Schema(type=types.Type.STRING),
+                    "population_raster_path":   types.Schema(type=types.Type.STRING),
+                    "shelf_contour_vector_path": types.Schema(type=types.Type.STRING),
+                    "slr_vector_path":          types.Schema(type=types.Type.STRING),
+                    "slr_field":                types.Schema(type=types.Type.STRING),
+                },
+                required=["aoi_vector_path", "bathymetry_raster_path", "dem_path",
+                          "geomorphology_vector_path", "geomorphology_fill_value",
+                          "landmass_vector_path", "wwiii_vector_path",
+                          "model_resolution", "max_fetch_distance", "dem_averaging_radius"],
+            ),
+        ),
+        types.FunctionDeclaration(
+            name="run_offshore_wind_energy",
+            description="Run InVEST Offshore Wind Energy to estimate offshore wind power potential. Use when user asks about offshore wind, wind energy, marine wind, or wind turbine siting.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "wind_data_path":                  types.Schema(type=types.Type.STRING, description="Wind data point shapefile (NOAA/ECMWF)"),
+                    "aoi_vector_path":                 types.Schema(type=types.Type.STRING, description="AOI polygon shapefile"),
+                    "bathymetry_path":                 types.Schema(type=types.Type.STRING, description="Bathymetry raster"),
+                    "land_polygon_vector_path":        types.Schema(type=types.Type.STRING, description="Land polygon for distance calculation"),
+                    "turbine_parameters_path":         types.Schema(type=types.Type.STRING, description="CSV with turbine specs"),
+                    "global_wind_parameters_path":     types.Schema(type=types.Type.STRING, description="CSV with global wind model parameters"),
+                    "number_of_turbines":              types.Schema(type=types.Type.INTEGER, description="Number of turbines per wind farm"),
+                    "min_depth":                       types.Schema(type=types.Type.NUMBER, description="Minimum water depth (m), default 3"),
+                    "max_depth":                       types.Schema(type=types.Type.NUMBER, description="Maximum water depth (m), default 60"),
+                    "min_distance":                    types.Schema(type=types.Type.NUMBER, description="Minimum distance from shore (m), default 0"),
+                    "max_distance":                    types.Schema(type=types.Type.NUMBER, description="Maximum distance from shore (m), default 200000"),
+                    "valuation_container":             types.Schema(type=types.Type.BOOLEAN, description="Enable economic valuation, default false"),
+                    "avg_grid_distance":               types.Schema(type=types.Type.NUMBER, description="Average grid distance (km), default 4"),
+                },
+                required=["wind_data_path", "aoi_vector_path", "bathymetry_path",
+                          "land_polygon_vector_path", "turbine_parameters_path",
+                          "global_wind_parameters_path", "number_of_turbines"],
+            ),
+        ),
+        types.FunctionDeclaration(
+            name="run_recreation_tourism",
+            description="Run InVEST Recreation and Tourism model using Flickr photo-user-days to estimate visitation. Use when user asks about recreation, tourism, photo-user-days, PUD, Flickr, or visitor estimation.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "aoi_path":                       types.Schema(type=types.Type.STRING, description="AOI polygon shapefile"),
+                    "start_year":                     types.Schema(type=types.Type.INTEGER, description="Start year (2005–2017)"),
+                    "end_year":                       types.Schema(type=types.Type.INTEGER, description="End year (2005–2017, >= start_year)"),
+                    "grid_aoi":                       types.Schema(type=types.Type.BOOLEAN, description="Grid the AOI, default false"),
+                    "grid_type":                      types.Schema(type=types.Type.STRING, description="'square' or 'hexagon', required if grid_aoi=true"),
+                    "cell_size":                      types.Schema(type=types.Type.NUMBER, description="Grid cell size in meters, required if grid_aoi=true"),
+                    "compute_regression":             types.Schema(type=types.Type.BOOLEAN, description="Compute regression against predictors, default false"),
+                    "predictor_table_path":           types.Schema(type=types.Type.STRING, description="Required if compute_regression=true"),
+                    "scenario_predictor_table_path":  types.Schema(type=types.Type.STRING),
+                },
+                required=["aoi_path", "start_year", "end_year"],
+            ),
+        ),
+        # ── Utility tools ──────────────────────────────────────────────────────
         types.FunctionDeclaration(
             name="read_file_content",
             description=(
@@ -375,6 +824,56 @@ TOOLS = [
         ),
     ])
 ]
+
+
+# ---------------------------------------------------------------------------
+# Keyword-based tool routing
+# ---------------------------------------------------------------------------
+
+_TOOL_KEYWORDS: dict[str, list[str]] = {
+    "run_network_analysis_grouping":        ["network analysis", "run_network_analysis"],
+    "run_coastal_blue_carbon_preprocessor": ["coastal blue carbon preprocessor", "cbc preprocessor", "run_coastal_blue_carbon_preprocessor"],
+    "run_coastal_blue_carbon":              ["coastal blue carbon main", "run_coastal_blue_carbon"],
+    "run_seasonal_water_yield":             ["seasonal water yield", "run_seasonal_water_yield", " swy "],
+    "run_crop_production_percentile":       ["crop production percentile", "run_crop_production_percentile"],
+    "run_crop_production_regression":       ["crop production regression", "run_crop_production_regression"],
+    "run_carbon_storage":                   ["carbon storage", "carbon sequestration", "run_carbon_storage"],
+    "run_habitat_quality":                  ["habitat quality", "run_habitat_quality"],
+    "run_annual_water_yield":               ["annual water yield", "run_annual_water_yield"],
+    "run_forest_carbon_edge_effect":        ["forest carbon", "run_forest_carbon"],
+    "run_crop_pollination":                 ["pollination", "run_crop_pollination", "run_pollination"],
+    "run_delineateit":                      ["delineateit", "watershed delineation", "run_delineateit"],
+    "run_routedem":                         ["routedem", "run_routedem"],
+    "run_Sediment_Delivery_Ratio_SDR":      ["sediment delivery ratio", " sdr", "run_sdr", "run_sediment", "run_Sediment_Delivery_Ratio_SDR"],
+    "run_ndr":                              ["nutrient delivery ratio", " ndr", "run_ndr"],
+    "run_urban_cooling":                    ["urban cooling", "run_urban_cooling"],
+    "run_urban_flood_risk_mitigation":      ["urban flood", "run_urban_flood"],
+    "run_urban_stormwater_retention":       ["urban stormwater", "run_urban_stormwater"],
+    "run_urban_nature_access":              ["urban nature access", "run_urban_nature"],
+    "run_urban_mental_health":              ["urban mental health", "run_urban_mental"],
+    "run_scenic_quality":                   ["scenic quality", "run_scenic_quality"],
+    "run_habitat_risk_assessment":          ["habitat risk assessment", " hra", "run_habitat_risk"],
+    "run_wave_energy_production":           ["wave energy", "run_wave_energy"],
+    "run_scenario_gen_proximity":           ["scenario generator proximity", "scenario gen proximity", "run_scenario_gen"],
+    "run_coastal_vulnerability":            ["coastal vulnerability", "run_coastal_vulnerability"],
+    "run_offshore_wind_energy":             ["offshore wind", "run_offshore_wind"],
+    "run_recreation_tourism":              ["recreation", "tourism", "run_recreation"],
+}
+
+_TOOL_BY_NAME: dict[str, types.Tool] = {
+    fd.name: tool
+    for tool in TOOLS
+    for fd in tool.function_declarations
+}
+
+
+def _detect_tool_from_message(message: str) -> str | None:
+    """Return the function name that best matches the user message, or None."""
+    msg_lower = message.lower()
+    for tool_name, keywords in _TOOL_KEYWORDS.items():
+        if any(kw.lower() in msg_lower for kw in keywords):
+            return tool_name
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -435,6 +934,7 @@ async def run_agent(
     files: list,
     event_callback: Callable[[dict], Any],
     model: str | None = None,
+    chat_history: list[dict] | None = None,
 ) -> None:
     """
     Main agent loop using Gemini native function calling.
@@ -469,7 +969,7 @@ async def run_agent(
         "run_crop_pollination":                 "q_pollination",
         "run_delineateit":                      "q_delineateit",
         "run_routedem":                         "q_routedem",
-        "run_sdr":                              "q_sdr",
+        "run_Sediment_Delivery_Ratio_SDR":      "q_sdr",
         "run_ndr":                              "q_ndr",
         "run_urban_cooling":                    "q_urban_cooling",
         "run_urban_flood_risk_mitigation":      "q_urban_flood",
@@ -480,6 +980,9 @@ async def run_agent(
         "run_habitat_risk_assessment":          "q_hra",
         "run_wave_energy_production":           "q_wave_energy",
         "run_scenario_gen_proximity":           "q_scenario_gen",
+        "run_coastal_vulnerability":            "q_coastal_vuln",
+        "run_offshore_wind_energy":             "q_wind_energy",
+        "run_recreation_tourism":               "q_recreation",
     }
 
     client = _get_client()
@@ -506,24 +1009,57 @@ async def run_agent(
         ]
     user_text = "\n".join(context_lines) + "\n\n" + message if context_lines else message
 
-    contents: list[types.Content] = [
-        types.Content(role="user", parts=[types.Part.from_text(text=user_text)])
-    ]
+    # Build multi-turn contents: prepend prior conversation history so Gemini
+    # remembers what was discussed in earlier turns of this session.
+    contents: list[types.Content] = []
+    for turn in (chat_history or []):
+        contents.append(types.Content(
+            role=turn["role"],
+            parts=[types.Part.from_text(text=turn["text"])],
+        ))
+    contents.append(types.Content(role="user", parts=[types.Part.from_text(text=user_text)]))
+
+    # Detect which tool the user is requesting. Used in retry nudge messages.
+    detected_tool_name = _detect_tool_from_message(user_text)
+    if detected_tool_name:
+        logger.info(f"[agent] keyword-routing → {detected_tool_name}")
+
+    # When a specific tool is detected, use only that tool's FunctionDeclaration
+    # on the first call. With just 1 function in scope, Gemini has no ambiguity
+    # and reliably calls it. Falls back to all TOOLS if no tool is detected or
+    # after the first iteration (tool call already made).
+    _single_tool: list[types.Tool] | None = (
+        [_TOOL_BY_NAME[detected_tool_name]]
+        if detected_tool_name and detected_tool_name in _TOOL_BY_NAME
+        else None
+    )
+
+    # run_crop_pollination consistently returns empty content at temperature=0.
+    # Start at 0.9 directly so it passes on the first call without retries.
+    # (run_Sediment_Delivery_Ratio_SDR behaves inconsistently at 0.9 and recovers faster via retries at 0.)
+    _HIGH_TEMP_TOOLS = {"run_crop_pollination"}
+    base_temperature = 0.9 if detected_tool_name in _HIGH_TEMP_TOOLS else 0
 
     # Agentic loop
     max_iterations = 10
     for iteration in range(max_iterations):
         logger.info(f"[agent] iteration={iteration} session={session_id} model={model_name}")
 
+        # Use the single-tool list on iteration 0 (when we know which tool to call),
+        # then switch to full TOOLS list for follow-up iterations.
+        active_tools = _single_tool if (iteration == 0 and _single_tool is not None) else TOOLS
+
+        gen_cfg = types.GenerateContentConfig(
+            system_instruction=system_instruction,
+            tools=active_tools,
+            temperature=base_temperature,
+        )
+
         response = await _generate_with_retry(
             client,
             model_name,
             contents,
-            config=types.GenerateContentConfig(
-                system_instruction=system_instruction,
-                tools=TOOLS,
-                temperature=0.7,
-            ),
+            config=gen_cfg,
         )
 
         if not response.candidates:
@@ -532,8 +1068,43 @@ async def run_agent(
 
         candidate = response.candidates[0]
         if candidate.content is None or candidate.content.parts is None:
-            logger.warning("[agent] Gemini returned candidate with no content/parts (safety filter or rate limit), stopping")
-            break
+            finish = getattr(candidate, "finish_reason", "?")
+            logger.warning(f"[agent] Empty content (finish_reason={finish}), retrying up to 10x")
+            fn_name = detected_tool_name or "the appropriate function"
+            # Escalating temperatures; never drop below base_temperature so retries
+            # don't regress to a state already known to produce empty content.
+            _retry_temps = [max(base_temperature, t)
+                            for t in [0.5, 0.7, 0.9, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]]
+            recovered = False
+            for _r in range(10):
+                await asyncio.sleep(2 ** min(_r, 3))
+                retry_temp = _retry_temps[_r]
+                # Use a FRESH single-turn conversation on every retry so Gemini
+                # never sees two consecutive user messages (invalid turn structure).
+                direct_cmd = (
+                    f"Call `{fn_name}` with the following parameters:\n{user_text}"
+                )
+                retry_contents = [
+                    types.Content(role="user", parts=[types.Part.from_text(text=direct_cmd)]),
+                ]
+                retry_cfg = types.GenerateContentConfig(
+                    system_instruction=system_instruction,
+                    tools=active_tools,
+                    temperature=retry_temp,
+                )
+                resp2 = await _generate_with_retry(client, model_name, retry_contents, config=retry_cfg)
+                c0 = resp2.candidates[0] if resp2.candidates else None
+                if c0 and c0.content is not None and c0.content.parts is not None:
+                    response = resp2
+                    candidate = c0
+                    contents = retry_contents
+                    recovered = True
+                    logger.info(f"[agent] Recovered on retry {_r + 1} (temp={retry_temp})")
+                    break
+                logger.warning(f"[agent] Retry {_r + 1} still empty/no-parts (temp={retry_temp})")
+            if not recovered:
+                logger.warning("[agent] All retries exhausted, stopping")
+                break
 
         contents.append(candidate.content)
 

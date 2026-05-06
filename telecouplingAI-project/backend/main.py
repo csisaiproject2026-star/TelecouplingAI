@@ -95,15 +95,18 @@ async def chat_endpoint(
     else:
         sm.touch_session(session_id)
 
-    # Validate that user provided a prompt
+    # If no message but files were uploaded, generate a sensible default prompt
     if not message or not message.strip():
-        async def empty_prompt_stream():
-            yield f"data: {json.dumps({'type': 'error', 'message': 'Please input prompt to let me know how to process it', 'error_code': 'EMPTY_PROMPT'}, ensure_ascii=False)}\n\n"
-        return StreamingResponse(
-            empty_prompt_stream(),
-            media_type="text/event-stream",
-            headers={"X-Session-ID": session_id},
-        )
+        if files:
+            message = "I have uploaded these files. Please analyze them and suggest which InVEST models I can run, or describe what they contain."
+        else:
+            async def empty_prompt_stream():
+                yield f"data: {json.dumps({'type': 'error', 'message': 'Please input prompt to let me know how to process it', 'error_code': 'EMPTY_PROMPT'}, ensure_ascii=False)}\n\n"
+            return StreamingResponse(
+                empty_prompt_stream(),
+                media_type="text/event-stream",
+                headers={"X-Session-ID": session_id},
+            )
 
     # Save any uploaded files and build file context list
     uploaded = []
@@ -139,6 +142,10 @@ async def chat_endpoint(
             if f["path"] not in existing_paths:
                 uploaded.append(f)
 
+    # Retrieve prior conversation history and save the current user turn
+    chat_history = sm.get_chat_history(session_id)
+    sm.add_chat_turn(session_id, "user", message)
+
     async def event_stream():
         queue: asyncio.Queue[dict | None] = asyncio.Queue()
 
@@ -162,6 +169,7 @@ async def chat_endpoint(
                     files=uploaded,
                     event_callback=callback,
                     model=model,
+                    chat_history=chat_history,
                 )
             except Exception as exc:
                 import traceback as _tb
@@ -177,11 +185,15 @@ async def chat_endpoint(
 
         agent_task = asyncio.create_task(run())
 
+        ai_text_parts: list[str] = []
         try:
             while True:
                 event = await queue.get()
                 if event is None:
                     break
+
+                if event.get("type") == "text_chunk":
+                    ai_text_parts.append(event.get("content", ""))
 
                 if event.get("type") == "tool_result":
                     event = _enrich_file_urls(event, session_id)
@@ -194,6 +206,11 @@ async def chat_endpoint(
                         ])
 
                 yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+
+            # Save the model's reply so future turns can reference this exchange
+            ai_text = "".join(ai_text_parts)
+            if ai_text:
+                sm.add_chat_turn(session_id, "model", ai_text)
         finally:
             # Client disconnected or stream ended — cancel the agent task to
             # prevent zombie coroutines and "Task was destroyed but pending" errors.
