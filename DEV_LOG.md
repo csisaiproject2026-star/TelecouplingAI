@@ -1,3 +1,99 @@
+## 2026-05-08 — 跨轮文件注入修复 + 多轮参数补全 + GCP Redis URL 修复
+
+### 完成内容
+
+#### 1. 跨轮文件注入（agent.py）
+- **根本原因**：`agent.py` 的 `context_lines` 只注入本轮上传的文件，如果用户在第 1 轮上传了文件、第 2 轮再补充参数，Gemini 在第 2 轮无法"看到"第 1 轮的文件
+- **修复**：每轮构建 `user_text` 时，从 Redis session 取出 `get_uploaded_files(session_id)`，过滤掉本轮已有的路径，将历史上传文件以 `"Previously uploaded file: <name> at <path>"` 格式追加进 `context_lines`
+- 变更：`backend/agent.py`，约 10 行代码
+
+#### 2. 多轮参数补全引导（agent.py system instruction）
+- 在 `_BASE_SYSTEM_INSTRUCTION` 增加 `## Handling Incomplete Parameters (Multi-turn Collection)` 章节
+- 明确规则：缺参数时先列清单等待用户补充，不得提前调用工具；补齐后结合历史记录调用；历史中已提供的参数不得再问
+
+#### 3. GCP 部署：tele-backend Redis URL 错误修复
+- 现象：`tele-backend` 容器 `REDIS_URL=redis://localhost:6379/0`，导致所有 `/api/chat` 请求返回 500（Redis ConnectionRefused）
+- 根因：该容器在上一 session 被手动 `docker run` 启动，未通过 `docker compose --env-file .env.docker`，导致 env 未正确注入
+- 修复：`docker stop tele-backend && docker rm tele-backend && docker compose --env-file .env.docker up -d api-server`，验证 `REDIS_URL=redis://redis:6379/0` ✅
+- 同时 `docker compose restart nginx`（nginx 需要更新 upstream IP）
+
+#### 4. 多轮测试验证（GCP 服务器）
+- 测试场景：2 轮对话，网络分析（Network Analysis Grouping）
+  - Turn 1：上传 `nodes.csv` + 提供 join 属性 → Gemini 正确识别缺少 `links_table`、`shapefile_path`，未提前调用工具 ✅
+  - Turn 2：上传 `links.csv` + `.shp` + 指定 walktrap → Gemini 将 Turn 1 的 `nodes.csv` 与 Turn 2 文件合并，调用工具 ✅
+  - 工具失败原因：仅上传 `.shp` 而缺少伴随的 `.shx` 文件（预期错误，非代码问题）
+
+### 关键变更文件
+- `backend/agent.py` — 跨轮文件注入（`prev_uploaded` 逻辑）+ 多轮参数补全 system instruction
+
+### 测试状态
+- 多轮参数收集 + 跨轮文件记忆：**GCP 验证 PASS** ✅
+- LLM 路径（10/10）：继承上一 session 结果
+
+---
+
+## 2026-05-06（晚）— 对话记忆、前端拖拽上传、空消息修复、部署完整验证
+
+### 完成内容
+
+#### 1. LLM 路径最终验证（10/10，全部 0 次重试）
+- 修复了上个 session 遗留的部署路径错误：`task_queue.py` 之前 scp 到了 `~/csis-platform/backend/workers/`（旧路径），正确路径为 `~/csis-platform/telecouplingAI-project/backend/workers/`
+- 同时发现 `csic_backend:latest` 镜像需从 `telecouplingAI-project/backend/` 构建（含全部 26 个工具），而非 `backend/`（仅含原始 6 个工具）
+- 修复后完整测试结果：
+
+| 工具 | 总耗时 | 重试 | 状态 |
+|------|--------|------|------|
+| CBC Preprocessor | 3.2s | 0 | ✅ |
+| DelineateIt | 4.5s | 0 | ✅ |
+| Annual Water Yield | 7.6s | 0 | ✅ |
+| Carbon Storage | 5.0s | 0 | ✅ |
+| Crop Production Percentile | 10.6s | 0 | ✅ |
+| Habitat Quality | 8.8s | 0 | ✅ |
+| NDR | 9.9s | 0 | ✅ |
+| **SDR** | **10.4s** | **0** | ✅ 改名后首次 0 重试 |
+| Seasonal Water Yield | 18.4s | 0 | ✅ |
+| **Pollination** | **26.3s** | **0** | ✅ base_temp=0.9 |
+
+#### 2. 多轮对话记忆（上下文连贯性修复）
+- **根本原因**：`agent.py` 每轮只传当前一条消息给 Gemini，历史对话完全丢弃，导致"记忆力差"
+- `session_manager.py`：新增 `add_chat_turn(session_id, role, text)` 和 `get_chat_history(session_id)`，对话历史存入 Redis，保留最近 40 条（20 轮）
+- `main.py`：每次请求前取历史、存用户消息；streaming 结束后收集所有 `text_chunk` 拼接为 AI 回复并存入历史
+- `agent.py`：新增 `chat_history` 参数，将历史作为交替 `Content` 对象拼在当前消息前传给 Gemini
+- Gemini 2.5 Flash 上下文 1M token，20 轮约 1-2 万 token，无压力
+
+#### 3. 前端拖拽上传文件（App.jsx）
+- 在聊天主区域添加 `onDragEnter/Leave/Over/Drop` 事件处理
+- 拖入时显示蓝色虚线蒙层 + Upload 图标 + "Drop files to attach"
+- 松手后文件加入输入框上方的文件列表
+- **Bug 修复**：初版用 `dragCounterRef` 计数器方案，拖回桌面时 overlay 不消失；改为 `e.currentTarget.contains(e.relatedTarget)` 判断——只有真正离开主区域时才清除 overlay
+
+#### 4. 空消息 + 文件上传修复（main.py）
+- 原行为：message 为空直接报错，不管是否有上传文件
+- 修复：有文件但无文字时自动补默认 prompt："I have uploaded these files. Please analyze them and suggest which InVEST models I can run, or describe what they contain."
+- 无文件无文字仍报错（合理）
+
+#### 5. 部署踩坑记录
+- `docker stop X && docker start X` 只重启容器，**不会切换到新镜像**；必须 `docker rm` 后 `docker run` 新镜像
+- backend 容器正确 `.env` 路径：`~/csis-platform/telecouplingAI-project/.env`（非根目录 `.env`）
+- frontend nginx upstream 名称必须是 `frontend-ui`（非 `tele-frontend`），否则 nginx reload 报 "host not found"
+- SSH 用户名：`csisaiproject2026`（非 `dru1889`）
+
+### 关键变更文件
+- `backend/shared/session_manager.py` — 对话历史存储
+- `backend/main.py` — 历史取存 + 空消息处理
+- `backend/agent.py` — chat_history 参数 + contents 多轮构建
+- `frontend/src/App.jsx` — 拖拽上传 + overlay bug 修复
+
+### 测试状态
+- LLM 路径（英文 prompt）：**10/10 PASS，全部 0 次重试**
+- 集成测试：26/26 PASS（未变）
+
+### Git
+- Commit: `c251abf`（feature/invest-expansion）
+- 包含本 session 及之前未提交的所有变更（23 个文件，3238 行新增）
+
+---
+
 ## 2026-05-06（下午）— SDR 函数名重命名实验 + agent.py 深度优化
 
 ### 完成内容

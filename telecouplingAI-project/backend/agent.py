@@ -232,6 +232,26 @@ Detects community clusters in flow networks using igraph. **Walktrap** (random w
 - Collect ALL required parameters before calling any tool — never guess or assume file paths
 - Detailed parameter strategies are provided in the skill specifications below
 
+## Handling Incomplete Parameters (Multi-turn Collection)
+Users often provide parameters across multiple messages. Follow this pattern:
+
+1. If the user requests a tool but some required parameters are missing, DO NOT call the tool yet.
+   Instead, reply with a friendly message listing exactly which parameters are still needed.
+   Example format:
+   "To run [Tool Name], I still need the following:
+   - `param_name_1`: [brief description of what it is]
+   - `param_name_2`: [brief description]
+   Please provide these and I'll run the model right away."
+
+2. Once the user replies with the missing information, combine it with what was provided earlier
+   (visible in the conversation history) and call the tool.
+
+3. Never ask for parameters that were already provided in earlier messages — check the full
+   conversation history before asking.
+
+4. If the user provides a file by uploading it (path listed at top of message), treat that as
+   satisfying the corresponding parameter — do not ask for it again.
+
 ## File Path Rules (CRITICAL)
 - NEVER display raw file system paths (e.g. C:\\..., /home/...) to the user in your text responses
 - When listing output files, mention only the filename (e.g. `aligned_lulc_2010.tif`), not the full path
@@ -996,10 +1016,22 @@ async def run_agent(
     from shared.session_manager import SessionManager as _SM
     _sm = _SM()
     context_lines = []
+    current_paths = {f.get('path', '') for f in (files or [])}
     if files:
         context_lines += [
             f"Uploaded file: {f.get('filename', 'unknown')} at {f.get('path', '')}"
             for f in files
+        ]
+    # Re-inject files uploaded in previous turns so Gemini can use them even when
+    # the user spreads parameter collection across multiple messages.
+    prev_uploaded = [
+        f for f in _sm.get_uploaded_files(session_id)
+        if f.get('path', '') not in current_paths
+    ]
+    if prev_uploaded:
+        context_lines += [
+            f"Previously uploaded file: {f.get('filename', 'unknown')} at {f.get('path', '')}"
+            for f in prev_uploaded
         ]
     output_files = _sm.get_output_files(session_id)
     if output_files:
