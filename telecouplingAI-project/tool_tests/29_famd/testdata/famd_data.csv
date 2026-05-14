@@ -1,0 +1,11 @@
+id,age,income,gender,region
+1,25,45000,M,North
+2,32,62000,F,South
+3,28,38000,M,East
+4,45,85000,F,West
+5,38,71000,M,North
+6,22,32000,F,East
+7,51,95000,M,South
+8,29,48000,F,West
+9,36,67000,M,North
+10,43,78000,F,South

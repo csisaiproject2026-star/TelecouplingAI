@@ -1,3 +1,95 @@
+## 2026-05-15 — 统一测试目录创建（tool_tests/）
+
+### 完成内容
+- 创建 `telecouplingAI-project/tool_tests/` 统一测试根目录
+- 为全部 42 个工具（27 个 InVEST + 15 个新工具）各建立子文件夹：
+  - `testdata/` — 输入样本数据（新工具有真实 CSV；InVEST 工具有 README 指向 datainput_for_demo）
+  - `output/` — 输出目录（.gitkeep 确保 git 跟踪）
+  - `how_to_test.bat` — 测试说明（Web UI 上传路径 + 使用 Prompt）
+- 为 15 个新工具生成最小可用测试数据：ols_data.csv, famd_data.csv, trade.csv, agents.csv, article.html 等
+- `tool_tests/README.md` — 目录说明 + 42 工具编号索引表
+
+### 关键变更文件
+- `tool_tests/README.md` — 总览索引
+- `tool_tests/01_network_analysis/` … `tool_tests/42_nutrition_metrics/` — 42 个工具子目录
+
+### 测试状态
+- 目录创建验证：84 个目录 + 128 个文件全部生成 ✅
+- 新工具 testdata：15 组 CSV/HTML 样本数据均已写入 ✅
+
+---
+
+## 2026-05-14 — 15 个新工具全量实现（Telecoupling Toolbox 非 InVEST 部分）
+
+### 完成内容
+- 分析 ArcGIS Pro Telecoupling Toolbox v3.3 的 28 个工具，确认全部 InVEST 工具已实现
+- 新增 15 个非 InVEST 工具，全部去除 arcpy 依赖，改用 pandas/numpy/scipy/geopandas/shapely/matplotlib/R subprocess
+- 每个工具完整实现：Celery 任务文件 + task_queue 注册 + output_router PATTERNS + SKILL.md
+
+### 新工具列表
+| # | 工具名 | 文件 | 核心库 |
+|---|--------|------|--------|
+| 1 | OLS Model Selection | tools/ols.py | numpy, scipy.stats |
+| 2 | FAMD | tools/famd.py | R subprocess (FactoMineR) |
+| 3 | CO2 Emissions | tools/co2_emissions.py | pandas |
+| 4 | Cost-Benefit Analysis | tools/cost_benefit_analysis.py | pandas |
+| 5 | Population Density | tools/population_density.py | pandas |
+| 6 | Radial Flows | tools/radial_flows.py | geopandas, shapely |
+| 7 | Commodity Trade | tools/commodity_trade.py | geopandas, 内置 ISO3 质心 |
+| 8 | Add Agents | tools/add_agents.py | geopandas |
+| 9 | Draw Agents Table | tools/draw_agents_table.py | geopandas |
+| 10 | Add Causes | tools/add_causes.py | geopandas |
+| 11 | Add Systems | tools/add_systems.py | geopandas |
+| 12 | Draw Systems Table | tools/draw_systems_table.py | geopandas |
+| 13 | Add Media Flows | tools/add_media_flows.py | BeautifulSoup + geopandas |
+| 14 | Food Security | tools/food_security.py | pandas, matplotlib |
+| 15 | Nutrition Metrics | tools/nutrition_metrics.py | pandas (Schofield BMR) |
+
+### 关键变更文件
+- `backend/tools/ols.py`, `co2_emissions.py`, `cost_benefit_analysis.py`, `population_density.py`
+- `backend/tools/radial_flows.py`, `commodity_trade.py`, `add_agents.py`, `draw_agents_table.py`
+- `backend/tools/add_causes.py`, `add_systems.py`, `draw_systems_table.py`, `add_media_flows.py`
+- `backend/tools/famd.py`, `food_security.py`, `nutrition_metrics.py`
+- `backend/r_scripts/famd.R`
+- `backend/workers/task_queue.py` — 新增 15 个导入 + tool_map 条目
+- `backend/renderers/output_router.py` — 新增 15 个 PATTERNS 条目
+- `backend/agent.py` — 新增 15 个 FunctionDeclaration + TOOL_TO_SKILL + _TOOL_QUEUES
+- `docker-compose.yml` — 新增 6 个 Celery worker 服务
+
+### 测试状态
+- 导入验证：`_verify_new_tools.py` 运行通过（已删除）✅
+- output_router patterns：15 个 key 全部断言通过 ✅
+
+---
+
+## 2026-05-14 — 15 个新工具 SKILL.md 批量创建
+
+### 完成内容
+- 为平台新增的 15 个工具各创建了完整的 SKILL.md 文件，格式与现有 SKILL 文件保持一致
+
+### 新建文件列表
+- `.claude/skills/run-model-selection-ols/SKILL.md` — OLS 线性回归 + 自动模型选择
+- `.claude/skills/run-famd/SKILL.md` — 因子分析（FAMD/PCA/MCA，混合数据类型自动切换）
+- `.claude/skills/run-co2-emissions/SKILL.md` — CO2 运输排放计算
+- `.claude/skills/run-cost-benefit-analysis/SKILL.md` — 成本收益分析（CBA）
+- `.claude/skills/run-population-density/SKILL.md` — 人口密度与变化分析
+- `.claude/skills/run-radial-flows/SKILL.md` — 放射状流向线绘制（OD 矩阵）
+- `.claude/skills/run-commodity-trade/SKILL.md` — 商品贸易流向可视化（内置 ISO3 质心）
+- `.claude/skills/run-add-agents/SKILL.md` — 交互式添加 Telecoupling 主体点
+- `.claude/skills/run-draw-agents-table/SKILL.md` — 批量从表格绘制主体点
+- `.claude/skills/run-add-causes/SKILL.md` — 添加 Telecoupling 驱动因子点
+- `.claude/skills/run-add-systems/SKILL.md` — 交互式添加耦合系统点
+- `.claude/skills/run-draw-systems-table/SKILL.md` — 批量从表格绘制系统点
+- `.claude/skills/run-add-media-flows/SKILL.md` — 媒体信息流分析（解析 HTML 中的国家提及）
+- `.claude/skills/run-food-security/SKILL.md` — FAO 食品安全指标分析与可视化
+- `.claude/skills/run-nutrition-metrics/SKILL.md` — 人口营养需求（LLER）计算
+
+### 测试状态
+- 文件结构验证：15 个目录均已正确创建 ✅
+- 内容格式：三个 section（DEV ONLY / PRE_EXECUTION / POST_EXECUTION）均完整 ✅
+
+---
+
 ## 2026-05-08 — 跨轮文件注入修复 + 多轮参数补全 + GCP Redis URL 修复
 
 ### 完成内容

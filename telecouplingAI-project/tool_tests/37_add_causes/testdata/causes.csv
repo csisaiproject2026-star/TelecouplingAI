@@ -1,0 +1,5 @@
+cause_id,cause_description,longitude,latitude,severity
+C001,Land use change - deforestation,116.0,28.0,High
+C002,Urban sprawl pressure,121.0,31.0,Medium
+C003,Agricultural intensification,104.0,30.0,High
+C004,Water extraction,113.0,23.0,Medium

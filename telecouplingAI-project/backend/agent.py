@@ -116,6 +116,21 @@ TOOL_TO_SKILL: dict[str, str] = {
     "run_coastal_vulnerability":              "run-coastal-vulnerability",
     "run_offshore_wind_energy":               "run-offshore-wind-energy",
     "run_recreation_tourism":                 "run-recreation-tourism",
+    "run_model_selection_ols":               "run-model-selection-ols",
+    "run_factor_analysis_mixed_data":        "run-famd",
+    "run_co2_emissions":                     "run-co2-emissions",
+    "run_cost_benefit_analysis":             "run-cost-benefit-analysis",
+    "run_population_count_density":          "run-population-density",
+    "run_draw_radial_flows":                 "run-radial-flows",
+    "run_commodity_trade":                   "run-commodity-trade",
+    "run_add_agents_interactively":          "run-add-agents",
+    "run_draw_agents_from_table":            "run-draw-agents-table",
+    "run_add_causes_interactively":          "run-add-causes",
+    "run_add_systems_interactively":         "run-add-systems",
+    "run_draw_systems_from_table":           "run-draw-systems-table",
+    "run_add_media_flows":                   "run-add-media-flows",
+    "run_food_security":                     "run-food-security",
+    "run_nutrition_metrics":                 "run-nutrition-metrics",
 }
 
 # ---------------------------------------------------------------------------
@@ -799,6 +814,249 @@ TOOLS = [
                 required=["aoi_path", "start_year", "end_year"],
             ),
         ),
+        # ── Telecoupling Toolbox — Statistical & Analytical Tools ──────────────
+        types.FunctionDeclaration(
+            name="run_model_selection_ols",
+            description="Run Ordinary Least Squares (OLS) regression on tabular CSV data. Supports model selection mode to test all variable combinations. Use when user asks about OLS, linear regression, model selection, R-squared, or explanatory variable analysis.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "input_csv":              types.Schema(type=types.Type.STRING, description="Path to input CSV with data"),
+                    "dependent_variable":     types.Schema(type=types.Type.STRING, description="Column name of the dependent (Y) variable"),
+                    "independent_variables":  types.Schema(type=types.Type.STRING, description="Comma-separated list of independent variable column names"),
+                    "model_selection":        types.Schema(type=types.Type.BOOLEAN, description="If true, test all variable combinations and rank by Adj R², default false"),
+                    "min_r2":                 types.Schema(type=types.Type.NUMBER, description="Minimum R² threshold for model selection, default 0.5"),
+                    "max_vif":                types.Schema(type=types.Type.NUMBER, description="Maximum VIF for model selection, default 7.5"),
+                    "max_p_value":            types.Schema(type=types.Type.NUMBER, description="Maximum coefficient p-value for model selection, default 0.05"),
+                },
+                required=["input_csv", "dependent_variable", "independent_variables"],
+            ),
+        ),
+        types.FunctionDeclaration(
+            name="run_factor_analysis_mixed_data",
+            description="Run Factor Analysis for Mixed Data (FAMD), PCA, or MCA via R/FactoMineR. Use when user asks about factor analysis, PCA, MCA, FAMD, dimensionality reduction, or mixed data analysis.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "input_csv":                types.Schema(type=types.Type.STRING, description="Path to input CSV with variables"),
+                    "quantitative_variables":   types.Schema(type=types.Type.STRING, description="Comma-separated list of numeric variable column names"),
+                    "qualitative_variables":    types.Schema(type=types.Type.STRING, description="Comma-separated list of categorical variable column names"),
+                    "n_components":             types.Schema(type=types.Type.INTEGER, description="Number of components/dimensions, default 5"),
+                    "handle_na":                types.Schema(type=types.Type.BOOLEAN, description="Impute missing values using missMDA, default true"),
+                },
+                required=["input_csv"],
+            ),
+        ),
+        types.FunctionDeclaration(
+            name="run_co2_emissions",
+            description="Calculate CO2 emissions from wildlife or goods transport routes. Use when user asks about CO2 emissions, transport emissions, carbon footprint of transport, or animal transport.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "input_csv":              types.Schema(type=types.Type.STRING, description="CSV with transport route data"),
+                    "capacity_per_trip":      types.Schema(type=types.Type.NUMBER, description="Number of animals/units per trip"),
+                    "co2_per_km_per_trip":    types.Schema(type=types.Type.NUMBER, description="CO2 emissions in kg per km per trip"),
+                    "animal_count_field":     types.Schema(type=types.Type.STRING, description="Column name for animal/unit count, default 'animal_count'"),
+                    "length_km_field":        types.Schema(type=types.Type.STRING, description="Column name for route length in km, default 'length_km'"),
+                    "id_field":               types.Schema(type=types.Type.STRING, description="Optional column name for route ID"),
+                },
+                required=["input_csv", "capacity_per_trip", "co2_per_km_per_trip"],
+            ),
+        ),
+        types.FunctionDeclaration(
+            name="run_cost_benefit_analysis",
+            description="Join cost and revenue data to a feature table and compute net returns (RETURNS = REVENUES - COSTS). Use when user asks about cost-benefit analysis, CBA, economic returns, costs vs revenues.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "input_csv":          types.Schema(type=types.Type.STRING, description="Main feature CSV"),
+                    "economic_data_csv":  types.Schema(type=types.Type.STRING, description="CSV with economic data containing cost and revenue columns"),
+                    "key_field":          types.Schema(type=types.Type.STRING, description="Column name used to join the two CSVs"),
+                    "cost_field":         types.Schema(type=types.Type.STRING, description="Column name for costs in economic_data_csv, default 'COSTS'"),
+                    "revenue_field":      types.Schema(type=types.Type.STRING, description="Column name for revenues in economic_data_csv, default 'REVENUES'"),
+                },
+                required=["input_csv", "economic_data_csv", "key_field"],
+            ),
+        ),
+        types.FunctionDeclaration(
+            name="run_population_count_density",
+            description="Calculate population density per reporting unit and optionally compute population change between two time periods. Use when user asks about population density, population count, population growth, or demographic analysis.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "input_csv":                          types.Schema(type=types.Type.STRING, description="CSV with reporting unit data"),
+                    "population_field":                   types.Schema(type=types.Type.STRING, description="Column name for population count"),
+                    "area_km2_field":                     types.Schema(type=types.Type.STRING, description="Column name for area in km²"),
+                    "unit_id_field":                      types.Schema(type=types.Type.STRING, description="Optional column name for unit ID (for joining second period data)"),
+                    "second_period_csv":                  types.Schema(type=types.Type.STRING, description="Optional CSV for second time period (for population change analysis)"),
+                    "second_period_population_field":     types.Schema(type=types.Type.STRING, description="Column name for population in second period CSV"),
+                },
+                required=["input_csv", "population_field", "area_km2_field"],
+            ),
+        ),
+        # ── Telecoupling Toolbox — Spatial Flow & Visualization Tools ──────────
+        types.FunctionDeclaration(
+            name="run_draw_radial_flows",
+            description="Generate radial flow lines from a CSV of origin-destination coordinate pairs. Use when user asks about radial flows, flow lines, OD matrix visualization, or origin-destination mapping.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "input_csv":     types.Schema(type=types.Type.STRING, description="CSV with origin and destination coordinates"),
+                    "from_x_field":  types.Schema(type=types.Type.STRING, description="Column name for origin longitude/X"),
+                    "from_y_field":  types.Schema(type=types.Type.STRING, description="Column name for origin latitude/Y"),
+                    "to_x_field":    types.Schema(type=types.Type.STRING, description="Column name for destination longitude/X"),
+                    "to_y_field":    types.Schema(type=types.Type.STRING, description="Column name for destination latitude/Y"),
+                    "crs":           types.Schema(type=types.Type.STRING, description="Coordinate reference system, default 'EPSG:4326'"),
+                },
+                required=["input_csv", "from_x_field", "from_y_field", "to_x_field", "to_y_field"],
+            ),
+        ),
+        types.FunctionDeclaration(
+            name="run_commodity_trade",
+            description="Map bilateral commodity trade flows between countries as GeoJSON flow lines. Use when user asks about commodity trade, bilateral trade, trade flows, import/export mapping.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "trade_csv":            types.Schema(type=types.Type.STRING, description="CSV with trade data (country pairs and values)"),
+                    "from_country_field":   types.Schema(type=types.Type.STRING, description="Column name for exporting country (ISO3 code recommended)"),
+                    "to_country_field":     types.Schema(type=types.Type.STRING, description="Column name for importing country (ISO3 code recommended)"),
+                    "value_field":          types.Schema(type=types.Type.STRING, description="Column name for trade value"),
+                    "year_field":           types.Schema(type=types.Type.STRING, description="Optional column name for year"),
+                    "year":                 types.Schema(type=types.Type.STRING, description="Optional year to filter (e.g. '2020')"),
+                    "top_n_partners":       types.Schema(type=types.Type.INTEGER, description="Optional: keep only top N trade flows by value"),
+                    "centroids_csv":        types.Schema(type=types.Type.STRING, description="Optional CSV with country centroids (columns: iso3, lon, lat)"),
+                },
+                required=["trade_csv", "from_country_field", "to_country_field", "value_field"],
+            ),
+        ),
+        # ── Telecoupling Toolbox — Agents / Causes / Systems ───────────────────
+        types.FunctionDeclaration(
+            name="run_add_agents_interactively",
+            description="Create a point feature layer for telecoupling agents from a CSV with Name, X (lon), Y (lat) columns. Use when user asks about adding agents, telecoupling agents, or placing agent points on a map.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "input_csv":    types.Schema(type=types.Type.STRING, description="CSV with agent data including X and Y coordinates"),
+                    "x_field":      types.Schema(type=types.Type.STRING, description="Column name for longitude/X"),
+                    "y_field":      types.Schema(type=types.Type.STRING, description="Column name for latitude/Y"),
+                    "name_field":   types.Schema(type=types.Type.STRING, description="Column name for agent name, default 'Name'"),
+                    "text_field":   types.Schema(type=types.Type.STRING, description="Optional column name for additional text/description"),
+                    "crs":          types.Schema(type=types.Type.STRING, description="CRS, default 'EPSG:4326'"),
+                },
+                required=["input_csv", "x_field", "y_field"],
+            ),
+        ),
+        types.FunctionDeclaration(
+            name="run_draw_agents_from_table",
+            description="Upload a pre-collected agent coordinate table (CSV) and render as point features. Use when user asks about drawing agents from a table, uploading agent coordinates, or batch agent mapping.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "input_csv":    types.Schema(type=types.Type.STRING, description="CSV with agent coordinates"),
+                    "x_field":      types.Schema(type=types.Type.STRING, description="Column name for longitude/X"),
+                    "y_field":      types.Schema(type=types.Type.STRING, description="Column name for latitude/Y"),
+                    "name_field":   types.Schema(type=types.Type.STRING, description="Optional column name for agent name"),
+                    "crs":          types.Schema(type=types.Type.STRING, description="CRS, default 'EPSG:4326'"),
+                },
+                required=["input_csv", "x_field", "y_field"],
+            ),
+        ),
+        types.FunctionDeclaration(
+            name="run_add_causes_interactively",
+            description="Create point features for telecoupling causes (drivers/pressures) from a CSV with coordinates and description. Use when user asks about adding causes, telecoupling drivers, or cause points.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "input_csv":          types.Schema(type=types.Type.STRING, description="CSV with cause data and coordinates"),
+                    "x_field":            types.Schema(type=types.Type.STRING, description="Column name for longitude/X"),
+                    "y_field":            types.Schema(type=types.Type.STRING, description="Column name for latitude/Y"),
+                    "description_field":  types.Schema(type=types.Type.STRING, description="Column name for cause description, default 'DESCRIPTION'"),
+                    "crs":                types.Schema(type=types.Type.STRING, description="CRS, default 'EPSG:4326'"),
+                },
+                required=["input_csv", "x_field", "y_field"],
+            ),
+        ),
+        types.FunctionDeclaration(
+            name="run_add_systems_interactively",
+            description="Create point features for telecoupling systems (sending/receiving/spillover) from a CSV with Name and coordinates. Use when user asks about adding systems, telecoupling systems, or system points.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "input_csv":    types.Schema(type=types.Type.STRING, description="CSV with system data and coordinates"),
+                    "x_field":      types.Schema(type=types.Type.STRING, description="Column name for longitude/X"),
+                    "y_field":      types.Schema(type=types.Type.STRING, description="Column name for latitude/Y"),
+                    "name_field":   types.Schema(type=types.Type.STRING, description="Column name for system name, default 'Name'"),
+                    "crs":          types.Schema(type=types.Type.STRING, description="CRS, default 'EPSG:4326'"),
+                },
+                required=["input_csv", "x_field", "y_field"],
+            ),
+        ),
+        types.FunctionDeclaration(
+            name="run_draw_systems_from_table",
+            description="Upload a systems coordinate table (CSV) and render as point features. Use when user asks about drawing systems from a table, uploading system coordinates, or batch system mapping.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "input_csv":  types.Schema(type=types.Type.STRING, description="CSV with system coordinates"),
+                    "x_field":    types.Schema(type=types.Type.STRING, description="Column name for longitude/X"),
+                    "y_field":    types.Schema(type=types.Type.STRING, description="Column name for latitude/Y"),
+                    "crs":        types.Schema(type=types.Type.STRING, description="CRS, default 'EPSG:4326'"),
+                },
+                required=["input_csv", "x_field", "y_field"],
+            ),
+        ),
+        types.FunctionDeclaration(
+            name="run_add_media_flows",
+            description="Parse an HTML file for country mentions and generate flow lines from a source point to each mentioned country. Use when user asks about media flows, information flows, country mentions in media, or media analysis.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "html_file":               types.Schema(type=types.Type.STRING, description="Path to HTML file to parse for country mentions"),
+                    "source_lon":              types.Schema(type=types.Type.NUMBER, description="Longitude of the source location (media outlet)"),
+                    "source_lat":              types.Schema(type=types.Type.NUMBER, description="Latitude of the source location"),
+                    "country_reference_csv":   types.Schema(type=types.Type.STRING, description="CSV with country names and centroids (columns: country/name, lon, lat)"),
+                    "source_name":             types.Schema(type=types.Type.STRING, description="Name of the source (e.g. media outlet name), default 'Source'"),
+                    "min_mentions":            types.Schema(type=types.Type.INTEGER, description="Minimum mention count to include a country, default 1"),
+                    "crs":                     types.Schema(type=types.Type.STRING, description="CRS, default 'EPSG:4326'"),
+                },
+                required=["html_file", "source_lon", "source_lat", "country_reference_csv"],
+            ),
+        ),
+        # ── Telecoupling Toolbox — Social & Food System Tools ──────────────────
+        types.FunctionDeclaration(
+            name="run_food_security",
+            description="Analyze FAO food security indicators for selected countries and generate trend charts. Use when user asks about food security, FAO indicators, undernourishment, food availability, or food access analysis.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "fao_csv":           types.Schema(type=types.Type.STRING, description="Path to FAO food security CSV data"),
+                    "countries":         types.Schema(type=types.Type.STRING, description="Comma-separated list of country names to analyze"),
+                    "indicator_field":   types.Schema(type=types.Type.STRING, description="Indicator name or column name to analyze (e.g. 'Prevalence of undernourishment')"),
+                    "country_field":     types.Schema(type=types.Type.STRING, description="Column name for country, default 'Area'"),
+                    "year_field":        types.Schema(type=types.Type.STRING, description="Column name for year, default 'Year'"),
+                    "value_field":       types.Schema(type=types.Type.STRING, description="Column name for indicator value, default 'Value'"),
+                    "unit_field":        types.Schema(type=types.Type.STRING, description="Optional column name for unit"),
+                },
+                required=["fao_csv", "countries", "indicator_field"],
+            ),
+        ),
+        types.FunctionDeclaration(
+            name="run_nutrition_metrics",
+            description="Calculate Lower Limit Energy Requirements (LLER) by age group and sex using FAO nutritional formulas. Use when user asks about nutrition metrics, LLER, energy requirements, caloric needs, or nutrition by age group.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "population_csv":               types.Schema(type=types.Type.STRING, description="CSV with population data by age group and sex"),
+                    "age_group_field":              types.Schema(type=types.Type.STRING, description="Column name for age group (e.g. '18-30'), default 'age_group'"),
+                    "sex_field":                    types.Schema(type=types.Type.STRING, description="Column name for sex ('male'/'female'), default 'sex'"),
+                    "population_count_field":       types.Schema(type=types.Type.STRING, description="Column name for population count, default 'population'"),
+                    "weight_kg_field":              types.Schema(type=types.Type.STRING, description="Optional column name for body weight in kg (uses FAO defaults if not provided)"),
+                    "male_height_cm":               types.Schema(type=types.Type.NUMBER, description="Reference male height in cm, default 170"),
+                    "female_height_cm":             types.Schema(type=types.Type.NUMBER, description="Reference female height in cm, default 158"),
+                },
+                required=["population_csv"],
+            ),
+        ),
         # ── Utility tools ──────────────────────────────────────────────────────
         types.FunctionDeclaration(
             name="read_file_content",
@@ -1003,6 +1261,21 @@ async def run_agent(
         "run_coastal_vulnerability":            "q_coastal_vuln",
         "run_offshore_wind_energy":             "q_wind_energy",
         "run_recreation_tourism":               "q_recreation",
+        "run_model_selection_ols":              "q_ols",
+        "run_factor_analysis_mixed_data":       "q_famd",
+        "run_co2_emissions":                    "q_co2",
+        "run_cost_benefit_analysis":            "q_cba",
+        "run_population_count_density":         "q_pop_density",
+        "run_draw_radial_flows":                "q_radial_flows",
+        "run_commodity_trade":                  "q_commodity_trade",
+        "run_add_agents_interactively":         "q_add_agents",
+        "run_draw_agents_from_table":           "q_draw_agents",
+        "run_add_causes_interactively":         "q_add_causes",
+        "run_add_systems_interactively":        "q_add_systems",
+        "run_draw_systems_from_table":          "q_draw_systems",
+        "run_add_media_flows":                  "q_add_media",
+        "run_food_security":                    "q_food_security",
+        "run_nutrition_metrics":                "q_nutrition",
     }
 
     client = _get_client()

@@ -168,6 +168,72 @@ PATTERNS: dict[str, dict[str, list[str]]] = {
                  "carbon_emissions_tons*.tif"],
         "csv": [],
     },
+    "ols": {
+        "csv": ["ols_coefficients.csv", "ols_diagnostics.csv", "ols_residuals.csv",
+                "model_selection_results.csv"],
+        "download": [],
+    },
+    "famd": {
+        "csv": ["famd_eigenvalues.csv", "famd_individual_coordinates.csv"],
+        "download": ["famd_plots.pdf"],
+    },
+    "co2_emissions": {
+        "csv": ["co2_emissions_results.csv", "co2_emissions_summary.csv"],
+    },
+    "cost_benefit_analysis": {
+        "csv": ["cba_results.csv", "cba_summary.csv"],
+    },
+    "population_density": {
+        "csv": ["population_density_results.csv", "population_density_summary.csv"],
+    },
+    "radial_flows": {
+        "qgis": ["radial_flows.shp"],
+        "csv": ["radial_flows_summary.csv"],
+        "download": ["radial_flows.geojson"],
+    },
+    "commodity_trade": {
+        "qgis": ["commodity_trade_flows.shp"],
+        "csv": ["commodity_trade_summary.csv"],
+        "download": ["commodity_trade_flows.geojson"],
+    },
+    "add_agents": {
+        "qgis": ["agents.shp"],
+        "csv": ["agents_table.csv"],
+        "download": ["agents.geojson"],
+    },
+    "draw_agents_table": {
+        "qgis": ["agents_from_table.shp"],
+        "csv": ["agents_from_table.csv"],
+        "download": ["agents_from_table.geojson"],
+    },
+    "add_causes": {
+        "qgis": ["causes.shp"],
+        "csv": ["causes_table.csv"],
+        "download": ["causes.geojson"],
+    },
+    "add_systems": {
+        "qgis": ["systems.shp"],
+        "csv": ["systems_table.csv"],
+        "download": ["systems.geojson"],
+    },
+    "draw_systems_table": {
+        "qgis": ["systems_from_table.shp"],
+        "csv": ["systems_from_table.csv"],
+        "download": ["systems_from_table.geojson"],
+    },
+    "add_media_flows": {
+        "qgis": ["media_flows.shp"],
+        "csv": ["media_mention_frequency.csv"],
+        "download": ["media_flows.geojson"],
+    },
+    "food_security": {
+        "csv": ["food_security_data.csv", "food_security_pivot.csv"],
+        "image": ["food_security_trend.png", "food_security_comparison.png"],
+    },
+    "nutrition_metrics": {
+        "csv": ["nutrition_metrics_results.csv", "nutrition_metrics_summary.csv"],
+        "image": ["nutrition_ller_chart.png"],
+    },
     "recreation": {
         "qgis": ["pud_results*.shp", "pud_results*.gpkg",
                  "tud_results*.shp", "tud_results*.gpkg",

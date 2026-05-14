@@ -63,6 +63,21 @@ def execute_tool(tool_name: str, params: dict, session_id: str, task_id: str, pr
     from tools.coastal_vulnerability import run_coastal_vulnerability
     from tools.wind_energy import run_offshore_wind_energy
     from tools.recreation import run_recreation
+    from tools.ols import run_ols
+    from tools.co2_emissions import run_co2_emissions
+    from tools.cost_benefit_analysis import run_cost_benefit_analysis
+    from tools.population_density import run_population_count_density
+    from tools.radial_flows import run_draw_radial_flows
+    from tools.commodity_trade import run_commodity_trade
+    from tools.add_agents import run_add_agents_interactively
+    from tools.draw_agents_table import run_draw_agents_from_table
+    from tools.add_causes import run_add_causes_interactively
+    from tools.add_systems import run_add_systems_interactively
+    from tools.draw_systems_table import run_draw_systems_from_table
+    from tools.add_media_flows import run_add_media_flows
+    from tools.famd import run_factor_analysis_mixed_data
+    from tools.food_security import run_food_security
+    from tools.nutrition_metrics import run_nutrition_metrics
 
     tool_map = {
         "run_network_analysis_grouping":        run_network_analysis,
@@ -94,6 +109,21 @@ def execute_tool(tool_name: str, params: dict, session_id: str, task_id: str, pr
         "run_coastal_vulnerability":            run_coastal_vulnerability,
         "run_offshore_wind_energy":             run_offshore_wind_energy,
         "run_recreation_tourism":               run_recreation,
+        "run_model_selection_ols":              run_ols,
+        "run_co2_emissions":                    run_co2_emissions,
+        "run_cost_benefit_analysis":            run_cost_benefit_analysis,
+        "run_population_count_density":         run_population_count_density,
+        "run_draw_radial_flows":                run_draw_radial_flows,
+        "run_commodity_trade":                  run_commodity_trade,
+        "run_add_agents_interactively":         run_add_agents_interactively,
+        "run_draw_agents_from_table":           run_draw_agents_from_table,
+        "run_add_causes_interactively":         run_add_causes_interactively,
+        "run_add_systems_interactively":        run_add_systems_interactively,
+        "run_draw_systems_from_table":          run_draw_systems_from_table,
+        "run_add_media_flows":                  run_add_media_flows,
+        "run_factor_analysis_mixed_data":       run_factor_analysis_mixed_data,
+        "run_food_security":                    run_food_security,
+        "run_nutrition_metrics":                run_nutrition_metrics,
     }
     func = tool_map.get(tool_name)
     if func is None:
