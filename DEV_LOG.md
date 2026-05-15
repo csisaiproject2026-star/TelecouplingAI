@@ -1,3 +1,25 @@
+## 2026-05-15 — 重命名 test_telebox_tools + 扩展 run_all_local_tests.py 到全 42 工具
+
+### 完成内容
+- `git mv test_new_tools.py → test_telebox_tools.py`：命名更清晰，区分 InVEST / TeleBox
+- `run_all_local_tests.py` 全面重写：
+  - Section A：InVEST 工具 02–27，直接调用 `natcap.invest.xxx.execute()`，输出到 `AI_local_test/NN/output/`
+  - Section B：TeleBox 工具 28–42，异步调用，输出通过 `generate_output_dir` patch
+  - CLI flags：`--invest`（仅 A）/ `--telebox`（仅 B）
+  - Recreation 自动 SKIP（本地服务器不可达）
+  - 所有数据路径统一到 `Systematic_tests/Test_data/NN_toolname/`
+- 本地验证：TeleBox 16/16 PASS；InVEST 25 PASS / 1 SKIP（Recreation，NatCap 服务器不可达，符合预期）
+
+### 关键变更文件
+- `backend/tests/test_new_tools.py` → `backend/tests/test_telebox_tools.py`（rename）
+- `Systematic_tests/AI_local_test/run_all_local_tests.py`（全面重写）
+
+### 测试状态
+- TeleBox section：16 PASS / 0 FAIL / 0 SKIP（本次验证）
+- InVEST section：25 PASS / 1 SKIP / 0 FAIL（与 pytest test_invest_integration.py 结果一致）
+
+---
+
 ## 2026-05-15 — 全平台测试统一：108 tests，106 PASS，1 SKIP，0 FAIL
 
 ### 完成内容

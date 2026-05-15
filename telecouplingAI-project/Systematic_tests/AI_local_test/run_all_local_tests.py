@@ -831,15 +831,20 @@ def main():
             sys.stdout.flush()
             status, elapsed, err = run_invest(display, fn)
             # Recreation SKIP
+            skip_msg = ""
             if status == "FAIL" and "SKIP" in err:
                 status = "SKIP"
+                for line in err.splitlines():
+                    if "RuntimeError:" in line:
+                        skip_msg = line.split("RuntimeError:")[-1].strip()
+                        break
             tag = {"PASS": PASS, "FAIL": FAIL, "SKIP": SKIP}[status]
             print(f"{tag}  ({elapsed:.1f}s)")
             if status == "FAIL":
                 print(f"    ERROR: {err.splitlines()[-1]}")
                 total_fail += 1
             elif status == "SKIP":
-                print(f"    NOTE: {err.split(':',1)[-1].strip()}")
+                print(f"    NOTE: {skip_msg or err.splitlines()[-1]}")
                 total_skip += 1
             else:
                 total_pass += 1
