@@ -144,6 +144,81 @@ Nigeria,2020,Undernourishment,18.0\nBrazil,2020,Undernourishment,7.0\n""", "text
      ("I've uploaded demographic population data by age_group, sex, and population count. "
       "Please calculate nutrition energy requirements (LLER) for this population."),
      120),
+
+    # ── New InVEST tools (server-side data, no upload needed) ─────────────────
+
+    (15, "Urban Cooling",
+     [],
+     (f"Model urban heat island cooling effects. All files are on the server at "
+      f"/data/datainput/16_urban_cooling/. Use lulc.tif, et0.tif, aoi.shp, "
+      f"Biophysical_UHI_fake.csv. "
+      f"Parameters: green_area_cooling_distance=1000, t_ref=21.5, uhi_max=3.5."),
+     600),
+
+    (16, "Urban Flood Risk",
+     [],
+     (f"Assess urban flood risk mitigation. Files are on the server at "
+      f"/data/datainput/17_urban_flood/. Use watersheds.gpkg, lulc.tif, "
+      f"soilgroup.tif, Biophysical_water_SF.csv. Set rainfall_depth=40."),
+     360),
+
+    (17, "Urban Stormwater",
+     [],
+     (f"Run urban stormwater retention model. Files are on the server at "
+      f"/data/datainput/18_urban_stormwater/. Use lulc.tif, soil_groups.tif, "
+      f"precipitation.tif, biophysical_table.csv, streets.shp, watershed.shp. "
+      f"Set adjust_retention_ratios=True, retention_radius=20, replacement_cost=1.59."),
+     360),
+
+    (18, "Urban Nature Access",
+     [],
+     (f"Assess urban nature access in Paris. Files are on the server at "
+      f"/data/datainput/19_urban_nature_access/. Use paris-lulc.tif, population.tif, "
+      f"administrative-units.shp, lulc-attributes.csv, pop-group-radii.csv. "
+      f"Use search_radius_mode='radius per population group', decay_function=dichotomy."),
+     600),
+
+    (20, "Scenic Quality",
+     [],
+     (f"Map scenic quality for the West Coast Vancouver Island area. Files are on the server at "
+      f"/data/datainput/21_scenic_quality/Input/. Use AOI_WCVI.shp, AquaWEM_points.shp, "
+      f"claybark_dem.tif. Enable valuation with valuation_function=linear, a_coef=1, b_coef=0.1."),
+     600),
+
+    (21, "HRA",
+     [],
+     (f"Run habitat risk assessment for the West Coast Vancouver Island. Files at "
+      f"/data/datainput/22_hra/Input/. Use habitat_stressor_info.csv, "
+      f"exposure_consequence_criteria.csv, subregions.shp. "
+      f"resolution=500, max_rating=3, risk_eq=euclidean, decay_eq=linear, n_overlapping_stressors=2."),
+     600),
+
+    (23, "Scenario Generator",
+     [],
+     (f"Generate land use change scenarios using proximity-based rules. Files at "
+      f"/data/datainput/27_scenario_gen_proximity/. Use scenario_proximity_lulc.tif, "
+      f"scenario_proximity_aoi.shp. Convert 20000 ha to lucode 12 from landcover codes 1 2 3 4 5, "
+      f"both nearest and farthest from edge."),
+     360),
+
+    (25, "Coastal Vulnerability",
+     [],
+     (f"Assess coastal vulnerability for Grand Bahama. Files at "
+      f"/data/datainput/24_coastal_vulnerability/. Use aoi_grandbahama_utm.shp, bathymetry.tif, "
+      f"dem_srtm_grandbahama.tif, geomorphology_grandbahama.shp, landmass_polygon.shp, "
+      f"WaveWatchIII_global.shp, continental_shelf_polyline_global.shp. "
+      f"dem_averaging_radius=900, geomorphology_fill_value=4, max_fetch_distance=30000, "
+      f"model_resolution=1000."),
+     900),
+
+    (27, "Forest Carbon Edge",
+     [],
+     (f"Estimate forest carbon edge effects. Files at /data/datainput/10_forest_carbon_edge_effect/. "
+      f"Use forest_carbon_edge_lulc_demo.tif, forest_edge_carbon_lu_table.csv, "
+      f"forest_carbon_edge_demo_aoi.shp, and the regression model parameters at "
+      f"core_data/forest_carbon_edge_regression_model_parameters.shp. "
+      f"compute_forest_edge_effects=True, n_nearest_model_points=10."),
+     600),
 ]
 
 

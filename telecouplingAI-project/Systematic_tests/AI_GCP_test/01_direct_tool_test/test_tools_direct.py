@@ -402,39 +402,127 @@ def t14_ndr():
 
 
 def t15_urban_cooling():
-    return skip_tool(15, "Urban Cooling", "no urban LULC/temp data on GCP")
+    UC = "/data/datainput/16_urban_cooling"
+    return run_tool(15, "Urban Cooling", (
+        f"Call run_urban_cooling with: "
+        f"lulc_raster_path={UC}/lulc.tif, "
+        f"ref_eto_raster_path={UC}/et0.tif, "
+        f"aoi_vector_path={UC}/aoi.shp, "
+        f"biophysical_table_path={UC}/Biophysical_UHI_fake.csv, "
+        f"green_area_cooling_distance=1000, t_ref=21.5, uhi_max=3.5, "
+        f"cc_method=factors, avg_rel_humidity=30, t_air_average_radius=2000, "
+        f"cc_weight_shade=0.6, cc_weight_albedo=0.2, cc_weight_eti=0.2, "
+        f"building_vector_path={UC}/sample_buildings.shp, "
+        f"energy_consumption_table_path={UC}/Fake_energy_savings.csv. Run immediately."
+    ), timeout=600)
 
 
 def t16_urban_flood():
-    return skip_tool(16, "Urban Flood Risk", "no urban data on GCP")
+    UF = "/data/datainput/17_urban_flood"
+    return run_tool(16, "Urban Flood Risk", (
+        f"Call run_urban_flood with: "
+        f"aoi_watersheds_path={UF}/watersheds.gpkg, "
+        f"rainfall_depth=40, "
+        f"lulc_path={UF}/lulc.tif, "
+        f"soils_hydrological_group_raster_path={UF}/soilgroup.tif, "
+        f"curve_number_table_path={UF}/Biophysical_water_SF.csv, "
+        f"built_infrastructure_vector_path={UF}/infrastructure.gpkg, "
+        f"infrastructure_damage_loss_table_path={UF}/Damage.csv. Run immediately."
+    ), timeout=360)
 
 
 def t17_urban_stormwater():
-    return skip_tool(17, "Urban Stormwater", "no urban data on GCP")
+    US = "/data/datainput/18_urban_stormwater"
+    return run_tool(17, "Urban Stormwater", (
+        f"Call run_urban_stormwater with: "
+        f"lulc_path={US}/lulc.tif, "
+        f"soil_group_path={US}/soil_groups.tif, "
+        f"precipitation_path={US}/precipitation.tif, "
+        f"biophysical_table={US}/biophysical_table.csv, "
+        f"adjust_retention_ratios=True, retention_radius=20, "
+        f"road_centerlines_path={US}/streets.shp, "
+        f"aggregate_areas_path={US}/watershed.shp, "
+        f"replacement_cost=1.59. Run immediately."
+    ), timeout=360)
 
 
 def t18_urban_nature():
-    return skip_tool(18, "Urban Nature Access", "no urban data on GCP")
+    UN = "/data/datainput/19_urban_nature_access"
+    return run_tool(18, "Urban Nature Access", (
+        f"Call run_urban_nature_access with: "
+        f"lulc_raster_path={UN}/paris-lulc.tif, "
+        f"lulc_attribute_table={UN}/lulc-attributes.csv, "
+        f"population_raster_path={UN}/population.tif, "
+        f"admin_boundaries_vector_path={UN}/administrative-units.shp, "
+        f"search_radius_mode=radius per population group, "
+        f"population_group_radii_table={UN}/pop-group-radii.csv, "
+        f"decay_function=dichotomy. Run immediately."
+    ), timeout=600)
 
 
 def t19_urban_mental_health():
-    return skip_tool(19, "Urban Mental Health", "no urban data on GCP")
+    UM = "/data/datainput/20_urban_mental_health"
+    return run_tool(19, "Urban Mental Health", (
+        f"Call run_urban_mental_health with: "
+        f"lulc_raster_path={UM}/paris-lulc.tif, "
+        f"lulc_attribute_table={UM}/lulc-attributes.csv, "
+        f"population_raster_path={UM}/population.tif, "
+        f"admin_boundaries_vector_path={UM}/administrative-units.shp, "
+        f"search_radius_mode=radius per population group, "
+        f"population_group_radii_table={UM}/pop-group-radii.csv, "
+        f"decay_function=dichotomy. Run immediately."
+    ), timeout=600)
 
 
 def t20_scenic_quality():
-    return skip_tool(20, "Scenic Quality", "no viewshed/DEM data configured on GCP")
+    SQ = "/data/datainput/21_scenic_quality/Input"
+    return run_tool(20, "Scenic Quality", (
+        f"Call run_scenic_quality with: "
+        f"aoi_vector_path={SQ}/AOI_WCVI.shp, "
+        f"structure_vector_path={SQ}/AquaWEM_points.shp, "
+        f"dem_path={SQ}/claybark_dem.tif, "
+        f"do_valuation=True, valuation_function=linear, "
+        f"a_coef=1, b_coef=0.1, max_valuation_radius=8000, refraction=0.13. Run immediately."
+    ), timeout=600)
 
 
 def t21_hra():
-    return skip_tool(21, "HRA", "no coastal habitat data on GCP")
+    HRA = "/data/datainput/22_hra/Input"
+    return run_tool(21, "HRA", (
+        f"Call run_hra with: "
+        f"info_table_path={HRA}/habitat_stressor_info.csv, "
+        f"criteria_table_path={HRA}/exposure_consequence_criteria.csv, "
+        f"aoi_vector_path={HRA}/subregions.shp, "
+        f"resolution=500, max_rating=3, risk_eq=euclidean, "
+        f"decay_eq=linear, n_overlapping_stressors=2. Run immediately."
+    ), timeout=600)
 
 
 def t22_wave_energy():
-    return skip_tool(22, "Wave Energy", "no wave/bathymetry data on GCP")
+    WE = "/data/datainput/23_wave_energy/input"
+    SHARED = "/data/datainput/_shared/Base_Data"
+    return run_tool(22, "Wave Energy", (
+        f"Call run_wave_energy with: "
+        f"wave_base_data_path={WE}/WaveData/wave_data.csv, "
+        f"analysis_area=West Coast of North America and Hawaii, "
+        f"machine_perf_path={WE}/Machine_Pelamis_Performance.csv, "
+        f"machine_param_path={WE}/Machine_Pelamis_Parameter.csv, "
+        f"bathymetry_path={SHARED}/global_dem.tif, "
+        f"aoi_vector_path={WE}/AOI_WCVI.shp. Run immediately."
+    ), timeout=900)
 
 
 def t23_scenario_generator():
-    return skip_tool(23, "Scenario Generator", "no LULC transition data on GCP")
+    SG = "/data/datainput/27_scenario_gen_proximity"
+    return run_tool(23, "Scenario Generator", (
+        f"Call run_scenario_gen_proximity with: "
+        f"base_lulc_path={SG}/scenario_proximity_lulc.tif, "
+        f"aoi_path={SG}/scenario_proximity_aoi.shp, "
+        f"replacement_lucode=12, area_to_convert=20000, "
+        f"focal_landcover_codes=1 2 3 4 5, "
+        f"convertible_landcover_codes=1 2 3 4 5, "
+        f"convert_nearest_to_edge=True, convert_farthest_from_edge=True. Run immediately."
+    ), timeout=360)
 
 
 def t24_recreation():
@@ -442,15 +530,52 @@ def t24_recreation():
 
 
 def t25_coastal_vulnerability():
-    return skip_tool(25, "Coastal Vulnerability", "no coastal geospatial data on GCP")
+    CV = "/data/datainput/24_coastal_vulnerability"
+    return run_tool(25, "Coastal Vulnerability", (
+        f"Call run_coastal_vulnerability with: "
+        f"aoi_vector_path={CV}/aoi_grandbahama_utm.shp, "
+        f"bathymetry_raster_path={CV}/bathymetry.tif, "
+        f"dem_path={CV}/dem_srtm_grandbahama.tif, "
+        f"dem_averaging_radius=900, geomorphology_fill_value=4, "
+        f"geomorphology_vector_path={CV}/geomorphology_grandbahama.shp, "
+        f"landmass_vector_path={CV}/landmass_polygon.shp, "
+        f"max_fetch_distance=30000, model_resolution=1000, "
+        f"wwiii_vector_path={CV}/WaveWatchIII_global.shp, "
+        f"shelf_contour_vector_path={CV}/continental_shelf_polyline_global.shp, "
+        f"habitat_table_path={CV}/GrandBahama_Habitats/Natural_Habitats.csv, "
+        f"population_raster_path={CV}/population_grandbahama.tif, "
+        f"population_radius=500. Run immediately."
+    ), timeout=900)
 
 
 def t26_wind_energy():
-    return skip_tool(26, "Wind Energy", "no wind/grid data on GCP")
+    WI = "/data/datainput/25_wind_energy/input"
+    SHARED = "/data/datainput/_shared/Base_Data"
+    return run_tool(26, "Wind Energy", (
+        f"Call run_offshore_wind_energy with: "
+        f"aoi_vector_path={WI}/New_England_US_Aoi.shp, "
+        f"bathymetry_path={SHARED}/global_dem.tif, "
+        f"global_wind_parameters_path={WI}/global_wind_energy_parameters.csv, "
+        f"land_polygon_vector_path={SHARED}/global_polygon.shp, "
+        f"number_of_turbines=80, "
+        f"turbine_parameters_path={WI}/3_6_turbine.csv, "
+        f"wind_data_path={WI}/ECNA_EEZ_WEBPAR_Aug27_2012.csv, "
+        f"min_depth=3, max_depth=60, min_distance=0, max_distance=200000, "
+        f"avg_grid_distance=4. Run immediately."
+    ), timeout=900)
 
 
 def t27_forest_carbon():
-    return skip_tool(27, "Forest Carbon Edge Effects", "no forest edge data on GCP")
+    FC = "/data/datainput/10_forest_carbon_edge_effect"
+    return run_tool(27, "Forest Carbon Edge Effects", (
+        f"Call run_forest_carbon_edge with: "
+        f"lulc_raster_path={FC}/forest_carbon_edge_lulc_demo.tif, "
+        f"biophysical_table_path={FC}/forest_edge_carbon_lu_table.csv, "
+        f"tropical_forest_edge_carbon_model_vector_path={FC}/core_data/forest_carbon_edge_regression_model_parameters.shp, "
+        f"aoi_vector_path={FC}/forest_carbon_edge_demo_aoi.shp, "
+        f"compute_forest_edge_effects=True, n_nearest_model_points=10, "
+        f"pools_to_calculate=all, biomass_to_carbon_conversion_factor=0.47. Run immediately."
+    ), timeout=600)
 
 
 def t28_ols():
@@ -546,7 +671,13 @@ def t35_add_agents():
 
 
 def t36_draw_agents():
-    return skip_tool(36, "Draw Agents", "requires GeoJSON from Add Agents output")
+    sid = new_sid("t36")
+    uploaded = upload_bytes(sid, [("agents.csv", AGENTS_CSV, "text/csv")])
+    return run_tool(36, "Draw Agents from Table", (
+        f"Call run_draw_agents_from_table with: "
+        f"input_csv={uploaded['agents.csv']}, "
+        f"x_field=longitude, y_field=latitude, name_field=name. Run immediately."
+    ), timeout=120)
 
 
 def t37_add_causes():
@@ -570,7 +701,13 @@ def t38_add_systems():
 
 
 def t39_draw_systems():
-    return skip_tool(39, "Draw Systems", "requires GeoJSON from Add Systems output")
+    sid = new_sid("t39")
+    uploaded = upload_bytes(sid, [("systems.csv", SYSTEMS_CSV, "text/csv")])
+    return run_tool(39, "Draw Systems from Table", (
+        f"Call run_draw_systems_from_table with: "
+        f"input_csv={uploaded['systems.csv']}, "
+        f"x_field=longitude, y_field=latitude. Run immediately."
+    ), timeout=120)
 
 
 def t40_add_media_flows():

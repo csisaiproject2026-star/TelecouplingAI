@@ -156,6 +156,38 @@ TOOLS_AVAILABLE = [
       "indicator_field=Undernourishment, country_field=Area, year_field=Year, "
       "value_field=Value. Run immediately."),
      120),
+
+    ("Tool15_UrbanCooling",
+     [],
+     (f"Call run_urban_cooling with: "
+      f"lulc_raster_path=/data/datainput/16_urban_cooling/lulc.tif, "
+      f"ref_eto_raster_path=/data/datainput/16_urban_cooling/et0.tif, "
+      f"aoi_vector_path=/data/datainput/16_urban_cooling/aoi.shp, "
+      f"biophysical_table_path=/data/datainput/16_urban_cooling/Biophysical_UHI_fake.csv, "
+      f"green_area_cooling_distance=1000, t_ref=21.5, uhi_max=3.5, "
+      f"cc_method=factors, avg_rel_humidity=30, t_air_average_radius=2000. Run immediately."),
+     600),
+
+    ("Tool23_ScenarioGen",
+     [],
+     (f"Call run_scenario_gen_proximity with: "
+      f"base_lulc_path=/data/datainput/27_scenario_gen_proximity/scenario_proximity_lulc.tif, "
+      f"aoi_path=/data/datainput/27_scenario_gen_proximity/scenario_proximity_aoi.shp, "
+      f"replacement_lucode=12, area_to_convert=20000, "
+      f"focal_landcover_codes=1 2 3 4 5, convertible_landcover_codes=1 2 3 4 5, "
+      f"convert_nearest_to_edge=True, convert_farthest_from_edge=True. Run immediately."),
+     360),
+
+    ("Tool27_ForestCarbon",
+     [],
+     (f"Call run_forest_carbon_edge with: "
+      f"lulc_raster_path=/data/datainput/10_forest_carbon_edge_effect/forest_carbon_edge_lulc_demo.tif, "
+      f"biophysical_table_path=/data/datainput/10_forest_carbon_edge_effect/forest_edge_carbon_lu_table.csv, "
+      f"tropical_forest_edge_carbon_model_vector_path=/data/datainput/10_forest_carbon_edge_effect/core_data/forest_carbon_edge_regression_model_parameters.shp, "
+      f"aoi_vector_path=/data/datainput/10_forest_carbon_edge_effect/forest_carbon_edge_demo_aoi.shp, "
+      f"compute_forest_edge_effects=True, n_nearest_model_points=10, "
+      f"pools_to_calculate=all, biomass_to_carbon_conversion_factor=0.47. Run immediately."),
+     600),
 ]
 
 
