@@ -197,7 +197,7 @@ Nigeria,2020,Undernourishment,18.0\nBrazil,2020,Undernourishment,7.0\n""", "text
      [],
      (f"Generate land use change scenarios using proximity-based rules. Files at "
       f"/data/datainput/27_scenario_gen_proximity/. Use scenario_proximity_lulc.tif, "
-      f"scenario_proximity_aoi.shp. Convert 20000 ha to lucode 12 from landcover codes 1 2 3 4 5, "
+      f"scenario_proximity_aoi.shp. Convert 20000 ha to lucode 12 from landcover codes 1,2,3,4,5, "
       f"both nearest and farthest from edge."),
      360),
 

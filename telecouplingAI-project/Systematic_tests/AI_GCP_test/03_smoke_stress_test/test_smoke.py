@@ -174,7 +174,7 @@ TOOLS_AVAILABLE = [
       f"base_lulc_path=/data/datainput/27_scenario_gen_proximity/scenario_proximity_lulc.tif, "
       f"aoi_path=/data/datainput/27_scenario_gen_proximity/scenario_proximity_aoi.shp, "
       f"replacement_lucode=12, area_to_convert=20000, "
-      f"focal_landcover_codes=1 2 3 4 5, convertible_landcover_codes=1 2 3 4 5, "
+      f"focal_landcover_codes='1 2 3 4 5', convertible_landcover_codes='1 2 3 4 5', "
       f"convert_nearest_to_edge=True, convert_farthest_from_edge=True. Run immediately."),
      360),
 

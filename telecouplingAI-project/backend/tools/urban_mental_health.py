@@ -66,6 +66,7 @@ async def run_urban_mental_health(
         "admin_boundaries_vector_path":   params["admin_boundaries_vector_path"],
         "search_radius_mode":             mode,
         "decay_function":                 params.get("decay_function", "gaussian"),
+        "urban_nature_demand":            float(params.get("urban_nature_demand", 250)),
     }
 
     if mode == RADIUS_UNIFORM:

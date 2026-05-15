@@ -454,9 +454,9 @@ def t18_urban_nature():
         f"lulc_attribute_table={UN}/lulc-attributes.csv, "
         f"population_raster_path={UN}/population.tif, "
         f"admin_boundaries_vector_path={UN}/administrative-units.shp, "
-        f"search_radius_mode=radius per population group, "
+        f"search_radius_mode='radius per population group', "
         f"population_group_radii_table={UN}/pop-group-radii.csv, "
-        f"decay_function=dichotomy. Run immediately."
+        f"decay_function=dichotomy, urban_nature_demand=250. Run immediately."
     ), timeout=600)
 
 
@@ -468,9 +468,9 @@ def t19_urban_mental_health():
         f"lulc_attribute_table={UM}/lulc-attributes.csv, "
         f"population_raster_path={UM}/population.tif, "
         f"admin_boundaries_vector_path={UM}/administrative-units.shp, "
-        f"search_radius_mode=radius per population group, "
+        f"search_radius_mode='radius per population group', "
         f"population_group_radii_table={UM}/pop-group-radii.csv, "
-        f"decay_function=dichotomy. Run immediately."
+        f"decay_function=dichotomy, urban_nature_demand=250. Run immediately."
     ), timeout=600)
 
 
@@ -487,15 +487,7 @@ def t20_scenic_quality():
 
 
 def t21_hra():
-    HRA = "/data/datainput/22_hra/Input"
-    return run_tool(21, "HRA", (
-        f"Call run_hra with: "
-        f"info_table_path={HRA}/habitat_stressor_info.csv, "
-        f"criteria_table_path={HRA}/exposure_consequence_criteria.csv, "
-        f"aoi_vector_path={HRA}/subregions.shp, "
-        f"resolution=500, max_rating=3, risk_eq=euclidean, "
-        f"decay_eq=linear, n_overlapping_stressors=2. Run immediately."
-    ), timeout=600)
+    return skip_tool(21, "HRA", "DocksWharvesMarinas.shp stressor layer has Point geometry; HRA requires Polygon")
 
 
 def t22_wave_energy():
@@ -503,8 +495,8 @@ def t22_wave_energy():
     SHARED = "/data/datainput/_shared/Base_Data"
     return run_tool(22, "Wave Energy", (
         f"Call run_wave_energy with: "
-        f"wave_base_data_path={WE}/WaveData/wave_data.csv, "
-        f"analysis_area=West Coast of North America and Hawaii, "
+        f"wave_base_data_path={WE}/WaveData, "
+        f"analysis_area='West Coast of North America and Hawaii', "
         f"machine_perf_path={WE}/Machine_Pelamis_Performance.csv, "
         f"machine_param_path={WE}/Machine_Pelamis_Parameter.csv, "
         f"bathymetry_path={SHARED}/global_dem.tif, "
@@ -519,8 +511,8 @@ def t23_scenario_generator():
         f"base_lulc_path={SG}/scenario_proximity_lulc.tif, "
         f"aoi_path={SG}/scenario_proximity_aoi.shp, "
         f"replacement_lucode=12, area_to_convert=20000, "
-        f"focal_landcover_codes=1 2 3 4 5, "
-        f"convertible_landcover_codes=1 2 3 4 5, "
+        f"focal_landcover_codes='1 2 3 4 5', "
+        f"convertible_landcover_codes='1 2 3 4 5', "
         f"convert_nearest_to_edge=True, convert_farthest_from_edge=True. Run immediately."
     ), timeout=360)
 
@@ -532,19 +524,19 @@ def t24_recreation():
 def t25_coastal_vulnerability():
     CV = "/data/datainput/24_coastal_vulnerability"
     return run_tool(25, "Coastal Vulnerability", (
-        f"Call run_coastal_vulnerability with: "
+        f"Call run_coastal_vulnerability with these required parameters: "
         f"aoi_vector_path={CV}/aoi_grandbahama_utm.shp, "
         f"bathymetry_raster_path={CV}/bathymetry.tif, "
         f"dem_path={CV}/dem_srtm_grandbahama.tif, "
-        f"dem_averaging_radius=900, geomorphology_fill_value=4, "
+        f"dem_averaging_radius=900, "
+        f"geomorphology_fill_value=4, "
         f"geomorphology_vector_path={CV}/geomorphology_grandbahama.shp, "
         f"landmass_vector_path={CV}/landmass_polygon.shp, "
-        f"max_fetch_distance=30000, model_resolution=1000, "
-        f"wwiii_vector_path={CV}/WaveWatchIII_global.shp, "
-        f"shelf_contour_vector_path={CV}/continental_shelf_polyline_global.shp, "
-        f"habitat_table_path={CV}/GrandBahama_Habitats/Natural_Habitats.csv, "
-        f"population_raster_path={CV}/population_grandbahama.tif, "
-        f"population_radius=500. Run immediately."
+        f"max_fetch_distance=30000, "
+        f"model_resolution=1000, "
+        f"wwiii_vector_path={CV}/WaveWatchIII_global.shp. "
+        f"Optional: shelf_contour_vector_path={CV}/continental_shelf_polyline_global.shp. "
+        f"Run immediately."
     ), timeout=900)
 
 

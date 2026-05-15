@@ -57,6 +57,8 @@ async def run_urban_cooling(
         "building_vector_path":        params.get("building_vector_path", ""),
         "avg_rel_humidity":            params.get("avg_rel_humidity", 30),
         "energy_consumption_table_path": params.get("energy_consumption_table_path", ""),
+        "do_energy_valuation":         bool(params.get("do_energy_valuation", False)),
+        "do_productivity_valuation":   bool(params.get("do_productivity_valuation", False)),
     }
 
     if cc_method == "factors":
