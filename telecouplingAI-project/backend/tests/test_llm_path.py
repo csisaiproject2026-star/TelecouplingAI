@@ -4,8 +4,16 @@ measures wall-clock time from prompt → tool_result SSE event.
 
 Endpoint: POST /api/chat  (multipart form: message=<str>; header: X-Session-ID)
 
-Run on GCP server:  python3 test_llm_path.py
+Run on GCP server (34.42.83.50):
+    python3 test_llm_path.py
 Results saved to:   /tmp/llm_test_results.json
+
+NOTE: This is NOT a pytest file — run standalone on GCP only.
+      Excluded from local pytest suite (--ignore=backend/tests/test_llm_path.py).
+      Data paths reference Docker container mounts:
+        SD = /data/datainput/SampleData   (NatCap sample data, symlinked)
+        DD = /data/datainput              (demo input data)
+      TeleBox tools 28–42 not yet included here — add after GCP deployment.
 """
 import json
 import sys

@@ -172,7 +172,7 @@ def test_delete_session(client):
 def test_chat_sse_returns_text_chunk(client, mock_session_manager):
     """Mock the agent to emit a text_chunk and done event, verify SSE format."""
 
-    async def fake_agent(message, session_id, files, event_callback, model=None):
+    async def fake_agent(message, session_id, files, event_callback, model=None, chat_history=None):
         await event_callback({"type": "text_chunk", "content": "Hello from CSIS!"})
         await event_callback({"type": "done"})
 
@@ -195,7 +195,7 @@ def test_chat_sse_returns_text_chunk(client, mock_session_manager):
 def test_chat_sse_error_event_on_agent_failure(client, mock_session_manager):
     """If agent raises, SSE should contain an error event (not a 500)."""
 
-    async def failing_agent(message, session_id, files, event_callback, model=None):
+    async def failing_agent(message, session_id, files, event_callback, model=None, chat_history=None):
         raise RuntimeError("Simulated agent crash")
 
     with patch("agent.run_agent", side_effect=failing_agent):
@@ -214,7 +214,7 @@ def test_chat_sse_error_event_on_agent_failure(client, mock_session_manager):
 def test_chat_sse_assigns_session_id_if_missing(client, mock_session_manager):
     """If no X-Session-ID header, backend should assign one and return it."""
 
-    async def fake_agent(message, session_id, files, event_callback, model=None):
+    async def fake_agent(message, session_id, files, event_callback, model=None, chat_history=None):
         await event_callback({"type": "done"})
 
     with patch("agent.run_agent", side_effect=fake_agent):

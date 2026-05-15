@@ -1,5 +1,6 @@
 """
 Tests for renderers: output_router.py and csv_analyzer.py
+Covers classify_file rules for all 42 tools + route_outputs logic + csv_analyzer.
 """
 import os
 import sys
@@ -54,6 +55,67 @@ class TestClassifyFile:
 
     def test_unknown_tool_fallback_unknown_ext(self):
         assert classify_file("anything.xyz", "unknown_tool") == "download"
+
+    # TeleBox tools 28–42
+    def test_ols_csv(self):
+        assert classify_file("ols_coefficients.csv", "ols") == "csv"
+
+    def test_ols_diagnostics_csv(self):
+        assert classify_file("ols_diagnostics.csv", "ols") == "csv"
+
+    def test_famd_pdf(self):
+        assert classify_file("famd_plots.pdf", "famd") == "download"
+
+    def test_famd_csv(self):
+        assert classify_file("famd_eigenvalues.csv", "famd") == "csv"
+
+    def test_co2_csv(self):
+        assert classify_file("co2_emissions_results.csv", "co2_emissions") == "csv"
+
+    def test_cba_csv(self):
+        assert classify_file("cba_results.csv", "cost_benefit_analysis") == "csv"
+
+    def test_population_density_csv(self):
+        assert classify_file("population_density_results.csv", "population_density") == "csv"
+
+    def test_radial_flows_geojson(self):
+        assert classify_file("radial_flows.geojson", "radial_flows") == "download"
+
+    def test_radial_flows_shp(self):
+        assert classify_file("radial_flows.shp", "radial_flows") == "qgis"
+
+    def test_commodity_trade_geojson(self):
+        assert classify_file("commodity_trade_flows.geojson", "commodity_trade") == "download"
+
+    def test_add_agents_geojson(self):
+        assert classify_file("agents.geojson", "add_agents") == "download"
+
+    def test_add_agents_shp(self):
+        assert classify_file("agents.shp", "add_agents") == "qgis"
+
+    def test_add_causes_geojson(self):
+        assert classify_file("causes.geojson", "add_causes") == "download"
+
+    def test_add_systems_geojson(self):
+        assert classify_file("systems.geojson", "add_systems") == "download"
+
+    def test_media_flows_geojson(self):
+        assert classify_file("media_flows.geojson", "add_media_flows") == "download"
+
+    def test_media_flows_csv(self):
+        assert classify_file("media_mention_frequency.csv", "add_media_flows") == "csv"
+
+    def test_food_security_png(self):
+        assert classify_file("food_security_trend.png", "food_security") == "image"
+
+    def test_food_security_csv(self):
+        assert classify_file("food_security_data.csv", "food_security") == "csv"
+
+    def test_nutrition_png(self):
+        assert classify_file("nutrition_ller_chart.png", "nutrition_metrics") == "image"
+
+    def test_nutrition_csv(self):
+        assert classify_file("nutrition_metrics_results.csv", "nutrition_metrics") == "csv"
 
 
 # --- route_outputs ---

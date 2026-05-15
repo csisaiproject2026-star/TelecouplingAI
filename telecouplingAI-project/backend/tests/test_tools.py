@@ -1,6 +1,8 @@
 """
 Tests for tool modules — unit tests that don't require InVEST/R execution.
 Tests parameter validation, SUPPORTED_CROPS checking, and task_queue dispatch.
+Covers all 42 tools: 01 Network Analysis, 02-27 InVEST, 28-42 TeleBox.
+Run: conda run -n TeleCouplingAI pytest tests/test_tools.py -v
 """
 import csv
 import os
@@ -683,3 +685,228 @@ class TestWaveEnergy:
         with pytest.raises(CSISError) as exc_info:
             await run_wave_energy(params, "sess", "tid", lambda p, m: None)
         assert exc_info.value.error_code == "INVALID_PARAMS"
+
+
+# ─── TeleBox tools 28–42: parameter validation ────────────────────────────────
+
+class TestOLS:
+    def test_required_keys(self):
+        from tools.ols import REQUIRED_KEYS
+        assert "input_csv" in REQUIRED_KEYS
+        assert "dependent_variable" in REQUIRED_KEYS
+        assert "independent_variables" in REQUIRED_KEYS
+
+    @pytest.mark.asyncio
+    async def test_missing_params_raises(self):
+        from tools.ols import run_ols
+        with pytest.raises(CSISError) as exc_info:
+            await run_ols({}, "sess", "tid", lambda p, m: None)
+        assert exc_info.value.error_code == "MISSING_PARAMS"
+
+
+class TestFAMD:
+    def test_required_keys(self):
+        from tools.famd import REQUIRED_KEYS
+        assert "input_csv" in REQUIRED_KEYS
+
+    @pytest.mark.asyncio
+    async def test_missing_params_raises(self):
+        from tools.famd import run_factor_analysis_mixed_data
+        with pytest.raises(CSISError) as exc_info:
+            await run_factor_analysis_mixed_data({}, "sess", "tid", lambda p, m: None)
+        assert exc_info.value.error_code == "MISSING_PARAMS"
+
+
+class TestCO2Emissions:
+    def test_required_keys(self):
+        from tools.co2_emissions import REQUIRED_KEYS
+        assert "input_csv" in REQUIRED_KEYS
+        assert "capacity_per_trip" in REQUIRED_KEYS
+        assert "co2_per_km_per_trip" in REQUIRED_KEYS
+
+    @pytest.mark.asyncio
+    async def test_missing_params_raises(self):
+        from tools.co2_emissions import run_co2_emissions
+        with pytest.raises(CSISError) as exc_info:
+            await run_co2_emissions({}, "sess", "tid", lambda p, m: None)
+        assert exc_info.value.error_code == "MISSING_PARAMS"
+
+
+class TestCostBenefitAnalysis:
+    def test_required_keys(self):
+        from tools.cost_benefit_analysis import REQUIRED_KEYS
+        assert "input_csv" in REQUIRED_KEYS
+        assert "economic_data_csv" in REQUIRED_KEYS
+        assert "key_field" in REQUIRED_KEYS
+
+    @pytest.mark.asyncio
+    async def test_missing_params_raises(self):
+        from tools.cost_benefit_analysis import run_cost_benefit_analysis
+        with pytest.raises(CSISError) as exc_info:
+            await run_cost_benefit_analysis({}, "sess", "tid", lambda p, m: None)
+        assert exc_info.value.error_code == "MISSING_PARAMS"
+
+
+class TestPopulationDensity:
+    def test_required_keys(self):
+        from tools.population_density import REQUIRED_KEYS
+        assert "input_csv" in REQUIRED_KEYS
+        assert "population_field" in REQUIRED_KEYS
+        assert "area_km2_field" in REQUIRED_KEYS
+
+    @pytest.mark.asyncio
+    async def test_missing_params_raises(self):
+        from tools.population_density import run_population_count_density
+        with pytest.raises(CSISError) as exc_info:
+            await run_population_count_density({}, "sess", "tid", lambda p, m: None)
+        assert exc_info.value.error_code == "MISSING_PARAMS"
+
+
+class TestRadialFlows:
+    def test_required_keys(self):
+        from tools.radial_flows import REQUIRED_KEYS
+        assert "input_csv" in REQUIRED_KEYS
+        assert "from_x_field" in REQUIRED_KEYS
+        assert "to_x_field" in REQUIRED_KEYS
+
+    @pytest.mark.asyncio
+    async def test_missing_params_raises(self):
+        from tools.radial_flows import run_draw_radial_flows
+        with pytest.raises(CSISError) as exc_info:
+            await run_draw_radial_flows({}, "sess", "tid", lambda p, m: None)
+        assert exc_info.value.error_code == "MISSING_PARAMS"
+
+
+class TestCommodityTrade:
+    def test_required_keys(self):
+        from tools.commodity_trade import REQUIRED_KEYS
+        assert "trade_csv" in REQUIRED_KEYS
+        assert "from_country_field" in REQUIRED_KEYS
+        assert "to_country_field" in REQUIRED_KEYS
+        assert "value_field" in REQUIRED_KEYS
+
+    @pytest.mark.asyncio
+    async def test_missing_params_raises(self):
+        from tools.commodity_trade import run_commodity_trade
+        with pytest.raises(CSISError) as exc_info:
+            await run_commodity_trade({}, "sess", "tid", lambda p, m: None)
+        assert exc_info.value.error_code == "MISSING_PARAMS"
+
+
+class TestAddAgents:
+    def test_required_keys(self):
+        from tools.add_agents import REQUIRED_KEYS
+        assert "input_csv" in REQUIRED_KEYS
+        assert "x_field" in REQUIRED_KEYS
+        assert "y_field" in REQUIRED_KEYS
+
+    @pytest.mark.asyncio
+    async def test_missing_params_raises(self):
+        from tools.add_agents import run_add_agents_interactively
+        with pytest.raises(CSISError) as exc_info:
+            await run_add_agents_interactively({}, "sess", "tid", lambda p, m: None)
+        assert exc_info.value.error_code == "MISSING_PARAMS"
+
+
+class TestDrawAgentsTable:
+    def test_required_keys(self):
+        from tools.draw_agents_table import REQUIRED_KEYS
+        assert "input_csv" in REQUIRED_KEYS
+        assert "x_field" in REQUIRED_KEYS
+        assert "y_field" in REQUIRED_KEYS
+
+    @pytest.mark.asyncio
+    async def test_missing_params_raises(self):
+        from tools.draw_agents_table import run_draw_agents_from_table
+        with pytest.raises(CSISError) as exc_info:
+            await run_draw_agents_from_table({}, "sess", "tid", lambda p, m: None)
+        assert exc_info.value.error_code == "MISSING_PARAMS"
+
+
+class TestAddCauses:
+    def test_required_keys(self):
+        from tools.add_causes import REQUIRED_KEYS
+        assert "input_csv" in REQUIRED_KEYS
+        assert "x_field" in REQUIRED_KEYS
+        assert "y_field" in REQUIRED_KEYS
+
+    @pytest.mark.asyncio
+    async def test_missing_params_raises(self):
+        from tools.add_causes import run_add_causes_interactively
+        with pytest.raises(CSISError) as exc_info:
+            await run_add_causes_interactively({}, "sess", "tid", lambda p, m: None)
+        assert exc_info.value.error_code == "MISSING_PARAMS"
+
+
+class TestAddSystems:
+    def test_required_keys(self):
+        from tools.add_systems import REQUIRED_KEYS
+        assert "input_csv" in REQUIRED_KEYS
+        assert "x_field" in REQUIRED_KEYS
+        assert "y_field" in REQUIRED_KEYS
+
+    @pytest.mark.asyncio
+    async def test_missing_params_raises(self):
+        from tools.add_systems import run_add_systems_interactively
+        with pytest.raises(CSISError) as exc_info:
+            await run_add_systems_interactively({}, "sess", "tid", lambda p, m: None)
+        assert exc_info.value.error_code == "MISSING_PARAMS"
+
+
+class TestDrawSystemsTable:
+    def test_required_keys(self):
+        from tools.draw_systems_table import REQUIRED_KEYS
+        assert "input_csv" in REQUIRED_KEYS
+        assert "x_field" in REQUIRED_KEYS
+        assert "y_field" in REQUIRED_KEYS
+
+    @pytest.mark.asyncio
+    async def test_missing_params_raises(self):
+        from tools.draw_systems_table import run_draw_systems_from_table
+        with pytest.raises(CSISError) as exc_info:
+            await run_draw_systems_from_table({}, "sess", "tid", lambda p, m: None)
+        assert exc_info.value.error_code == "MISSING_PARAMS"
+
+
+class TestAddMediaFlows:
+    def test_required_keys(self):
+        from tools.add_media_flows import REQUIRED_KEYS
+        assert "html_file" in REQUIRED_KEYS
+        assert "source_lon" in REQUIRED_KEYS
+        assert "source_lat" in REQUIRED_KEYS
+        assert "country_reference_csv" in REQUIRED_KEYS
+
+    @pytest.mark.asyncio
+    async def test_missing_params_raises(self):
+        from tools.add_media_flows import run_add_media_flows
+        with pytest.raises(CSISError) as exc_info:
+            await run_add_media_flows({}, "sess", "tid", lambda p, m: None)
+        assert exc_info.value.error_code == "MISSING_PARAMS"
+
+
+class TestFoodSecurity:
+    def test_required_keys(self):
+        from tools.food_security import REQUIRED_KEYS
+        assert "fao_csv" in REQUIRED_KEYS
+        assert "countries" in REQUIRED_KEYS
+        assert "indicator_field" in REQUIRED_KEYS
+
+    @pytest.mark.asyncio
+    async def test_missing_params_raises(self):
+        from tools.food_security import run_food_security
+        with pytest.raises(CSISError) as exc_info:
+            await run_food_security({}, "sess", "tid", lambda p, m: None)
+        assert exc_info.value.error_code == "MISSING_PARAMS"
+
+
+class TestNutritionMetrics:
+    def test_required_keys(self):
+        from tools.nutrition_metrics import REQUIRED_KEYS
+        assert "population_csv" in REQUIRED_KEYS
+
+    @pytest.mark.asyncio
+    async def test_missing_params_raises(self):
+        from tools.nutrition_metrics import run_nutrition_metrics
+        with pytest.raises(CSISError) as exc_info:
+            await run_nutrition_metrics({}, "sess", "tid", lambda p, m: None)
+        assert exc_info.value.error_code == "MISSING_PARAMS"
