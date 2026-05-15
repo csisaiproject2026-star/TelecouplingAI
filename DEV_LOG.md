@@ -1,3 +1,39 @@
+## 2026-05-15 — GCP 部署前代码审查 + 测试套件全面扩展
+
+### 完成内容
+- **Dockerfile 修复**：
+  - 补 `r-factominer`（FAMD 工具必需，否则 GCP 上完全失败）
+  - 补 `beautifulsoup4`（Add Media Flows HTML 解析质量提升）
+- **pytest 套件全面扩展**（207 → 207 PASS + 1 SKIP，含更多测试）：
+  - `test_tools.py`：新增 tools 28-42 的 REQUIRED_KEYS + missing_params 验证测试（64→94 tests）
+  - `test_renderers.py`：新增 TeleBox 工具 classify_file 测试（+20 tests）
+  - `test_api.py`：修复 fake_agent mock 漏 `chat_history` 参数导致的隐性失败
+  - `test_llm_path.py`：更新 docstring，标注 GCP-only 状态
+- **本地运行器**：tool 01 Network Analysis 补入 `run_all_local_tests.py`，42 工具全覆盖
+- **部署就绪状态**：docker-compose.yml ✅ task_queue.py ✅ output_router.py ✅ SKILL.md ✅ Dockerfile ✅
+
+### 关键变更文件
+- `backend/Dockerfile`（依赖补全）
+- `backend/tests/test_tools.py`（64→94 tests）
+- `backend/tests/test_renderers.py`（+20 tests）
+- `backend/tests/test_api.py`（mock 签名修复）
+- `Systematic_tests/AI_local_test/run_all_local_tests.py`（tool 01 补入）
+
+### 测试状态
+| 套件 | 测试数 | 结果 |
+|------|--------|------|
+| test_tools.py | 94 | 94 PASS |
+| test_renderers.py | 33 | 33 PASS |
+| test_utils.py | 9 | 9 PASS |
+| test_api.py | 27 | 27 PASS |
+| test_telebox_tools.py | 18 | 18 PASS |
+| test_invest_integration.py | 27 | 26 PASS / 1 SKIP |
+| **合计** | **208** | **207 PASS / 1 SKIP / 0 FAIL** |
+
+> 下一步：推 GCP，重建 Docker 镜像，端到端测试 TeleBox 工具
+
+---
+
 ## 2026-05-15 — 重命名 test_telebox_tools + 扩展 run_all_local_tests.py 到全 42 工具
 
 ### 完成内容
