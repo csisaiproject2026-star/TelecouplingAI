@@ -59,7 +59,7 @@ def _run_ols(y: np.ndarray, x: np.ndarray, var_labels: list[str]):
     # White's robust SE
     u2 = e ** 2
     dof_scale = n / (n - k)
-    s_hat = ((u2 * x).T @ x) * dof_scale
+    s_hat = ((u2[:, np.newaxis] * x).T @ x) * dof_scale
     var_beta_rob = xxi @ s_hat @ xxi
     se_beta_rob = np.sqrt(var_beta_rob.diagonal())
     t_stat_rob = coef.flatten() / se_beta_rob

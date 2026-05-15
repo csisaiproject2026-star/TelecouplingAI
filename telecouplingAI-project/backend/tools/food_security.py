@@ -47,7 +47,7 @@ async def run_food_security(
         raise CSISError(f"FAO CSV not found: {fao_csv}", "FILE_NOT_FOUND")
 
     progress_callback(10, "Reading FAO data...")
-    df = pd.read_csv(fao_csv, encoding="utf-8", errors="replace")
+    df = pd.read_csv(fao_csv, encoding="utf-8")
 
     for col in [country_field, year_field, value_field]:
         if col not in df.columns:
