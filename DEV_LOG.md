@@ -1,3 +1,35 @@
+## 2026-05-15 — 全平台测试统一：108 tests，106 PASS，1 SKIP，0 FAIL
+
+### 完成内容
+- 重写 `backend/tests/test_invest_integration.py`：
+  - 数据路径从硬编码 `NatCapInvest_SampleData` 改为 `Systematic_tests/Test_data/`
+  - 所有工具用 `td("NN_folder")` helper 统一访问，与文件夹命名规范对齐
+  - Urban Mental Health 改用 `20_urban_mental_health/` 自己的数据文件夹
+  - 修复 CBC 路径（`inputs/` 子目录不存在，直接读根目录文件）
+  - 补充缺失的 Coastal Vulnerability habitat 文件（Natural_Habitats.csv、Coral.*、Mangrove.*）
+- 更新 `backend/tests/test_tools.py`：
+  - `MODEL_DATA` 从旧 `datainput_for_demo/` 改为 `Test_data/05_crop_production_percentile/model_data`
+  - task_queue 工具数量从 24 扩展到 42
+- 新增 `Systematic_tests/Test_data/all_tools_test_timing.md`：完整计时报告
+
+### 测试结果（本地）
+| Suite | 结果 | 耗时 |
+|-------|------|------|
+| test_tools.py (64 tests) | 64 PASS | 4.05s |
+| test_invest_integration.py (27 tests) | 26 PASS / 1 SKIP | 360s |
+| test_new_tools.py (17 tests) | 17 PASS | 4.48s |
+| **合计** | **106 PASS / 1 SKIP / 0 FAIL** | **~370s** |
+
+> SKIP = Recreation（本地网络不可达 NatCap 服务器，GCP 上需要开放 TCP 54321 出口规则后 PASS）
+
+### 关键变更文件
+- `backend/tests/test_invest_integration.py`（重写）
+- `backend/tests/test_tools.py`（路径修复 + 工具列表扩展）
+- `Systematic_tests/Test_data/all_tools_test_timing.md`（新增）
+- `Systematic_tests/Test_data/24_coastal_vulnerability/GrandBahama_Habitats/`（补充缺失文件）
+
+---
+
 ## 2026-05-15 — 新工具 pytest + 本地运行器，修复 OLS/food_security bug
 
 ### 完成内容
