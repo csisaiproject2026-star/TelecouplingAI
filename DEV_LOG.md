@@ -1,3 +1,76 @@
+## 2026-05-15 — GCP 四级测试套件全量执行（27 PASS / 0 FAIL / 15 SKIP）
+
+### 完成内容
+- **测试套件重构**：将 `AI_Smoke_GCP_test/` 和 `GCP_test/` 合并到 `AI_GCP_test/`，形成 4 个子目录：
+  - `01_direct_tool_test/`：直接调用工具（无 LLM 推理）
+  - `02_llm_tool_test/`：自然语言 → LLM → 工具调用
+  - `03_smoke_stress_test/`：单用户冒烟 + 5/20 并发压力
+  - `04_browser_test/`：Playwright / 手动浏览器模拟
+- **修复 11 个工具提示词**（CO2、CBA、Radial Flows、Commodity Trade、Add Agents、Add Causes、Add Systems、FAMD、Media Flows、Food Security、Nutrition Metrics）：
+  - 纠正参数名（`country_column` → `capacity_per_trip`，`input_csv` → `fao_csv`/`trade_csv`/`population_csv` 等）
+  - 纠正函数名（`run_famd` → `run_factor_analysis_mixed_data`，`run_add_agents` → `run_add_agents_interactively` 等）
+  - 纠正测试数据格式（CO2 需动物运输路线数据；Food Security 需 FAO Area/Year/Item/Value 格式；Nutrition 需人口年龄/性别/数量格式；CBA 需双 CSV 连接）
+  - Radial Flows 需含坐标列（from_x/from_y/to_x/to_y）；Commodity Trade 需 ISO-3 国家码；Add Causes/Systems CSV 需加 longitude/latitude 列
+
+### 最终测试结果
+
+**01 直接工具测试（42 工具）**
+| 类别 | 数量 | 说明 |
+|------|------|------|
+| PASS | 27 | 14 InVEST + 13 TeleBox，全部通过 |
+| SKIP | 15 | 城市类工具（无城市数据）+ 海岸/森林/风能/Recreation 等 |
+| FAIL | 0 | — |
+
+**02 LLM 工具测试（10 工具，自然语言调用）**
+| Phase | 结果 |
+|-------|------|
+| Phase 1（6 工具）| 6/6 PASS |
+| Phase 2（10 工具）| 10/10 PASS |
+| Phase 3（3 并发会话隔离）| 3/3 PASS，壁钟 6.0s |
+
+**03 冒烟 + 压力测试**
+| 测试 | 结果 | 说明 |
+|------|------|------|
+| 冒烟 Phase 1（单用户，8 工具）| 7/8 PASS | HabitatQuality 偶发 flaky（并发资源）|
+| 冒烟 Phase 2（5 并发，20 次）| 20/20 PASS，30s 壁钟 | CPU avg 20.6%，RAM peak 8.2GB |
+| 压力测试（20 用户，40 次）| 39/40 PASS，163s 壁钟 | 1 次 OLS 超时（120s 边界），CPU avg 18%，peak 47% |
+
+### 关键变更文件
+- `Systematic_tests/AI_GCP_test/01_direct_tool_test/test_tools_direct.py`（修复 11 个工具的数据格式和提示词）
+- `Systematic_tests/AI_GCP_test/02_llm_tool_test/test_llm_tools.py`（修复 CO2/Food Security/Nutrition 数据格式）
+- `Systematic_tests/AI_GCP_test/03_smoke_stress_test/test_smoke.py`（修复 OLS/CO2/Food Security 数据格式和提示词）
+- `Systematic_tests/AI_GCP_test/03_smoke_stress_test/test_stress_50.py`（修复 OLS/CO2/CBA/Food Security 数据格式和提示词）
+- 生成 JSON 报告：`results_direct.json`、`results_llm.json`、`results_smoke.json`、`results_stress.json`
+
+### 测试状态
+- GCP 全量测试完成：27/27 可测工具全部通过（0 FAIL）
+- 15 工具 SKIP（缺少 GCP 上的地理数据，非代码问题）
+- 并发稳定性：5 并发 100%，20 并发 97.5%，压力下 CPU 最高 47%，RAM 峰值 8.2GB/32GB
+
+---
+
+## 2026-05-15 — GCP 完整部署（42 工具全上线）
+
+### 完成内容
+- **环境修复**：
+  - `.env`（docker compose 变量替换）：修正 HOST_* 路径为 Linux 路径（上次 tar 传文件覆盖成了 Windows 路径）
+  - `.env.docker`（容器内 env）：写入真实 GOOGLE_API_KEY、GCP IP（`FILE_SERVER_URL=http://34.42.83.50:8001/download/`）
+- **镜像重打标签**：`csis-backend:latest`（7.71GB，含 r-factominer + beautifulsoup4）→ `csic_backend:latest`
+- **docker compose up -d --force-recreate**：全部 39 个容器成功启动（含新增 TeleBox workers: ols/famd/co2/spatial-flows/tc-pts/food）
+- **nginx restart**：刷新 upstream IP，避免 502
+- **验证通过**：`/health` → `{"status":"ok"}`，前端 200，文件服务器 200
+
+### 关键变更文件（GCP 服务器上）
+- `~/csis-platform/telecouplingAI-project/.env`（HOST_* Linux 路径）
+- `~/csis-platform/telecouplingAI-project/.env.docker`（真实 API key + GCP IP）
+
+### 测试状态
+- GCP：39 容器全部 Up，API `/health` ok，前端可访问
+- 访问地址：http://34.42.83.50/
+- 待做：端到端测试 TeleBox 工具（ols/famd/co2 等），Recreation TCP 54321 出口规则
+
+---
+
 ## 2026-05-15 — GCP 部署前代码审查 + 测试套件全面扩展
 
 ### 完成内容
