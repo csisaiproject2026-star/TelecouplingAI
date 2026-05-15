@@ -454,9 +454,7 @@ def t18_urban_nature():
         f"lulc_attribute_table={UN}/lulc-attributes.csv, "
         f"population_raster_path={UN}/population.tif, "
         f"admin_boundaries_vector_path={UN}/administrative-units.shp, "
-        f"search_radius_mode='radius per population group', "
-        f"population_group_radii_table={UN}/pop-group-radii.csv, "
-        f"decay_function=dichotomy, urban_nature_demand=250. Run immediately."
+        f"search_radius=300, urban_nature_demand=250, decay_function=gaussian. Run immediately."
     ), timeout=600)
 
 
@@ -468,9 +466,7 @@ def t19_urban_mental_health():
         f"lulc_attribute_table={UM}/lulc-attributes.csv, "
         f"population_raster_path={UM}/population.tif, "
         f"admin_boundaries_vector_path={UM}/administrative-units.shp, "
-        f"search_radius_mode='radius per population group', "
-        f"population_group_radii_table={UM}/pop-group-radii.csv, "
-        f"decay_function=dichotomy, urban_nature_demand=250. Run immediately."
+        f"search_radius=300, urban_nature_demand=250, decay_function=gaussian. Run immediately."
     ), timeout=600)
 
 

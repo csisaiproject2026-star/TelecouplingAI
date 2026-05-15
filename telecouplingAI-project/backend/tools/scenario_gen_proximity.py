@@ -56,7 +56,7 @@ async def run_scenario_gen_proximity(
         "convert_nearest_to_edge":     nearest,
         "convert_farthest_from_edge":  farthest,
         "aoi_path":                    params.get("aoi_path", ""),
-        "n_steps":                     params.get("n_steps", 1),
+        "n_fragmentation_steps":       int(params.get("n_steps", 1)),
     }
 
     progress_callback(20, "Running InVEST Scenario Generator (Proximity)...")
