@@ -18,7 +18,7 @@ RUN mamba create -n TeleCouplingAI python=3.12 -y && \
         pydantic=2.10.6 requests python-dotenv \
         pillow pyyaml \
         qgis \
-        r-base r-igraph r-dplyr r-jsonlite r-sf r-rcolorbrewer \
+        r-base r-igraph r-factominer r-dplyr r-jsonlite r-sf r-rcolorbrewer \
         gxx_linux-64 gcc_linux-64 && \
     mamba clean -afy
 
@@ -43,7 +43,8 @@ RUN pip install --no-cache-dir \
         "celery[redis]>=5.3.0" \
         "redis>=5.0.0" \
         "aiohttp[speedups]>=3.9.0" \
-        "loguru>=0.7.0"
+        "loguru>=0.7.0" \
+        "beautifulsoup4>=4.12.0"
 
 # --- Step 4: copy code ---
 COPY . .
