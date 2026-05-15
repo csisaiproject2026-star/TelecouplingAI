@@ -1,3 +1,14 @@
+## 2026-05-15 — 清理本地临时目录
+
+### 完成内容
+- 删除 `uploads/`（18MB）— 历史测试会话上传的临时文件，git 已通过 `.gitignore` 排除
+- `data/` 保留：`basemap/world_satellite.mbtiles` 是前端地图底图运行时资源，`db_files/` 和 `logs/` 是运行时写入目录
+
+### 关键变更
+- 删除：`telecouplingAI-project/uploads/`
+
+---
+
 ## 2026-05-15 — 测试体系重组（Systematic_tests/）
 
 ### 完成内容
