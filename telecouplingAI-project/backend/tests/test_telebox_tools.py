@@ -1,9 +1,9 @@
 """
-Integration tests: run the 15 new non-InVEST tools directly (no LLM, no Celery).
+Integration tests: run the 15 TeleBox (non-InVEST) tools directly (no LLM, no Celery).
 Each test calls the tool's async function with sample data from Systematic_tests/Test_data/.
 
 Test data: telecouplingAI-project/Systematic_tests/Test_data/
-Run with: conda run -n TeleCouplingAI pytest tests/test_new_tools.py -v
+Run with: conda run -n TeleCouplingAI pytest tests/test_telebox_tools.py -v
 """
 import asyncio
 import os
