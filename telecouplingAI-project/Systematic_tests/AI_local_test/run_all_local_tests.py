@@ -4,7 +4,7 @@ Local test runner for ALL 42 CSIS tools.
 Calls each tool directly (no LLM, no Celery) and writes inspectable outputs
 to Systematic_tests/AI_local_test/<nn>_<tool>/output/.
 
-  Section A — InVEST tools (01–27): call natcap.invest.xxx.execute() directly
+  Section A — InVEST + custom tools (01–27): call execute() or async fn directly
   Section B — TeleBox tools (28–42): call async Python functions directly
 
 Usage (from telecouplingAI-project/ directory):
@@ -138,8 +138,21 @@ def _reg(nn: str, display: str, fn: callable):
 
 
 # ── 01 Network Analysis ───────────────────────────────────────────────────────
-# Custom Python tool — covered by test_telebox_tools / test_tools.py
-# (requires shapefile inputs not in Test_data; skip in this runner)
+def _invest_01():
+    _NA_DIR = os.path.join(TEST_DATA, "01_network_analysis", "Network Analysis Grouping")
+    run_async(__import__("tools.network_analysis", fromlist=["run_network_analysis"])
+              .run_network_analysis(
+        {
+            "nodes_table":          os.path.join(_NA_DIR, "nodes.csv"),
+            "links_table":          os.path.join(_NA_DIR, "links.csv"),
+            "shapefile_path":       os.path.join(_NA_DIR, "World_countries_2002.shp"),
+            "nodes_join_attri":     "CODE",
+            "layer_join_attri":     "ISO_3_CODE",
+            "clustering_algorithm": "walktrap",
+        },
+        "local_test", "t_01", noop_progress,
+    ))
+_reg("01_network_analysis", "01 Network Analysis", _invest_01)
 
 # ── 02 CBC Preprocessor ───────────────────────────────────────────────────────
 def _invest_02():
