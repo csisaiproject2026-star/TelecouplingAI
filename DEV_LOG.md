@@ -1,3 +1,40 @@
+## 2026-05-15 — 测试体系重组（Systematic_tests/）
+
+### 完成内容
+- 将分散在各处的测试文件和数据全部整合到 `Systematic_tests/` 统一目录
+- 建立 5 个语义清晰的测试分类子目录
+- 所有工具测试数据（42 个工具）集中到 `Test_data/`，通过 `.gitignore` 排除大型二进制文件
+- 删除冗余目录：`datainput_for_demo/`、`test_outputs/`、`outputs/`（490MB 运行产物）、`adhoc_test/`、`tests/`
+
+### 最终目录结构
+
+```
+telecouplingAI-project/Systematic_tests/
+├── Test_data/               ← .gitignored；42 个工具的测试输入数据
+│   ├── 01_network_analysis/ ← 原 datainput_for_demo/NetworkAnalysisGrouping_input/
+│   ├── 02~06_*/             ← 原 datainput_for_demo/ 其余 5 个工具
+│   ├── 07~27_*/             ← 原 C:/YPHOME/NatCapInvest_SampleData/（按工具编号对应）
+│   ├── 28~42_*/             ← 新工具 CSV/HTML 样本数据
+│   └── _shared/Base_Data/  ← InVEST 共享基础地理数据
+├── AI_local_test/           ← 42 个 per-tool 子目录（output/ + how_to_test.bat）
+├── AI_GCP_test/             ← pytest 自动化集成测试（e2e/concurrent/integration）
+├── AI_Smoke_GCP_test/       ← 快速冒烟测试（test_gcp_e2e.py）
+├── Manual_GCP_test/         ← 历史手动脚本（manual_20260315/、headless_qgis/）
+├── GCP_test/                ← 基础设施压力测试（test_stress_50.py）
+└── README.md                ← 结构说明 + 5 个分类索引
+```
+
+### 关键变更文件
+- `Systematic_tests/` — 新建，替代 `tool_tests/`（已重命名）
+- `.gitignore` — 新建，排除 `Systematic_tests/Test_data/`、`outputs/`、`uploads/`
+- 删除：`datainput_for_demo/`、`test_outputs/`、`outputs/`、`adhoc_test/`、`tests/`
+
+### 测试状态
+- 目录迁移验证：42 个工具 Test_data 子目录全部到位 ✅
+- .gitignore 生效：Test_data/ 不再被 git 跟踪 ✅
+
+---
+
 ## 2026-05-15 — 统一测试目录创建（tool_tests/）
 
 ### 完成内容
