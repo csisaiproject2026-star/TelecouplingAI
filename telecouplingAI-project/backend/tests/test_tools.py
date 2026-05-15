@@ -13,7 +13,10 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from shared.utils import CSISError
 
-MODEL_DATA = r"C:\YPHOME\Jianan_Projects\Telecoupling_AI_Project\fulldev\telecouplingAI-project\datainput_for_demo\CropProductionPercentile_input\model_data"
+MODEL_DATA = os.path.normpath(os.path.join(
+    os.path.dirname(__file__), "..", "..", "Systematic_tests", "Test_data",
+    "05_crop_production_percentile", "model_data"
+))
 
 
 # --- Tool 1: Network Analysis validation ---
@@ -287,9 +290,10 @@ class TestTaskQueue:
             execute_tool("nonexistent_tool", {}, "sess", "tid", lambda p, m: None)
 
     def test_tool_map_has_all_tools(self):
-        """Verify all 24 tool names are in the dispatch map."""
+        """Verify all 42 tool call names are registered in the dispatch map."""
         from workers.task_queue import execute_tool
         expected_tools = [
+            # InVEST tools (01–27)
             "run_network_analysis_grouping",
             "run_coastal_blue_carbon_preprocessor",
             "run_coastal_blue_carbon",
@@ -314,6 +318,25 @@ class TestTaskQueue:
             "run_habitat_risk_assessment",
             "run_wave_energy_production",
             "run_scenario_gen_proximity",
+            "run_coastal_vulnerability",
+            "run_offshore_wind_energy",
+            "run_recreation_tourism",
+            # New non-InVEST tools (28–42)
+            "run_model_selection_ols",
+            "run_factor_analysis_mixed_data",
+            "run_co2_emissions",
+            "run_cost_benefit_analysis",
+            "run_population_count_density",
+            "run_draw_radial_flows",
+            "run_commodity_trade",
+            "run_add_agents_interactively",
+            "run_draw_agents_from_table",
+            "run_add_causes_interactively",
+            "run_add_systems_interactively",
+            "run_draw_systems_from_table",
+            "run_add_media_flows",
+            "run_food_security",
+            "run_nutrition_metrics",
         ]
         for tool_name in expected_tools:
             try:
