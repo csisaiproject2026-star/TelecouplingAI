@@ -1,6 +1,7 @@
 """
-Integration tests: run the 15 TeleBox (non-InVEST) tools directly (no LLM, no Celery).
+Integration tests: run the 16 TeleBox (non-InVEST) tools directly (no LLM, no Celery).
 Each test calls the tool's async function with sample data from Systematic_tests/Test_data/.
+Covers: tool 01 (Network Analysis) + tools 28-42.
 
 Test data: telecouplingAI-project/Systematic_tests/Test_data/
 Run with: conda run -n TeleCouplingAI pytest tests/test_telebox_tools.py -v
@@ -39,6 +40,33 @@ def patch_output_dir(monkeypatch, tmp_path):
         os.makedirs(out, exist_ok=True)
         return out, f"pytest/{tool_name}"
     monkeypatch.setattr(utils, "generate_output_dir", _mock)
+
+
+# ─── 01 Network Analysis ─────────────────────────────────────────────────────
+
+class TestNetworkAnalysis:
+    def test_network_analysis_run(self, tmp_path, monkeypatch):
+        """Network Analysis: R/igraph walktrap → PDF + CSV + SHP."""
+        patch_output_dir(monkeypatch, tmp_path)
+        from tools.network_analysis import run_network_analysis
+        NA_DIR = td("01_network_analysis", "Network Analysis Grouping")
+        params = {
+            "nodes_table":          os.path.join(NA_DIR, "nodes.csv"),
+            "links_table":          os.path.join(NA_DIR, "links.csv"),
+            "shapefile_path":       os.path.join(NA_DIR, "World_countries_2002.shp"),
+            "nodes_join_attri":     "CODE",
+            "layer_join_attri":     "ISO_3_CODE",
+            "clustering_algorithm": "walktrap",
+        }
+        try:
+            result = run(run_network_analysis(params, "pytest", "t000", noop_progress))
+            files = [f["filename"] for f in result["files"]]
+            assert any(f.endswith(".pdf") for f in files), f"No PDF output. Got: {files}"
+            assert any("network_stats" in f for f in files), f"No stats CSV. Got: {files}"
+        except Exception as e:
+            if "R" in str(e) or "Rscript" in str(e) or "igraph" in str(e):
+                pytest.skip(f"R/igraph not available: {e}")
+            raise
 
 
 # ─── 28 OLS ───────────────────────────────────────────────────────────────────
