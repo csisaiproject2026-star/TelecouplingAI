@@ -1,3 +1,27 @@
+## 2026-05-15 — 新工具 pytest + 本地运行器，修复 OLS/food_security bug
+
+### 完成内容
+- 新增 `backend/tests/test_new_tools.py`：覆盖工具 28–42 的 17 个 pytest 测试，**17/17 PASS，4.48s**
+- 新增 `Systematic_tests/AI_local_test/run_all_local_tests.py`：直接调用 Python 函数，输出写入 `AI_local_test/xx/output/`，**17/17 PASS**
+- 修复 `ols.py`：White 稳健标准误广播 bug（`u2 * x` → `u2[:, np.newaxis] * x`）
+- 修复 `food_security.py`：移除 `pd.read_csv()` 不支持的 `errors=` 参数
+- 新增 `AI_local_test/new_tools_test_timing.md`：各工具耗时统计表
+- 更新 `.gitignore`：排除 `AI_local_test/*/output/*` 生成产物，保留 `.gitkeep`
+- 删除旧 `tool_tests/` 目录（已迁移至 `Systematic_tests/`）
+
+### 关键变更文件
+- `backend/tests/test_new_tools.py`（新增）
+- `Systematic_tests/AI_local_test/run_all_local_tests.py`（新增）
+- `backend/tools/ols.py`（bug 修复）
+- `backend/tools/food_security.py`（bug 修复）
+- `.gitignore`（更新）
+
+### 测试状态
+- pytest: `17/17 PASS` (4.48s) — `conda run -n TeleCouplingAI pytest backend/tests/test_new_tools.py -v`
+- local runner: `17/17 PASS` — `conda run -n TeleCouplingAI python Systematic_tests/AI_local_test/run_all_local_tests.py`
+
+---
+
 ## 2026-05-15 — 清理本地临时目录
 
 ### 完成内容
