@@ -1,3 +1,20 @@
+## 2026-05-16 — 提交 2026-05-16 测试批次 + 仓库清理
+
+### 完成内容
+- 将 2026-05-16 全部未提交工作提交到 `feature/invest-expansion`（commit `1648a27`，57 文件 / 5718 行新增）
+  - 内容：AI_GCP 四层测试套件（direct/llm/browser/smoke）+ Manual_ClientToGCP_test 42 份指南 + Recreation 下架 + list-all-tools 修复 + 3 个 SKILL.md/backend 修复
+- 删除误重定向产生的 0 字节垃圾文件 `total=%.1fs`
+- 删除废弃的内层仓库 `telecouplingAI-project/.git`（HEAD 停在 2026-05-04），开发统一用外层 `fulldev` 仓库，避免在子目录误操作 git
+- `references/Telecoupling+Toolbox_ArcGISProV3.3/`（8.5MB ArcGIS 工具箱资料）按决定保持不跟踪
+
+### 关键变更文件
+- 无代码变更，仅 git 提交与仓库清理
+
+### 测试状态
+- 未运行测试（纯仓库维护）
+
+---
+
 ## 2026-05-16 — 修复 "list all tools" 输出格式
 
 ### 完成内容
