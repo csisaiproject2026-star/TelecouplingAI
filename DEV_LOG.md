@@ -1,3 +1,20 @@
+## 2026-05-16 — GCP 服务器代码审查 + 冗余清理
+
+### 完成内容
+- 浏览 GCP（34.42.83.50）代码与容器状态：容器内 `agent.py`/`main.py` 与源码 md5 完全一致，部署同步无误；agent.py 1547 行 / 43 个 FunctionDeclaration，Recreation 下架已生效（无任何 recreation 引用）。
+- **修复前端 DNS 名冲突**：compose 服务 `frontend-ui`（容器名 `tele-frontend`）与一个早期手动启动的独立 `frontend-ui` 容器抢同一 DNS 名 —— 删除独立容器、重启 nginx，站点验证正常。
+- **移除 Recreation worker**：从 `docker-compose.yml`（服务器 + 本地）删除 `celery-worker-recreation` 服务块，删除 `tele-celery-recreation` 容器（工具已下架、worker 闲置无用）。
+- 删除服务器上废弃的内层 git 仓库 `telecouplingAI-project/.git`（HEAD 停在 2026-05-04）。
+- 清理 `~/csis-platform/` 顶层历史垃圾：旧 `agent.py`/`main.py`/`backend/`、5 个部署 `*.tar.gz`、旧 test 脚本、旧 root `docker-compose.yml`/`nginx/`/`.env`、旧 `datainput_for_demo/`（172 MB）—— 顶层现只剩 `telecouplingAI-project/`。
+
+### 关键变更文件
+- `telecouplingAI-project/docker-compose.yml`（本地 + 服务器，移除 recreation worker 服务块）
+
+### 测试状态
+- GCP 38 容器全部 Up、0 unhealthy；站点 `GET /` 与 `/health` 均 200；`docker compose config` 校验通过。
+
+---
+
 ## 2026-05-16 — 提交 2026-05-16 测试批次 + 仓库清理
 
 ### 完成内容
