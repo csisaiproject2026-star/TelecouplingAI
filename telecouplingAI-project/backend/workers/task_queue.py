@@ -62,7 +62,14 @@ def execute_tool(tool_name: str, params: dict, session_id: str, task_id: str, pr
     from tools.scenario_gen_proximity import run_scenario_gen_proximity
     from tools.coastal_vulnerability import run_coastal_vulnerability
     from tools.wind_energy import run_offshore_wind_energy
-    from tools.recreation import run_recreation
+    def run_recreation(*args, **kwargs):
+        raise RuntimeError(
+            "Recreation & Tourism is temporarily unavailable: "
+            "the required external NatCap recmodel server (34.44.144.58:54321) "
+            "is not accessible due to permission restrictions. "
+            "This feature is not supported at this time."
+        )
+
     from tools.ols import run_ols
     from tools.co2_emissions import run_co2_emissions
     from tools.cost_benefit_analysis import run_cost_benefit_analysis

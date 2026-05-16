@@ -26,6 +26,8 @@ services:
       - ${HOST_UPLOADS_DIR:-/data/uploads}:/data/uploads
       - ${HOST_MODEL_DATA_PATH:-/data/model_data}:/data/model_data:ro
       - ./datainput_for_demo:/data/datainput:ro
+      - ./Systematic_tests:/home/csisaiproject2026/csis-platform/telecouplingAI-project/Systematic_tests
+      - ./.claude:/.claude
     depends_on:
       redis:
         condition: service_healthy

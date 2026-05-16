@@ -142,7 +142,9 @@
       "Bash(\"C:/YPHOME/Jianan_Projects/Telecoupling_AI_Project/fulldev/telecouplingAI-project/.env\":*)",
       "Bash(docker restart:*)",
       "Bash(python -m pytest tests/test_concurrent_tools.py -v -s --timeout=420)",
-      "Bash(\"C:/YPHOME/Jianan_Projects/Telecoupling_AI_Project/fulldev/DEV_LOG.md\":*)"
+      "Bash(\"C:/YPHOME/Jianan_Projects/Telecoupling_AI_Project/fulldev/DEV_LOG.md\":*)",
+      "Bash(mkdir -p \"C:/YPHOME/Jianan_Projects/Telecoupling_AI_Project/fulldev/telecouplingAI-project/.claude/skills/run-coastal-vulnerability\")",
+      "Bash(mkdir -p \"C:/YPHOME/Jianan_Projects/Telecoupling_AI_Project/fulldev/telecouplingAI-project/.claude/skills/run-offshore-wind-energy\")"
     ]
   }
 }

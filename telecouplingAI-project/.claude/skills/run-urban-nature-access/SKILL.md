@@ -37,7 +37,17 @@ invest_args keys:
 - 'radius per population group': different population groups have different mobility — requires population_group_radii_table CSV
 - 'radius per urban nature class': different park sizes have different catchment radii — radii encoded in lulc_attribute_table
 
-**decay_function**: controls how access decreases with distance — 'gaussian' is default and most realistic for walking behavior
+**decay_function**: controls how access decreases with distance. Valid values (accept any of these):
+- 'gaussian' (default): smooth, realistic decay — best for walking behavior
+- 'linear': uniform linear decay
+- 'exponential': rapid decay with distance
+- 'dichotomy': binary — all nature within radius counted equally (classic buffer approach)
+
+**Optional parameters**:
+- urban_nature_demand: per-capita nature area standard in m² (e.g. 250 for WHO recommended 9 m²/person × some factor); used to compute supply-demand balance; default if omitted is no demand threshold
+- aggregate_by_pop_group: true/false — if true, aggregate results separately for each population group defined in population_group_radii_table (only relevant when search_radius_mode='radius per population group')
+
+**IMPORTANT**: Call the tool as soon as all required parameters are provided. Do NOT ask for optional parameters unless the user explicitly mentions them.
 
 ---
 

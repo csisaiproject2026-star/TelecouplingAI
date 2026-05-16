@@ -32,9 +32,18 @@ invest_args keys:
 - soils_hydrological_group_raster_path: raster of SCS hydrological soil groups (A=well drained, D=poorly drained) encoded as integers 1–4
 - curve_number_table_path: CSV with Curve Number (CN) values for each LULC class × soil group combination (columns: lucode, CN_A, CN_B, CN_C, CN_D)
 
-**Optional — damage valuation** (ask only if user wants economic estimates):
-- built_infrastructure_vector_path: polygon shapefile of buildings/roads/infrastructure footprints (must have 'type' field)
+**IMPORTANT — file identification when multiple CSVs are uploaded**:
+- The CSV containing columns lucode/CN_A/CN_B/CN_C/CN_D (or similar CN columns) is the `curve_number_table_path` — use it directly without asking.
+- Any other CSV (e.g. with infrastructure type and damage cost columns) is the `infrastructure_damage_loss_table_path`.
+- Do NOT ask the user which CSV is which — identify by column names or filename context.
+
+**IMPORTANT — GeoPackage format**: `.gpkg` (GeoPackage) files are valid vector inputs and should be used directly for `aoi_watersheds_path` and `built_infrastructure_vector_path`. Do not ask for a shapefile if a `.gpkg` is uploaded.
+
+**Optional — damage valuation** (include if infrastructure files are uploaded):
+- built_infrastructure_vector_path: polygon vector file of buildings/roads/infrastructure footprints (shapefile or .gpkg; must have 'type' field)
 - infrastructure_damage_loss_table_path: CSV mapping infrastructure type to damage cost per unit area flooded
+
+**IMPORTANT**: Call the tool as soon as all required parameters are available from uploaded files. Do not ask for clarification if files are already uploaded.
 
 ---
 

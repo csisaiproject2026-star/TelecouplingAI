@@ -1,3 +1,169 @@
+## 2026-05-16 — 修复 "list all tools" 输出格式
+
+### 完成内容
+- **问题1**：`please list all tools` 返回 `Tool Name: run_xxx` 格式（函数名而非描述）
+  - 根因：`_BASE_SYSTEM_INSTRUCTION` 的 "Available Tools Overview" 只列了 8 个工具且格式用函数名
+  - 修复：替换为完整 41 工具 markdown 列表（`- **名称**: 描述`），分三组（InVEST/TeleBox/Utility）
+- **问题2**：每次回复前都自动加 "I am an expert in Telecoupling toolbox..." 前缀
+  - 根因：Greeting Behaviour 指令导致 LLM 将该句作为所有回复的 opener
+  - 修复：完全删除 `## Greeting Behaviour` 节，LLM 不再注入该前缀
+
+### 关键变更文件
+- `telecouplingAI-project/backend/agent.py`（`_BASE_SYSTEM_INSTRUCTION`：删除 Greeting 节，替换工具列表）
+
+### 测试状态
+- GCP 验证通过：`please list all tools` 输出正确的 markdown 列表，无 greeting 前缀，无 run_xxx 函数名
+
+---
+
+## 2026-05-16 — Recreation & Tourism 工具下架（Tool 26）
+
+### 完成内容
+- **`backend/agent.py`**：移除 `run_recreation_tourism` 的 FunctionDeclaration（共 19 行），从 `_SINGLE_TOOL_KEYWORDS` 和 `_TOOL_QUEUES` 中移除对应条目。LLM 不再看到该工具，无法调用也不会在"list all tools"中列出
+- **`backend/workers/task_queue.py`**：将 `from tools.recreation import run_recreation` 替换为内联 stub 函数，`raise RuntimeError("temporarily unavailable: external NatCap recmodel server not accessible")`，保证万一触发仍返回友好错误
+- 工具文件本身（`tools/recreation.py`、SKILL.md 等）**保持不变**，仅从调用链中断开
+- 部署方式：SCP → `agent.py` + `workers/task_queue.py` → GCP，重建镜像，`docker compose up -d --force-recreate`
+
+### 关键变更文件
+- `telecouplingAI-project/backend/agent.py`（移除 FunctionDeclaration + keyword + queue 条目）
+- `telecouplingAI-project/backend/workers/task_queue.py`（stub 替换 import）
+
+### 测试状态
+- 本地代码变更完成，待部署 GCP 后验证（询问 recreation → LLM 应回复"不支持"而非调用工具）
+
+---
+
+## 2026-05-16 — Manual_ClientToGCP_test 测试指南生成（42 工具）
+
+### 完成内容
+- 编写 `Systematic_tests/Manual_ClientToGCP_test/_generate_guides.py`（自包含脚本，可随时重新运行）
+- 脚本执行后创建 42 个工具子目录，每个目录含 `how_to_test.md`
+- 同时生成顶层 `README.md`（含 InVEST 27 + TeleBox 15 工具索引表）
+- 覆盖所有特殊情况：
+  - 需要 patch 文件的工具（02/03/05/06/08/15 NDR）在文件清单中单独标注 patch 路径
+  - 大文件服务器预装的工具（23 Wave Energy / 25 Wind Energy）注明"勿上传，传 server 路径"
+  - Tool 26 Recreation & Tourism 标记为 SKIP（依赖外部 recmodel server）
+  - Seasonal Water Yield（04）提示上传 24 个月度栅格
+
+### 关键变更文件
+- `telecouplingAI-project/Systematic_tests/Manual_ClientToGCP_test/_generate_guides.py`（新建）
+- `telecouplingAI-project/Systematic_tests/Manual_ClientToGCP_test/README.md`（新建）
+- `telecouplingAI-project/Systematic_tests/Manual_ClientToGCP_test/01_network_analysis/how_to_test.md` … `42_nutrition_metrics/how_to_test.md`（42 个，新建）
+
+### 测试状态
+- 脚本在 Windows PowerShell 执行成功：42 目录 + 43 文件全部创建
+- 内容抽查通过（Tool 04, 23, 26 格式正确，patch/server-path 注释清晰）
+
+---
+
+## 2026-05-16 — Smoke Test 创建并通过（Phase 1: 4/4，Phase 2: 12/12）
+
+### 完成内容
+- **创建 `AI_GCP_smoke_test/run_AI_GCP_smoke_test.py`**：快速 smoke + 轻量并发压力测试
+  - **4 个代表性工具**：07 Carbon Storage（快速 InVEST）、09 Annual Water Yield（中等 InVEST + shapefile）、28 OLS（TeleBox）、30 CO2（TeleBox）
+  - **Phase 1**：1 个用户顺序跑 4 个工具，验证基线延迟（全程约 12s）
+  - **Phase 2**：N 个并发用户（默认 3），错峰到达（0–8s 窗口），工具顺序随机打乱
+  - 每次 retry 一次（LLM 未调用工具时）
+  - Phase 2 采集 CPU/RAM/网络资源指标（每 5s 一个样本）
+  - 命令行参数：`--phase 1|2`、`--users N`
+  - 在 GCP 宿主机运行，通过 `http://localhost`（nginx 80 端口）访问
+- **测试结果**：Phase 1: 4/4 PASS（12.8s），Phase 2: 12/12 PASS（wall time 19.4s）
+  - 并发期间 CPU peak 27%，内存 peak 9088 MB / 32093 MB（28%）
+
+### 关键变更文件
+- `telecouplingAI-project/Systematic_tests/AI_GCP_smoke_test/run_AI_GCP_smoke_test.py`（新增）
+
+### 测试状态
+- **GCP Smoke 测试（压力/并发）**：Phase 1 4/4 ✓，Phase 2 12/12 ✓（3 并发用户）
+- GCP 浏览器测试：41/41 PASS（Tool 26 SKIP）
+- GCP LLM 测试：41/41 PASS（Tool 26 SKIP）
+- GCP 直接测试：42/42 PASS
+
+---
+
+## 2026-05-16 — 浏览器自动化测试全量通过（41 PASS / 0 FAIL / 1 SKIP）
+
+### 完成内容
+- **创建 `AI_GCP_browser_test/run_AI_GCP_browser_test.py`**：用 Playwright (headless Chromium) 模拟真实用户操作浏览器
+  - 真正把文件拖入/选入上传控件（非路径文本），再输入 prompt，等待蓝色 ToolStatusCard（LLM 已调用工具）
+  - `_expand_uploads()` 自动展开 `.shp` → 全部 sidecar，目录路径 → 目录内全部文件
+  - PASS 标准：45s 内出现 `.bg-blue-50` 或 `.bg-green-50`（LLM 路由正确即判 PASS）
+  - 每工具独立浏览器上下文（fresh sessionStorage / 新 session_id）
+- **修复 4 处初始失败**：
+  - **Tool 17 Urban Flood**：SKILL.md 缺少 GeoPackage 格式说明 + 多 CSV 时无法识别哪个是 curve_number_table；在 PRE_EXECUTION 加入两条"IMPORTANT"说明后 PASS
+  - **Tool 23 Wave Energy**：上传 WaveData/ 目录（811 MB 二进制 WatchWatch III 数据）触发 HTTP 413；修改为只上传用户侧文件（AOI shp + 机器 CSV），在 prompt 中传 `wave_base_data_path` 和 `bathymetry_path` 服务器路径后 PASS（与 LLM 直接测试保持一致）
+  - **Tool 32 Population Density**：prompt 使用了不存在的参数 `population_t1_field`/`population_t2_field`；改为 SKILL.md 中的正确参数 `population_field` + `area_km2_field` 后 PASS
+  - **Tool 40 Add Media Flows**：`.html` 文件被后端文件类型白名单拒绝（`supported_extensions` 不含 `.html`）；在 `backend/main.py` 中添加 `.html`/`.htm`，重建 Docker 镜像后 PASS
+- **最终结果**：41 PASS / 0 FAIL / 1 SKIP（Recreation 需外部 NatCap 服务）
+
+### 关键变更文件
+- `telecouplingAI-project/Systematic_tests/AI_GCP_browser_test/run_AI_GCP_browser_test.py`（新增）
+- `telecouplingAI-project/.claude/skills/run-urban-flood/SKILL.md`（新增 GeoPackage 格式说明 + 多 CSV 歧义消除）
+- `telecouplingAI-project/backend/main.py`（`supported_extensions` 加入 `.html`/`.htm`）
+
+### 测试状态
+- **GCP 浏览器测试**：**41/41 PASS**（Tool 26 SKIP）
+- GCP LLM 测试：41/41 PASS（上次已完成）
+- GCP 直接测试：42/42 PASS
+- 本地测试：42/42 PASS
+
+---
+
+## 2026-05-16 — GCP LLM 路径测试全量通过（41 PASS / 0 FAIL / 1 SKIP）
+
+### 完成内容
+- **创建 `AI_GCP_llm_test/run_AI_GCP_llm_test.py`**：通过 `/api/chat` SSE 接口对所有 42 个工具做完整 LLM 路径测试
+  - 使用 stdlib `urllib.request`，无需额外依赖
+  - 解析 SSE 流中的 `tool_start` / `tool_result` / `error` 事件判断测试通过
+  - Tool 26（Recreation）因需外部 NatCap 服务固定 SKIP
+  - 对需要 patched CSV 的工具（02,03,05,06,08,15）引用 AI_GCP_direct_test 的预处理文件
+  - 每工具 SSE 日志保存至 `nn_tool/log/sse.jsonl`
+- **修复 Docker 网络错误**：上次 `docker compose up` 误用根目录 compose 导致 `tele-backend` 进入 `csis-platform_default` 网络，与 Redis 所在 `telecouplingai-project_default` 不通；重新从内层 compose 启动恢复
+- **新增 `.claude/` 挂载**：在内层 `docker-compose.yml` 为 `api-server` 添加 `./.claude:/.claude` 卷，使 SKILL.md 文件对容器内 `agent.py` 可见（原 `SKILL_DIR = /.claude/skills/` 路径在镜像中不存在）
+- **SKILL.md 修复（2 处）**：
+  - `run-urban-nature-access`：在 `[PRE_EXECUTION]` 中显式列出 `dichotomy` 为合法 `decay_function` 值，并补充 `urban_nature_demand` / `aggregate_by_pop_group` 可选参数说明
+  - `run-coastal-vulnerability`：明确注明 `slr_vector_path` / `slr_field` 为可选，LLM 不应主动询问
+- **测试 prompt 修复（2 处）**：
+  - Tool 23 Wave Energy：`analysis_area=westcoast` → `West Coast of North America and Hawaii`（全名）
+  - Tool 41 Food Security：`indicator_field=Value` → `indicator_field=Prevalence of undernourishment`（实际指标名）
+- **最终结果**：41 PASS / 0 FAIL / 1 SKIP（Recreation）
+
+### 关键变更文件
+- `telecouplingAI-project/Systematic_tests/AI_GCP_llm_test/run_AI_GCP_llm_test.py`（新增）
+- `telecouplingAI-project/docker-compose.yml`（新增 `.claude` 挂载 + `Systematic_tests` 挂载）
+- `telecouplingAI-project/.claude/skills/run-urban-nature-access/SKILL.md`
+- `telecouplingAI-project/.claude/skills/run-coastal-vulnerability/SKILL.md`
+
+### 测试状态
+- GCP LLM 测试：**41/41 PASS**（Tool 26 SKIP）
+- GCP 直接测试：42/42 PASS（上次已完成）
+- 本地测试：42/42 PASS（已有）
+
+---
+
+## 2026-05-15 — GCP 直接工具测试全量通过（42 PASS / 0 FAIL）
+
+### 完成内容
+- **重写 `run_AI_GCP_direct_test.py`**：完整对标 `run_all_local_tests.py`
+  - Section A (01-27)：直接调用 `natcap.invest.X.execute()`，不走 backend wrapper
+  - Section B (28-42)：直接调用 backend async 函数
+  - 包含全部 CSV patch：`lucode→code`（CBC）、`lucode→lulc`（HQ）、strip `load_type_n/p`（NDR）、`crop_name→crop`（Crop）
+  - 修正所有参数：`layer_join_attri="ISO_3_CODE"`、`lulc_cur_path`、`calc_p=False`、`risk_eq="Euclidean"`、`aoi_path`（Scenic/Wave）等
+- **docker-compose.yml 新增挂载**：`./telecouplingAI-project/Systematic_tests` → 容器内同名绝对路径，测试输出直接写到宿主机
+- **DATA 路径修正**：从 `/data/datainput`（旧目录，6个老格式文件夹）改为 `Systematic_tests/Test_data`（新结构）
+- 脚本永久存放于 `Systematic_tests/AI_GCP_direct_test/run_AI_GCP_direct_test.py`
+- 42 个 `nn_tool/output/` 子文件夹已在宿主机上有实际输出文件
+
+### 关键变更文件
+- `telecouplingAI-project/Systematic_tests/AI_GCP_direct_test/run_AI_GCP_direct_test.py`（新建）
+- `telecouplingAI-project/docker-compose.yml`（新增 Systematic_tests 挂载）
+
+### 测试状态
+- GCP 直接工具测试：**42 PASS / 0 FAIL / 1 SKIP**（Tool 26 Recreation 需外部 NatCap 服务器）
+- Step 1（无 LLM 直接测试）✅ 完成，可进入 Step 2（LLM 调用测试）
+
+---
+
 ## 2026-05-15 — GCP 四级测试套件全量执行（27 PASS / 0 FAIL / 15 SKIP）
 
 ### 完成内容

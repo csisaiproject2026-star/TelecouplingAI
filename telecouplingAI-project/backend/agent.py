@@ -115,7 +115,6 @@ TOOL_TO_SKILL: dict[str, str] = {
     "run_scenario_gen_proximity":             "run-scenario-gen-proximity",
     "run_coastal_vulnerability":              "run-coastal-vulnerability",
     "run_offshore_wind_energy":               "run-offshore-wind-energy",
-    "run_recreation_tourism":                 "run-recreation-tourism",
     "run_model_selection_ols":               "run-model-selection-ols",
     "run_factor_analysis_mixed_data":        "run-famd",
     "run_co2_emissions":                     "run-co2-emissions",
@@ -194,20 +193,58 @@ _BASE_SYSTEM_INSTRUCTION = """
 You are CSIS Assistant, an expert in ecosystem services modelling (InVEST) and spatial analysis.
 Always respond in the same language as the user.
 
-## Greeting Behaviour
-When the user sends a greeting (e.g. "hello", "hi", "hey", "good morning", or any equivalent in other languages), respond with exactly:
-"I am an expert in Telecoupling toolbox, who has a solid background to assist you on across scales of human natural integrations analysis."
-Do not add any other text to this greeting response.
-
 ## Available Tools Overview
-- Tool 1: run_network_analysis_grouping — network/flow analysis using R + igraph
-- Tool 2: run_coastal_blue_carbon_preprocessor — LULC transition preprocessing for blue carbon
-- Tool 3: run_coastal_blue_carbon — carbon stock, sequestration and NPV analysis
-- Tool 4: run_seasonal_water_yield — quickflow, baseflow and local recharge modelling
-- Tool 5: run_crop_production_percentile — crop yield for 172 crops based on climate percentiles
-- Tool 6: run_crop_production_regression — crop yield based on fertilizer NPK rates (10 crops)
-- read_file_content — read and analyze any output file (CSV, TXT) to answer user questions
-- render_spatial_file — render a spatial output file (TIF, SHP) to a map image
+
+When a user asks you to list all supported tools, respond with the exact markdown list below. Copy it verbatim — do NOT rephrase, reorder, or add function call names (run_xxx). Always start the list on a new paragraph (blank line before the first section header).
+
+**InVEST Ecosystem Services Tools**
+- **Network Analysis Grouping**: Performs network/flow analysis using R + igraph for community detection and clustering.
+- **Coastal Blue Carbon Preprocessor**: Preprocesses LULC transitions for blue carbon modeling.
+- **Coastal Blue Carbon**: Analyzes carbon stock, sequestration, and Net Present Value (NPV) for coastal blue carbon habitats.
+- **Seasonal Water Yield**: Models quickflow, baseflow, and local recharge in watersheds.
+- **Crop Production Percentile**: Estimates crop yield for 172 crops based on climate percentiles.
+- **Crop Production Regression**: Estimates crop yield for 10 staple crops based on fertilizer NPK rates.
+- **Carbon Storage**: Estimates carbon stocks and sequestration based on LULC.
+- **Habitat Quality**: Maps habitat degradation and quality from human threats.
+- **Annual Water Yield**: Estimates annual water yield using the Budyko curve.
+- **Forest Carbon Edge Effect**: Estimates above-ground carbon in tropical forests, accounting for edge effects.
+- **Crop Pollination**: Models wild bee pollination services on farms.
+- **DelineateIt**: Delineates watersheds from a Digital Elevation Model (DEM) and outlet points.
+- **RouteDEM**: Computes flow direction, flow accumulation, streams, and slope from a DEM.
+- **Sediment Delivery Ratio (SDR)**: Estimates soil erosion and sediment export.
+- **Nutrient Delivery Ratio (NDR)**: Estimates nitrogen and phosphorus export from watersheds.
+- **Urban Cooling Island**: Estimates urban heat mitigation from green spaces.
+- **Urban Flood Risk Mitigation**: Estimates stormwater runoff and flood risk using curve numbers.
+- **Urban Stormwater Retention**: Estimates runoff retention and recharge in urban areas.
+- **Urban Nature Access**: Estimates population access to urban green space.
+- **Urban Mental Health**: Estimates mental health benefits from urban green space.
+- **Scenic Quality**: Computes viewshed visibility from structure points.
+- **Habitat Risk Assessment (HRA)**: Evaluates cumulative risk to habitats from multiple stressors.
+- **Wave Energy Production**: Estimates ocean wave energy potential.
+- **Scenario Generator - Proximity-Based**: Generates LULC conversion scenarios based on proximity.
+- **Coastal Vulnerability**: Assesses shoreline exposure and risk from waves, wind, and sea level.
+- **Offshore Wind Energy**: Estimates offshore wind power potential.
+
+**Telecoupling Toolbox**
+- **Model Selection OLS**: Runs Ordinary Least Squares (OLS) regression with automated model selection.
+- **Factor Analysis Mixed Data (FAMD)**: Performs PCA, MCA, or FAMD for dimensionality reduction.
+- **CO2 Emissions**: Calculates CO2 emissions from transport routes.
+- **Cost-Benefit Analysis**: Joins economic data and computes net returns.
+- **Population Count Density**: Calculates population density and change.
+- **Draw Radial Flows**: Generates radial flow lines from origin-destination coordinates.
+- **Commodity Trade**: Maps bilateral commodity trade flows between countries.
+- **Add Agents Interactively**: Creates point features for telecoupling agents from a CSV.
+- **Draw Agents from Table**: Renders agent point features from an uploaded coordinate table.
+- **Add Causes Interactively**: Creates point features for telecoupling causes from a CSV.
+- **Add Systems Interactively**: Creates point features for telecoupling systems from a CSV.
+- **Draw Systems from Table**: Renders system point features from an uploaded coordinate table.
+- **Add Media Flows**: Parses HTML for country mentions and generates media flow lines.
+- **Food Security**: Analyzes FAO food security indicators and generates trend charts.
+- **Nutrition Metrics**: Calculates Lower Limit Energy Requirements (LLER) by age group and sex.
+
+**Utility Tools**
+- **Read File Content**: Reads and returns the content of an output file (CSV or TXT) to answer user questions.
+- **Render Spatial File**: Renders a spatial output file (TIF, SHP) to a map image.
 
 ## File Analysis
 When a user asks to summarize, analyze, or asks questions about a specific output file (e.g. "summarize the CSV", "what are the top nodes?", "which country has the highest degree?"), call read_file_content with the file's internal_path. Then use the returned data to provide a detailed, domain-relevant analysis. Do NOT say you cannot read files.
@@ -795,25 +832,6 @@ TOOLS = [
                           "global_wind_parameters_path", "number_of_turbines"],
             ),
         ),
-        types.FunctionDeclaration(
-            name="run_recreation_tourism",
-            description="Run InVEST Recreation and Tourism model using Flickr photo-user-days to estimate visitation. Use when user asks about recreation, tourism, photo-user-days, PUD, Flickr, or visitor estimation.",
-            parameters=types.Schema(
-                type=types.Type.OBJECT,
-                properties={
-                    "aoi_path":                       types.Schema(type=types.Type.STRING, description="AOI polygon shapefile"),
-                    "start_year":                     types.Schema(type=types.Type.INTEGER, description="Start year (2005–2017)"),
-                    "end_year":                       types.Schema(type=types.Type.INTEGER, description="End year (2005–2017, >= start_year)"),
-                    "grid_aoi":                       types.Schema(type=types.Type.BOOLEAN, description="Grid the AOI, default false"),
-                    "grid_type":                      types.Schema(type=types.Type.STRING, description="'square' or 'hexagon', required if grid_aoi=true"),
-                    "cell_size":                      types.Schema(type=types.Type.NUMBER, description="Grid cell size in meters, required if grid_aoi=true"),
-                    "compute_regression":             types.Schema(type=types.Type.BOOLEAN, description="Compute regression against predictors, default false"),
-                    "predictor_table_path":           types.Schema(type=types.Type.STRING, description="Required if compute_regression=true"),
-                    "scenario_predictor_table_path":  types.Schema(type=types.Type.STRING),
-                },
-                required=["aoi_path", "start_year", "end_year"],
-            ),
-        ),
         # ── Telecoupling Toolbox — Statistical & Analytical Tools ──────────────
         types.FunctionDeclaration(
             name="run_model_selection_ols",
@@ -1135,7 +1153,6 @@ _TOOL_KEYWORDS: dict[str, list[str]] = {
     "run_scenario_gen_proximity":           ["scenario generator proximity", "scenario gen proximity", "run_scenario_gen"],
     "run_coastal_vulnerability":            ["coastal vulnerability", "run_coastal_vulnerability"],
     "run_offshore_wind_energy":             ["offshore wind", "run_offshore_wind"],
-    "run_recreation_tourism":              ["recreation", "tourism", "run_recreation"],
 }
 
 _TOOL_BY_NAME: dict[str, types.Tool] = {
@@ -1260,7 +1277,6 @@ async def run_agent(
         "run_scenario_gen_proximity":           "q_scenario_gen",
         "run_coastal_vulnerability":            "q_coastal_vuln",
         "run_offshore_wind_energy":             "q_wind_energy",
-        "run_recreation_tourism":               "q_recreation",
         "run_model_selection_ols":              "q_ols",
         "run_factor_analysis_mixed_data":       "q_famd",
         "run_co2_emissions":                    "q_co2",

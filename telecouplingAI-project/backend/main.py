@@ -111,7 +111,7 @@ async def chat_endpoint(
     # Save any uploaded files and build file context list
     uploaded = []
     unsupported_files = []
-    supported_extensions = {'.tif', '.tiff', '.shp', '.geojson', '.gpkg', '.csv', '.dbf', '.prj', '.shx', '.cpg', '.qpj', '.sbx', '.sbn', '.xml'}
+    supported_extensions = {'.tif', '.tiff', '.shp', '.geojson', '.gpkg', '.csv', '.dbf', '.prj', '.shx', '.cpg', '.qpj', '.sbx', '.sbn', '.xml', '.html', '.htm'}
 
     if files:
         upload_dir = os.path.join(settings.UPLOADS_DIR, session_id)
@@ -158,7 +158,7 @@ async def chat_endpoint(
                 if unsupported_files:
                     await queue.put({
                         "type": "warning",
-                        "message": f"Unsupported file types skipped: {', '.join(unsupported_files)}. Supported formats: .tif, .tiff, .shp, .geojson, .gpkg, .csv",
+                        "message": f"Unsupported file types skipped: {', '.join(unsupported_files)}. Supported formats: .tif, .tiff, .shp, .geojson, .gpkg, .csv, .html",
                         "skipped_files": unsupported_files,
                     })
 
