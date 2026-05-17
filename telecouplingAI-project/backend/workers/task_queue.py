@@ -15,6 +15,7 @@ import logging
 import redis
 from celery import Celery
 from config import settings
+from shared.utils import sanitize_error_message
 
 logger = logging.getLogger(__name__)
 
@@ -183,7 +184,7 @@ def run_tool_task(self, tool_name: str, params: dict, session_id: str):
         publish(r, session_id, tid, {
             "type": "error",
             "task_id": tid,
-            "message": str(e),
+            "message": sanitize_error_message(str(e)),
         })
     finally:
         r.close()

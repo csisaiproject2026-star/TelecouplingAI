@@ -496,21 +496,19 @@ TOOLS = [
             "- `Machine_AquaBuOY_Parameter.csv`",
             "- `AOI_WCVI.shp` (+ sidecars: `.dbf` `.shx` `.prj`)",
             "",
-            "**Do NOT upload** (pre-installed on server, pass as server paths in prompt):",
-            "- `WaveData/` directory (~811 MB) — at `Test_data/23_wave_energy/input/WaveData`",
-            "- `global_dem.tif` — at `Test_data/_shared/Base_Data/global_dem.tif`",
+            "WaveData (~811 MB) and the global DEM are **not** uploaded — the tool uses "
+            "the server's built-in copies automatically. No server paths needed.",
         ],
         prompt=(
             "Run Wave Energy on the uploaded files. "
             "analysis_area=West Coast of North America and Hawaii, "
-            "wave_base_data_path=/home/csisaiproject2026/csis-platform/telecouplingAI-project/Systematic_tests/Test_data/23_wave_energy/input/WaveData, "
-            "bathymetry_path=/home/csisaiproject2026/csis-platform/telecouplingAI-project/Systematic_tests/Test_data/_shared/Base_Data/global_dem.tif, "
             "valuation_container=false."
         ),
         outputs=["Wave energy raster", "Captured wave energy raster"],
         notes=(
-            "WaveData (~811 MB) and global DEM are pre-installed on the GCP server. "
-            "Pass their server-side absolute paths in the prompt — do NOT upload them from your local machine."
+            "Do not pass wave_base_data_path or bathymetry_path — omit them and the tool "
+            "automatically uses the server's built-in WaveData and global DEM, then notes "
+            "in its reply that the built-in defaults were used."
         ),
     ),
     dict(
@@ -552,21 +550,19 @@ TOOLS = [
             "- `3_6_turbine.csv`",
             "- `ECNA_EEZ_WEBPAR_Aug27_2012.csv`",
             "",
-            "**Do NOT upload** (pre-installed on server, pass as server paths in prompt):",
-            "- `global_dem.tif` — at `Test_data/_shared/Base_Data/global_dem.tif`",
-            "- `global_polygon.shp` — at `Test_data/_shared/Base_Data/global_polygon.shp`",
+            "The global DEM and global land polygon are **not** uploaded — the tool uses "
+            "the server's built-in copies automatically. No server paths needed.",
         ],
         prompt=(
             "Run Offshore Wind Energy on the uploaded files. "
-            "bathymetry_path=/home/csisaiproject2026/csis-platform/telecouplingAI-project/Systematic_tests/Test_data/_shared/Base_Data/global_dem.tif, "
-            "land_polygon_vector_path=/home/csisaiproject2026/csis-platform/telecouplingAI-project/Systematic_tests/Test_data/_shared/Base_Data/global_polygon.shp, "
             "number_of_turbines=80, min_depth=3, max_depth=60, "
             "min_distance=0, max_distance=200000, avg_grid_distance=4, valuation_container=false."
         ),
         outputs=["Wind energy density raster", "Harvested energy raster", "Turbine site shapefile"],
         notes=(
-            "Global DEM and land polygon are pre-installed on the GCP server. "
-            "Pass their server-side absolute paths in the prompt — do NOT upload them."
+            "Do not pass bathymetry_path or land_polygon_vector_path — omit them and the tool "
+            "automatically uses the server's built-in global DEM and land polygon, then notes "
+            "in its reply that the built-in defaults were used."
         ),
     ),
     dict(

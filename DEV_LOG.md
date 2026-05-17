@@ -1,3 +1,86 @@
+## 2026-05-17 — Wave/Wind Energy 大体积数据改为服务器内置默认
+
+### 完成内容
+- **问题**：手动测试 Tool 23 Wave Energy 报错 `FileNotFoundError: .../WaveData/NAmerica_WestCoast_4m.txt.bin`
+  - 根因：Manual 测试指南让用户在 prompt 里填宿主机路径 `Systematic_tests/Test_data/...`，但该目录**未挂载进 Docker worker 容器**，InVEST 在容器里找不到。文件本身没丢——正确的容器内路径是 `/data/datainput/...`（挂载自 `datainput_for_demo/`）
+- **修复思路**（用户确认）：大体积数据（WaveData 811MB、global_dem 112MB、global_polygon 155MB）用户无法上传也不该知道路径 → 在工具里写死服务器内置默认路径，参数改为可选
+- **Wave Energy**（`wave_energy.py`）：`wave_base_data_path`/`bathymetry_path` 移出 REQUIRED_KEYS；新增默认常量 `/data/datainput/23_wave_energy/input/WaveData`、`/data/datainput/_shared/Base_Data/global_dem.tif`；用户不传时回退
+- **Wind Energy**（`wind_energy.py`）：`bathymetry_path`/`land_polygon_vector_path` 同样处理，默认 `global_dem.tif`、`global_polygon.shp`
+- **使用默认时给用户提示**：工具返回 `result["warning"]`（worker 已有 warning 事件机制），文案 "No file was uploaded for ..., so the server's built-in default data was used."
+- `agent.py`：两工具 FunctionDeclaration 对应参数移出 `required`，描述注明「可选，省略则用服务器内置默认」
+- 两个 SKILL.md：PRE_EXECUTION 增加「Server-provided defaults — DO NOT ask the user for these paths」段
+- 测试指南：`_generate_guides.py` 修正 Tool 23/25 的 prompt（删除服务器路径）与文件清单，重新生成 23/25/README
+
+### 关键变更文件
+- `telecouplingAI-project/backend/tools/wave_energy.py`、`tools/wind_energy.py`
+- `telecouplingAI-project/backend/agent.py`
+- `telecouplingAI-project/.claude/skills/run-wave-energy-production/SKILL.md`、`run-offshore-wind-energy/SKILL.md`
+- `telecouplingAI-project/Systematic_tests/Manual_ClientToGCP_test/_generate_guides.py` + 23/25 指南
+
+### 测试状态
+- 本地 `TeleCouplingAI` 环境验证两模块导入正常、REQUIRED_KEYS 与默认常量正确
+- 已部署 GCP：重建 `csic_backend:latest` + 全量 `--force-recreate`；容器内 md5 一致；38 容器 Up；`GET /` 200
+
+---
+
+## 2026-05-17 — 错误信息不再暴露服务器路径
+
+### 完成内容
+- **问题**：工具报错时前端直接显示服务器绝对路径，如 `Unable to open /data/uploads/csis_xxx/scenario_proximity_aoi.shx ...`
+- **修复**：`shared/utils.py` 新增 `sanitize_error_message()`，用正则把绝对路径（unix `/data/...` 与 Windows `C:\...`）替换为纯文件名；模块名（如 `natcap/invest`）因前置 lookbehind 不受影响
+- 套用位置：
+  - `workers/task_queue.py`：worker 发布 error 事件源头 `str(e)` → `sanitize_error_message(str(e))`
+  - `agent.py`：工具异常兜底 except 块，前端 error 事件 + 回传给 Gemini 的 function_response error 都清理
+- 注：本次报错的真实原因是手动测试漏传 shapefile 的 `.shx` sidecar；按用户要求不做 `SHAPE_RESTORE_SHX` 自动重建，仅修错误信息显示
+
+### 关键变更文件
+- `telecouplingAI-project/backend/shared/utils.py`（新增 `sanitize_error_message`）
+- `telecouplingAI-project/backend/workers/task_queue.py`
+- `telecouplingAI-project/backend/agent.py`
+
+### 测试状态
+- 本地 `TeleCouplingAI` 环境验证：真实报错字符串路径被去除只剩文件名，模块名不受影响
+- 已部署 GCP：重建 `csic_backend:latest` + 全量 `--force-recreate`；容器内 md5 一致；站点 `GET /` 200
+
+---
+
+## 2026-05-17 — 修复 Tool 27 Scenario Gen Proximity 多值参数报错
+
+### 完成内容
+- **问题**：手动测试 Tool 27 报错 `invalid literal for int() with base 10: '1,2,3,4,5'`
+  - 根因：`agent.py` 中 `focal_landcover_codes`/`convertible_landcover_codes` 参数描述写「Comma-separated」，LLM 据此传逗号分隔串 `"1,2,3,4,5"`；而 InVEST `scenario_gen_proximity` 用 `.split()`（空格）解析，对整串做 `int()` 直接抛 `ValueError`
+- **修复**：
+  - `tools/scenario_gen_proximity.py`：新增 `_normalize_codes()`，将 list/逗号/空格/带方括号等各种形式归一为空格分隔整数串（根本容错）
+  - `agent.py`：两参数描述 Comma-separated → Space-separated，注明「接受一个或多个代码」
+  - `SKILL.md`：4 处 "comma-separated" → "space-separated"
+- 关于「响应慢」：部分耗时是报错后 LLM 重试/追问循环（随修复消失）；`scenario_gen_proximity` 迭代距离变换本身 1–3 分钟属 InVEST 固有耗时，非 bug
+
+### 关键变更文件
+- `telecouplingAI-project/backend/tools/scenario_gen_proximity.py`
+- `telecouplingAI-project/backend/agent.py`
+- `telecouplingAI-project/.claude/skills/run-scenario-gen-proximity/SKILL.md`
+
+### 测试状态
+- 本地用 `TeleCouplingAI` conda 环境（natcap.invest 3.14.3）验证 `_normalize_codes`：逗号/空格/列表/方括号全部正确归一为 `'1 2 3 4 5'`
+- 已部署 GCP：重建 `csic_backend:latest` 镜像 + 全量 `--force-recreate`；容器内 md5 与本地一致；站点 `GET /` 与 `/health` 均 200
+
+---
+
+## 2026-05-17 — GCP celery worker 镜像同步
+
+### 完成内容
+- 排查"GCP 是否最新代码"：md5 对比发现 `tele-backend` 8/8 文件与本地一致，但 37 个 `tele-celery-*` worker 仍挂在旧 dangling 镜像 `84d7e6d85e08` 上 —— 工具代码/`task_queue.py` 一致，仅 `agent.py` 是旧版（无害死代码，worker 不执行 agent.py）
+- 成因：27h 前重建过 `tele-backend`，但 celery worker 未跟随 `--force-recreate`
+- 在 GCP 执行 `docker compose up -d --force-recreate` + `docker compose restart nginx`，全部 38 容器重建到当前 `csic_backend:latest` (`b28b68a3`)
+
+### 关键变更文件
+- 无代码变更，仅 GCP 容器重建（环境同步）
+
+### 测试状态
+- 34 容器统一 `csic_backend:latest`；celery worker `agent.py` md5 = `fc63cdb7` = 本地；`GET /` 与 `/health` 均 200
+
+---
+
 ## 2026-05-16 — GCP 服务器代码审查 + 冗余清理
 
 ### 完成内容

@@ -23,13 +23,18 @@ logger = logging.getLogger(__name__)
 
 REQUIRED_KEYS = [
     "aoi_vector_path",
-    "bathymetry_path",
     "global_wind_parameters_path",
-    "land_polygon_vector_path",
     "number_of_turbines",
     "turbine_parameters_path",
     "wind_data_path",
 ]
+
+# Server built-in base data. The global DEM (~112 MB) and global land polygon
+# (~155 MB) are too large for users to upload, so they are pre-installed on the
+# server and mounted into the worker container. When the user does not supply
+# these paths, the tool falls back to these defaults.
+_DEFAULT_BATHYMETRY   = "/data/datainput/_shared/Base_Data/global_dem.tif"
+_DEFAULT_LAND_POLYGON = "/data/datainput/_shared/Base_Data/global_polygon.shp"
 
 
 async def run_offshore_wind_energy(
@@ -46,13 +51,25 @@ async def run_offshore_wind_energy(
     workspace_dir, _ = generate_output_dir("wind_energy", session_id)
     progress_callback(10, "Created output directory")
 
+    # Fall back to server built-in base data when the user does not supply it,
+    # and collect a notice so the user is told which defaults were used.
+    default_notices = []
+    bathymetry_path = params.get("bathymetry_path")
+    if not bathymetry_path:
+        bathymetry_path = _DEFAULT_BATHYMETRY
+        default_notices.append("bathymetry DEM (global_dem.tif)")
+    land_polygon_vector_path = params.get("land_polygon_vector_path")
+    if not land_polygon_vector_path:
+        land_polygon_vector_path = _DEFAULT_LAND_POLYGON
+        default_notices.append("land polygon (global_polygon.shp)")
+
     invest_args = {
         "workspace_dir":              workspace_dir,
         "results_suffix":             params.get("results_suffix", ""),
         "wind_data_path":             params["wind_data_path"],
         "aoi_vector_path":            params["aoi_vector_path"],
-        "bathymetry_path":            params["bathymetry_path"],
-        "land_polygon_vector_path":   params["land_polygon_vector_path"],
+        "bathymetry_path":            bathymetry_path,
+        "land_polygon_vector_path":   land_polygon_vector_path,
         "turbine_parameters_path":    params["turbine_parameters_path"],
         "number_of_turbines":         int(params["number_of_turbines"]),
         "global_wind_parameters_path": params["global_wind_parameters_path"],
@@ -75,4 +92,10 @@ async def run_offshore_wind_energy(
     files = await scan_output_directory(workspace_dir, "wind_energy")
     progress_callback(100, "Done")
 
-    return {"success": True, "files": files}
+    result = {"success": True, "files": files}
+    if default_notices:
+        result["warning"] = (
+            "No file was uploaded for " + " and ".join(default_notices)
+            + ", so the server's built-in default data was used for the computation."
+        )
+    return result

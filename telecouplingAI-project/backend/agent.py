@@ -31,6 +31,7 @@ from google.genai.client import HttpOptions
 import redis.asyncio as aioredis
 
 from config import settings
+from shared.utils import sanitize_error_message
 
 logger = logging.getLogger(__name__)
 
@@ -744,19 +745,18 @@ TOOLS = [
             parameters=types.Schema(
                 type=types.Type.OBJECT,
                 properties={
-                    "wave_base_data_path":  types.Schema(type=types.Type.STRING, description="Path to InVEST wave base data directory"),
+                    "wave_base_data_path":  types.Schema(type=types.Type.STRING, description="Optional. Path to InVEST wave base data directory. Omit it to use the server's built-in default WaveData (the user does not need to upload or know this path)."),
                     "analysis_area":        types.Schema(type=types.Type.STRING, description="One of: 'Australia', 'East Coast of North America and Puerto Rico', 'Global', 'North Sea 10 meter resolution', 'North Sea 4 meter resolution', 'West Coast of North America and Hawaii'"),
                     "machine_perf_path":    types.Schema(type=types.Type.STRING, description="Wave energy machine performance CSV"),
                     "machine_param_path":   types.Schema(type=types.Type.STRING, description="Wave energy machine parameters CSV"),
-                    "bathymetry_path":      types.Schema(type=types.Type.STRING, description="Bathymetry raster (DEM)"),
+                    "bathymetry_path":      types.Schema(type=types.Type.STRING, description="Optional. Bathymetry raster (DEM). Omit it to use the server's built-in default global DEM (the user does not need to upload or know this path)."),
                     "aoi_vector_path":      types.Schema(type=types.Type.STRING),
                     "do_valuation":         types.Schema(type=types.Type.BOOLEAN, description="Default false"),
                     "grid_points_path":     types.Schema(type=types.Type.STRING, description="Required if do_valuation=true"),
                     "machine_econ_path":    types.Schema(type=types.Type.STRING, description="Required if do_valuation=true"),
                     "number_of_machines":   types.Schema(type=types.Type.INTEGER, description="Default 28"),
                 },
-                required=["wave_base_data_path", "analysis_area", "machine_perf_path",
-                          "machine_param_path", "bathymetry_path"],
+                required=["analysis_area", "machine_perf_path", "machine_param_path"],
             ),
         ),
         types.FunctionDeclaration(
@@ -768,8 +768,8 @@ TOOLS = [
                     "base_lulc_path":              types.Schema(type=types.Type.STRING, description="Base LULC raster to convert"),
                     "replacement_lucode":          types.Schema(type=types.Type.INTEGER, description="LULC code to convert pixels to"),
                     "area_to_convert":             types.Schema(type=types.Type.NUMBER, description="Area (ha) to convert"),
-                    "focal_landcover_codes":       types.Schema(type=types.Type.STRING, description="Comma-separated LULC codes to measure distance from"),
-                    "convertible_landcover_codes": types.Schema(type=types.Type.STRING, description="Comma-separated LULC codes eligible for conversion"),
+                    "focal_landcover_codes":       types.Schema(type=types.Type.STRING, description="Space-separated LULC codes to measure distance from, e.g. '1 2 3'. Accepts one or many codes."),
+                    "convertible_landcover_codes": types.Schema(type=types.Type.STRING, description="Space-separated LULC codes eligible for conversion, e.g. '1 2 3'. Accepts one or many codes."),
                     "convert_nearest_to_edge":     types.Schema(type=types.Type.BOOLEAN, description="Convert pixels nearest to focal LULC, default true"),
                     "convert_farthest_from_edge":  types.Schema(type=types.Type.BOOLEAN, description="Convert pixels farthest from focal LULC, default false"),
                     "aoi_path":                    types.Schema(type=types.Type.STRING),
@@ -815,8 +815,8 @@ TOOLS = [
                 properties={
                     "wind_data_path":                  types.Schema(type=types.Type.STRING, description="Wind data point shapefile (NOAA/ECMWF)"),
                     "aoi_vector_path":                 types.Schema(type=types.Type.STRING, description="AOI polygon shapefile"),
-                    "bathymetry_path":                 types.Schema(type=types.Type.STRING, description="Bathymetry raster"),
-                    "land_polygon_vector_path":        types.Schema(type=types.Type.STRING, description="Land polygon for distance calculation"),
+                    "bathymetry_path":                 types.Schema(type=types.Type.STRING, description="Optional. Bathymetry raster. Omit it to use the server's built-in default global DEM (the user does not need to upload or know this path)."),
+                    "land_polygon_vector_path":        types.Schema(type=types.Type.STRING, description="Optional. Land polygon for distance calculation. Omit it to use the server's built-in default global land polygon (the user does not need to upload or know this path)."),
                     "turbine_parameters_path":         types.Schema(type=types.Type.STRING, description="CSV with turbine specs"),
                     "global_wind_parameters_path":     types.Schema(type=types.Type.STRING, description="CSV with global wind model parameters"),
                     "number_of_turbines":              types.Schema(type=types.Type.INTEGER, description="Number of turbines per wind farm"),
@@ -827,8 +827,7 @@ TOOLS = [
                     "valuation_container":             types.Schema(type=types.Type.BOOLEAN, description="Enable economic valuation, default false"),
                     "avg_grid_distance":               types.Schema(type=types.Type.NUMBER, description="Average grid distance (km), default 4"),
                 },
-                required=["wind_data_path", "aoi_vector_path", "bathymetry_path",
-                          "land_polygon_vector_path", "turbine_parameters_path",
+                required=["wind_data_path", "aoi_vector_path", "turbine_parameters_path",
                           "global_wind_parameters_path", "number_of_turbines"],
             ),
         ),
@@ -1525,15 +1524,16 @@ async def run_agent(
 
             except Exception as exc:
                 logger.exception(f"[agent] Tool {tool_name} failed: {exc}")
+                safe_msg = sanitize_error_message(str(exc))
                 await _maybe_await(event_callback({
                     "type": "error",
-                    "message": str(exc),
+                    "message": safe_msg,
                     "error_code": "TOOL_FAILED",
                 }))
                 function_response_parts.append(
                     types.Part.from_function_response(
                         name=tool_name,
-                        response={"error": str(exc)},
+                        response={"error": safe_msg},
                     )
                 )
             finally:

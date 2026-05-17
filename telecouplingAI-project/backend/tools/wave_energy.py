@@ -17,12 +17,17 @@ from shared.utils import CSISError, validate_required, generate_output_dir, scan
 logger = logging.getLogger(__name__)
 
 REQUIRED_KEYS = [
-    "wave_base_data_path",
     "analysis_area",
     "machine_perf_path",
     "machine_param_path",
-    "bathymetry_path",
 ]
+
+# Server built-in base data. WaveData (~811 MB) and the global DEM (~112 MB)
+# are too large for users to upload, so they are pre-installed on the server
+# and mounted into the worker container. When the user does not supply these
+# paths, the tool falls back to these defaults.
+_DEFAULT_WAVE_BASE_DATA = "/data/datainput/23_wave_energy/input/WaveData"
+_DEFAULT_BATHYMETRY     = "/data/datainput/_shared/Base_Data/global_dem.tif"
 
 VALID_ANALYSIS_AREAS = {
     "Australia",
@@ -70,14 +75,26 @@ async def run_wave_energy(
     workspace_dir, _ = generate_output_dir("wave_energy", session_id)
     progress_callback(10, "Created output directory")
 
+    # Fall back to server built-in base data when the user does not supply it,
+    # and collect a notice so the user is told which defaults were used.
+    default_notices = []
+    wave_base_data_path = params.get("wave_base_data_path")
+    if not wave_base_data_path:
+        wave_base_data_path = _DEFAULT_WAVE_BASE_DATA
+        default_notices.append("wave base data (WaveData)")
+    bathymetry_path = params.get("bathymetry_path")
+    if not bathymetry_path:
+        bathymetry_path = _DEFAULT_BATHYMETRY
+        default_notices.append("bathymetry DEM (global_dem.tif)")
+
     invest_args = {
         "workspace_dir":       workspace_dir,
         "results_suffix":      params.get("results_suffix", ""),
-        "wave_base_data_path": params["wave_base_data_path"],
+        "wave_base_data_path": wave_base_data_path,
         "analysis_area":       _AREA_CODE[analysis_area],
         "machine_perf_path":   params["machine_perf_path"],
         "machine_param_path":  params["machine_param_path"],
-        "dem_path":            params["bathymetry_path"],
+        "dem_path":            bathymetry_path,
         "aoi_path":            params.get("aoi_vector_path", ""),
         "valuation_container": do_valuation,
     }
@@ -98,4 +115,10 @@ async def run_wave_energy(
     files = await scan_output_directory(workspace_dir, "wave_energy")
     progress_callback(100, "Done")
 
-    return {"success": True, "files": files}
+    result = {"success": True, "files": files}
+    if default_notices:
+        result["warning"] = (
+            "No file was uploaded for " + " and ".join(default_notices)
+            + ", so the server's built-in default data was used for the computation."
+        )
+    return result

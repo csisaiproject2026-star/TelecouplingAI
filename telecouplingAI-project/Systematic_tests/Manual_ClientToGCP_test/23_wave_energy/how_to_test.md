@@ -13,9 +13,7 @@ From GCP server path `Test_data/23_wave_energy/input/`:
 - `Machine_AquaBuOY_Parameter.csv`
 - `AOI_WCVI.shp` (+ sidecars: `.dbf` `.shx` `.prj`)
 
-**Do NOT upload** (pre-installed on server, pass as server paths in prompt):
-- `WaveData/` directory (~811 MB) — at `Test_data/23_wave_energy/input/WaveData`
-- `global_dem.tif` — at `Test_data/_shared/Base_Data/global_dem.tif`
+WaveData (~811 MB) and the global DEM are **not** uploaded — the tool uses the server's built-in copies automatically. No server paths needed.
 
 *(Download these files via SCP from the GCP server, or use the GCP browser directly)*
 
@@ -26,7 +24,7 @@ From GCP server path `Test_data/23_wave_energy/input/`:
 Copy and paste this into the chat box:
 
 ```
-Run Wave Energy on the uploaded files. analysis_area=West Coast of North America and Hawaii, wave_base_data_path=/home/csisaiproject2026/csis-platform/telecouplingAI-project/Systematic_tests/Test_data/23_wave_energy/input/WaveData, bathymetry_path=/home/csisaiproject2026/csis-platform/telecouplingAI-project/Systematic_tests/Test_data/_shared/Base_Data/global_dem.tif, valuation_container=false.
+Run Wave Energy on the uploaded files. analysis_area=West Coast of North America and Hawaii, valuation_container=false.
 ```
 
 ---
@@ -43,4 +41,4 @@ Run Wave Energy on the uploaded files. analysis_area=West Coast of North America
 
 ## Notes
 
-WaveData (~811 MB) and global DEM are pre-installed on the GCP server. Pass their server-side absolute paths in the prompt — do NOT upload them from your local machine.
+Do not pass wave_base_data_path or bathymetry_path — omit them and the tool automatically uses the server's built-in WaveData and global DEM, then notes in its reply that the built-in defaults were used.

@@ -14,8 +14,8 @@ invest_args keys:
 - base_lulc_path (required; baseline LULC raster)
 - replacement_lucode (required int; LULC code to assign to converted pixels)
 - area_to_convert (required float; hectares to convert)
-- focal_landcover_codes (required str; comma-separated lucodes adjacent to which conversion occurs)
-- convertible_landcover_codes (required str; comma-separated lucodes that can be converted)
+- focal_landcover_codes (required str; space-separated lucodes adjacent to which conversion occurs; tool also normalizes commas)
+- convertible_landcover_codes (required str; space-separated lucodes that can be converted; tool also normalizes commas)
 - convert_nearest_to_edge (bool; default True; convert pixels nearest to focal class edges first)
 - convert_farthest_from_edge (bool; default False; convert pixels farthest from focal class edges)
 - aoi_path (optional; clip conversion to area of interest polygon)
@@ -34,8 +34,8 @@ Types: replacement_lucode cast to int, area_to_convert to float, codes to str.
 - base_lulc_path: baseline land use / land cover raster (the map to modify)
 - replacement_lucode: the LULC code of the new land cover type (e.g. 1 for forest if 1=forest in the legend)
 - area_to_convert: total area to convert (hectares)
-- focal_landcover_codes: comma-separated list of LULC codes defining the 'edge' to convert near (e.g. "1,2" to convert land near forest and shrubland)
-- convertible_landcover_codes: comma-separated list of LULC codes that are eligible to be converted (e.g. "3,4" for cropland and grassland only)
+- focal_landcover_codes: space-separated list of LULC codes defining the 'edge' to convert near (e.g. "1 2" to convert land near forest and shrubland)
+- convertible_landcover_codes: space-separated list of LULC codes that are eligible to be converted (e.g. "3 4" for cropland and grassland only)
 
 **Conversion direction** (ask user which scenario):
 - convert_nearest_to_edge: True → converts eligible pixels closest to the focal class boundary first (simulates edge expansion — e.g. deforestation encroaching on forest from the outside)
@@ -84,7 +84,7 @@ Types: replacement_lucode cast to int, area_to_convert to float, codes to str.
 **focal_landcover_codes vs convertible_landcover_codes**:
 - Focal codes define WHERE conversion happens (near these classes)
 - Convertible codes define WHAT gets converted (only these pixel types change)
-- Example: focal="1" (forest), convertible="3,4" (cropland, grassland) → crops/grassland nearest to forest are converted to replacement_lucode — simulating agricultural expansion into forest margins
+- Example: focal="1" (forest), convertible="3 4" (cropland, grassland) → crops/grassland nearest to forest are converted to replacement_lucode — simulating agricultural expansion into forest margins
 
 **n_steps > 1**:
 - Generates multiple incremental scenario rasters showing the conversion pathway step by step

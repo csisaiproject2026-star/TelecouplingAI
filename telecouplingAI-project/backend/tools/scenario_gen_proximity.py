@@ -25,6 +25,20 @@ REQUIRED_KEYS = [
 ]
 
 
+def _normalize_codes(value) -> str:
+    """Coerce LULC codes into the space-separated string InVEST expects.
+
+    The LLM may pass a list, a comma-separated string, or a space-separated
+    string. InVEST's scenario_gen_proximity parses these via str.split() and
+    int(), so anything but space-separated integers raises ValueError.
+    """
+    if isinstance(value, (list, tuple)):
+        items = value
+    else:
+        items = str(value).strip("[]()").replace(",", " ").split()
+    return " ".join(str(int(x)) for x in items)
+
+
 async def run_scenario_gen_proximity(
     params: dict,
     session_id: str,
@@ -51,8 +65,8 @@ async def run_scenario_gen_proximity(
         "base_lulc_path":              params["base_lulc_path"],
         "replacement_lucode":          int(params["replacement_lucode"]),
         "area_to_convert":             float(params["area_to_convert"]),
-        "focal_landcover_codes":       str(params["focal_landcover_codes"]),
-        "convertible_landcover_codes": str(params["convertible_landcover_codes"]),
+        "focal_landcover_codes":       _normalize_codes(params["focal_landcover_codes"]),
+        "convertible_landcover_codes": _normalize_codes(params["convertible_landcover_codes"]),
         "convert_nearest_to_edge":     nearest,
         "convert_farthest_from_edge":  farthest,
         "aoi_path":                    params.get("aoi_path", ""),

@@ -11,13 +11,13 @@ Tool name: run_wave_energy_production
 
 invest_args keys:
 - workspace_dir
-- wave_base_data_path (required; CSV pointing to pre-packaged wave data — bundled with InVEST sample data)
+- wave_base_data_path (OPTIONAL; pre-packaged wave data directory. Defaults to server built-in WaveData when omitted)
 - analysis_area (required; string enum: 'Australia' | 'East Coast of North America and Puerto Rico' |
   'Global' | 'North Sea 10 meter resolution' | 'North Sea 4 meter resolution' |
   'West Coast of North America and Hawaii')
 - machine_perf_path (required; CSV matrix of device power output at different wave conditions)
 - machine_param_path (required; CSV of device specs: CapMax kW, HsMax m, TpMax sec)
-- bathymetry_path (required; ocean depth raster, negative values, m)
+- bathymetry_path (OPTIONAL; ocean depth raster. Defaults to server built-in global DEM when omitted)
 - aoi_vector_path (optional; clip analysis to specific region)
 - do_valuation (bool; default False)
 - grid_points_path (CSV; required if do_valuation=True; columns: id, type, lat, long, location)
@@ -35,7 +35,6 @@ invest_args keys:
 - Trade-offs between wave energy and marine conservation/fisheries
 
 **Required parameters**:
-- wave_base_data_path: path to the wave base data CSV bundled with InVEST sample data (ask user to locate it in their InVEST installation under `WaveEnergy/` sample data folder)
 - analysis_area: select from the following options:
   - "Australia"
   - "East Coast of North America and Puerto Rico"
@@ -45,7 +44,10 @@ invest_args keys:
   - "West Coast of North America and Hawaii"
 - machine_perf_path: CSV performance matrix (Hs wave height × Tp wave period → power kW); sample data provided with InVEST
 - machine_param_path: CSV of device parameters (CapMax, HsMax, TpMax); sample data provided
-- bathymetry_path: ocean bathymetry raster (negative depth values in meters); global 1 arc-minute data bundled with InVEST sample data
+
+**Server-provided defaults — DO NOT ask the user for these paths**:
+- wave_base_data_path: large pre-packaged WaveData directory (~811 MB). It is pre-installed on the server. Omit this parameter entirely unless the user explicitly supplies their own wave base data — the tool will use the built-in default and notify the user.
+- bathymetry_path: global ocean bathymetry DEM. Pre-installed on the server. Omit this parameter unless the user explicitly supplies their own DEM — the tool uses the built-in default and notifies the user.
 
 **Optional parameters**:
 - aoi_vector_path: polygon to clip the analysis to a specific coastal region (recommended for large analysis areas to reduce runtime)

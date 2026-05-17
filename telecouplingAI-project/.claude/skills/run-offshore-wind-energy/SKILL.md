@@ -13,8 +13,8 @@ invest_args keys:
 - workspace_dir
 - wind_data_path (required; CSV of wind speed at hub height — WEBPAR format)
 - aoi_vector_path (required; polygon of wind farm study area / EEZ)
-- bathymetry_path (required; ocean depth raster, negative values m)
-- land_polygon_vector_path (required; global land polygon — exclusion zone)
+- bathymetry_path (OPTIONAL; ocean depth raster. Defaults to server built-in global DEM when omitted)
+- land_polygon_vector_path (OPTIONAL; global land polygon. Defaults to server built-in global polygon when omitted)
 - turbine_parameters_path (required; CSV of turbine specs: rated power kW, hub height, rotor diameter, cut-in/cut-out speeds)
 - number_of_turbines (required int; number of turbines in the farm)
 - global_wind_parameters_path (required; CSV of global model parameters — bundled with InVEST)
@@ -38,11 +38,13 @@ invest_args keys:
 **Required parameters**:
 - wind_data_path: CSV of wind speed at hub height with columns: longitude, latitude, wind speed (m/s) percentiles — WEBPAR format; bundled with InVEST sample data under WindEnergy/input/
 - aoi_vector_path: polygon of the wind farm planning area (typically an EEZ or sub-region)
-- bathymetry_path: ocean bathymetry raster (negative depth values in meters); global DEM bundled under Base_Data/global_dem.tif
-- land_polygon_vector_path: global land polygon for exclusion buffering (keep ships and turbines away from shore); bundled under Base_Data/global_polygon.shp
 - turbine_parameters_path: CSV of turbine specifications — InVEST includes 3_6_turbine.csv (3.6 MW) and 5_0_turbine.csv (5 MW) under WindEnergy/input/
 - number_of_turbines: total number of turbines in the wind farm (used for calculating total farm energy and carbon offset)
 - global_wind_parameters_path: global model parameters CSV (loss factors, capacity factors) bundled under WindEnergy/input/global_wind_energy_parameters.csv
+
+**Server-provided defaults — DO NOT ask the user for these paths**:
+- bathymetry_path: global ocean bathymetry DEM (~112 MB). Pre-installed on the server. Omit this parameter unless the user explicitly supplies their own DEM — the tool uses the built-in default and notifies the user.
+- land_polygon_vector_path: global land polygon (~155 MB). Pre-installed on the server. Omit this parameter unless the user explicitly supplies their own land polygon — the tool uses the built-in default and notifies the user.
 
 **Optional parameters**:
 - min_depth / max_depth: depth range for viable turbine installation (default 3–60 m for fixed-bottom foundations)

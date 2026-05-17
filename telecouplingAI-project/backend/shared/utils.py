@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import subprocess
 import sys
 from datetime import datetime
@@ -12,6 +13,28 @@ from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+
+# Matches absolute filesystem paths (unix /data/uploads/... or Windows C:\...).
+# Only matches when preceded by whitespace/quote/paren/start so module names
+# like "natcap/invest" inside prose are left untouched.
+_ABS_PATH_RE = re.compile(r'(?<![^\s\'"(>])(?:[A-Za-z]:)?(?:[/\\][^/\\\s\'"]+)+')
+
+
+def sanitize_error_message(msg: Any) -> str:
+    """Strip absolute server paths from error text shown to end users.
+
+    InVEST/GDAL errors embed full server paths such as
+    /data/uploads/csis_xxx/file.shx — users should only ever see the
+    filename, never the internal directory layout.
+    """
+    if not msg:
+        return "" if msg is None else str(msg)
+
+    def _basename(m: re.Match) -> str:
+        return m.group(0).replace('\\', '/').rsplit('/', 1)[-1]
+
+    return _ABS_PATH_RE.sub(_basename, str(msg))
 
 
 class CSISError(Exception):
