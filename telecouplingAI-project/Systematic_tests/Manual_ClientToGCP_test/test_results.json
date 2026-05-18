@@ -1,0 +1,254 @@
+[
+  {
+    "tool": "01_network_analysis",
+    "status": "PASS",
+    "time_s": 12.3,
+    "ts": "00:44:35"
+  },
+  {
+    "tool": "04_seasonal_water_yield",
+    "status": "PASS",
+    "time_s": 26.2,
+    "ts": "00:50:07"
+  },
+  {
+    "tool": "05_crop_production_percentile",
+    "status": "PASS",
+    "time_s": 12.5,
+    "ts": "00:50:35"
+  },
+  {
+    "tool": "06_crop_production_regression",
+    "status": "PASS",
+    "time_s": 12.4,
+    "ts": "00:50:49"
+  },
+  {
+    "tool": "07_carbon_storage",
+    "status": "PASS",
+    "time_s": 20.3,
+    "ts": "00:51:04"
+  },
+  {
+    "tool": "09_annual_water_yield",
+    "status": "PASS",
+    "time_s": 18.6,
+    "ts": "00:51:42"
+  },
+  {
+    "tool": "10_forest_carbon_edge_effect",
+    "status": "PASS",
+    "time_s": 45.5,
+    "ts": "00:52:02"
+  },
+  {
+    "tool": "11_crop_pollination",
+    "status": "PASS",
+    "time_s": 34.1,
+    "ts": "00:52:50"
+  },
+  {
+    "tool": "12_delineateit",
+    "status": "PASS",
+    "time_s": 11.4,
+    "ts": "00:53:26"
+  },
+  {
+    "tool": "13_routedem",
+    "status": "PASS",
+    "time_s": 13.2,
+    "ts": "00:53:39"
+  },
+  {
+    "tool": "14_sdr",
+    "status": "PASS",
+    "time_s": 38.6,
+    "ts": "00:53:54"
+  },
+  {
+    "tool": "15_ndr",
+    "status": "PASS",
+    "time_s": 41.9,
+    "ts": "00:54:35"
+  },
+  {
+    "tool": "16_urban_cooling",
+    "status": "PASS",
+    "time_s": 15.8,
+    "ts": "00:55:19"
+  },
+  {
+    "tool": "17_urban_flood",
+    "status": "PASS",
+    "time_s": 18.0,
+    "ts": "00:55:37"
+  },
+  {
+    "tool": "19_urban_nature_access",
+    "status": "PASS",
+    "time_s": 53.0,
+    "ts": "01:02:52"
+  },
+  {
+    "tool": "20_urban_mental_health",
+    "status": "PASS",
+    "time_s": 27.2,
+    "ts": "01:03:47"
+  },
+  {
+    "tool": "21_scenic_quality",
+    "status": "PASS",
+    "time_s": 92.6,
+    "ts": "01:04:17"
+  },
+  {
+    "tool": "23_wave_energy",
+    "status": "PASS",
+    "time_s": 20.3,
+    "ts": "01:06:11"
+  },
+  {
+    "tool": "25_wind_energy",
+    "status": "PASS",
+    "time_s": 21.5,
+    "ts": "01:08:02"
+  },
+  {
+    "tool": "26_recreation",
+    "status": "SKIP",
+    "time_s": 0,
+    "ts": "01:08:26"
+  },
+  {
+    "tool": "28_ols",
+    "status": "PASS",
+    "time_s": 9.8,
+    "ts": "01:08:48"
+  },
+  {
+    "tool": "29_famd",
+    "status": "PASS",
+    "time_s": 14.2,
+    "ts": "01:08:59"
+  },
+  {
+    "tool": "30_co2_emissions",
+    "status": "PASS",
+    "time_s": 9.9,
+    "ts": "01:09:16"
+  },
+  {
+    "tool": "33_radial_flows",
+    "status": "PASS",
+    "time_s": 10.0,
+    "ts": "01:19:38"
+  },
+  {
+    "tool": "35_add_agents",
+    "status": "PASS",
+    "time_s": 11.7,
+    "ts": "01:24:55"
+  },
+  {
+    "tool": "38_add_systems",
+    "status": "PASS",
+    "time_s": 6.9,
+    "ts": "01:35:19"
+  },
+  {
+    "tool": "40_add_media_flows",
+    "status": "PASS",
+    "time_s": 7.2,
+    "ts": "01:40:33"
+  },
+  {
+    "tool": "41_food_security",
+    "status": "PASS",
+    "time_s": 10.3,
+    "ts": "01:40:42"
+  },
+  {
+    "tool": "02_coastal_blue_carbon_preprocessor",
+    "status": "PASS",
+    "time_s": 10.5,
+    "ts": "09:34:51"
+  },
+  {
+    "tool": "03_coastal_blue_carbon",
+    "status": "PASS",
+    "time_s": 18.3,
+    "ts": "09:35:03"
+  },
+  {
+    "tool": "18_urban_stormwater",
+    "status": "PASS",
+    "time_s": 12.9,
+    "ts": "09:35:39"
+  },
+  {
+    "tool": "24_coastal_vulnerability",
+    "status": "PASS",
+    "time_s": 105.6,
+    "ts": "09:36:11"
+  },
+  {
+    "tool": "27_scenario_gen_proximity",
+    "status": "PASS",
+    "time_s": 21.1,
+    "ts": "09:37:59"
+  },
+  {
+    "tool": "31_cost_benefit_analysis",
+    "status": "PASS",
+    "time_s": 7.7,
+    "ts": "09:38:22"
+  },
+  {
+    "tool": "42_nutrition_metrics",
+    "status": "PASS",
+    "time_s": 7.1,
+    "ts": "10:03:57"
+  },
+  {
+    "tool": "32_population_density",
+    "status": "PASS",
+    "time_s": 6.8,
+    "ts": "10:15:53"
+  },
+  {
+    "tool": "37_add_causes",
+    "status": "PASS",
+    "time_s": 8.6,
+    "ts": "10:26:12"
+  },
+  {
+    "tool": "08_habitat_quality",
+    "status": "PASS",
+    "time_s": 25.2,
+    "ts": "10:37:17"
+  },
+  {
+    "tool": "36_draw_agents_table",
+    "status": "PASS",
+    "time_s": 7.8,
+    "ts": "10:43:08"
+  },
+  {
+    "tool": "34_commodity_trade",
+    "status": "PASS",
+    "time_s": 7.4,
+    "ts": "11:46:15"
+  },
+  {
+    "tool": "39_draw_systems_table",
+    "status": "PASS",
+    "time_s": 6.5,
+    "ts": "11:46:25"
+  },
+  {
+    "tool": "22_hra",
+    "status": "PASS",
+    "time_s": 17.7,
+    "ts": "11:48:18"
+  }
+]

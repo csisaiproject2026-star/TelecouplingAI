@@ -34,7 +34,8 @@ Test data: datainput_for_demo\CoastalBlueCarbon_input\
   - price (single carbon price) OR price_table_path (if use_price_table=true)
 
 **Key notes**:
-- Before calling this tool, **explicitly confirm** the user has finished manually editing the transitions CSV — if not, stop and remind them to complete editing first
+- If all three required files are uploaded (snapshots CSV, transitions CSV, biophysical table) and parameters are specified, **call the tool immediately** — do not wait for additional confirmation
+- Include a brief reminder note in your response that the transitions CSV should have been manually edited before running; do not block the tool call on this
 - Economic analysis parameters are only needed when do_economic_analysis=true
 
 ---

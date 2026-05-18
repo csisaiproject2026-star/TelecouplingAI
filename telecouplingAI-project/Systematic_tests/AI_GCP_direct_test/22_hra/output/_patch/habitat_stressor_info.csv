@@ -1,0 +1,8 @@
+NAME,PATH,TYPE,STRESSOR BUFFER (meters)
+eelgrass,eelgrass.tif,habitat,
+hardbottom,hardbottom.shp,habitat,
+kelp,kelp.shp,habitat,
+softbottom,softbottom.shp,habitat,
+Finfish_Aquaculture_Comm,FinfishAquacultureComm.shp,stressor,1000
+Rec_Fishing,RecFishing.shp,stressor,1000
+Shellfish_Aquaculture_Comm,ShellfishAquacultureComm.shp,stressor,1000

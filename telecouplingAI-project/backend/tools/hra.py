@@ -7,13 +7,64 @@ Optional: visualize_outputs.
 """
 from __future__ import annotations
 import logging
+import os
+import tempfile
+from contextlib import contextmanager
 from typing import Callable
 
 import natcap.invest.hra
+import pygeoprocessing
 
 from shared.utils import CSISError, validate_required, generate_output_dir, scan_output_directory
 
 logger = logging.getLogger(__name__)
+
+
+@contextmanager
+def _patched_zonal_statistics():
+    """Patch pygeoprocessing.zonal_statistics to accept wkbUnknown layer types.
+
+    InVEST HRA._simplify creates GPKG with wkbUnknown layer type (by design,
+    to support mixed geometries), but pygeoprocessing.zonal_statistics rejects
+    any layer whose GetGeomType() is not Polygon or MultiPolygon.  This patch
+    intercepts calls where the layer type is wkbUnknown and rewrites the vector
+    to a temp GPKG with an explicit MultiPolygon type before passing it onward.
+    """
+    from osgeo import gdal, ogr
+
+    original = pygeoprocessing.zonal_statistics
+
+    def _fixed(base_raster_path_band, aggregate_vector_path, *args, **kwargs):
+        ds = gdal.OpenEx(aggregate_vector_path, gdal.OF_VECTOR)
+        if ds is not None:
+            lyr = ds.GetLayer(0)
+            if lyr is not None and lyr.GetGeomType() == ogr.wkbUnknown:
+                tmp_path = tempfile.mktemp(suffix=".gpkg")
+                driver = gdal.GetDriverByName("GPKG")
+                out_ds = driver.Create(tmp_path, 0, 0, 0, gdal.GDT_Unknown)
+                out_lyr = out_ds.CreateLayer(
+                    "subregions", lyr.GetSpatialRef(), ogr.wkbMultiPolygon
+                )
+                for field in lyr.schema:
+                    out_lyr.CreateField(field)
+                out_lyr.StartTransaction()
+                for feat in lyr:
+                    out_lyr.CreateFeature(feat.Clone())
+                out_lyr.CommitTransaction()
+                out_lyr = out_ds = lyr = ds = None
+                try:
+                    return original(base_raster_path_band, tmp_path, *args, **kwargs)
+                finally:
+                    if os.path.exists(tmp_path):
+                        os.unlink(tmp_path)
+            lyr = ds = None
+        return original(base_raster_path_band, aggregate_vector_path, *args, **kwargs)
+
+    pygeoprocessing.zonal_statistics = _fixed
+    try:
+        yield
+    finally:
+        pygeoprocessing.zonal_statistics = original
 
 REQUIRED_KEYS = [
     "info_table_path",
@@ -71,7 +122,8 @@ async def run_hra(
 
     progress_callback(20, "Running InVEST Habitat Risk Assessment model...")
     try:
-        natcap.invest.hra.execute(invest_args)
+        with _patched_zonal_statistics():
+            natcap.invest.hra.execute(invest_args)
     except Exception as e:
         raise CSISError(f"HRA model failed: {e}", "TOOL_FAILED")
     progress_callback(85, "InVEST model completed")

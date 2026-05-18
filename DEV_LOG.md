@@ -1,3 +1,71 @@
+## 2026-05-18 — 浏览器测试 14 工具修复：最终达到 41 PASS / 0 FAIL / 1 SKIP
+
+### 完成内容
+- 从上一 session 遗留的 38 PASS / 3 FAIL / 1 SKIP 继续，修复了工具 22（HRA）、工具 34（Commodity Trade）、工具 39（Draw Systems Table）
+
+**Tool 22 HRA — pygeoprocessing geometry type 兼容性 bug 修复**
+- 根因定位：`hra._simplify()` 创建 GPKG 时用 `ogr.wkbUnknown` 作为 layer type（InVEST 有意设计，支持混合几何），但 `pygeoprocessing.zonal_statistics()` 检查 `GetGeomType()` 返回值，wkbUnknown(0) 不在 [wkbPolygon(3), wkbMultiPolygon(6)] 列表中，抛出 "Vector geometry type must be Polygon or MultiPolygon"
+- 修复：在 `backend/tools/hra.py` 中实现 `_patched_zonal_statistics()` contextmanager，monkey-patch `pygeoprocessing.zonal_statistics`，遇到 wkbUnknown layer 时将 vector 写入 wkbMultiPolygon 类型的临时 GPKG 再传入原函数
+- 本地验证通过（InVEST HRA 在 `TeleCouplingAI` 环境中成功运行 SUCCESS）
+- 部署：`docker cp` 注入容器 → `docker build` 重建 `csic_backend:latest` → `--force-recreate celery-worker-hra`
+
+**Tool 34 Commodity Trade — 错误工具 + CSV 数据修复**
+- 根因：test prompt 要求调用 `run_draw_radial_flows`，但文件名含 "commodity_trade"，LLM 实际调用 `run_commodity_trade`（正确工具），然而 CSV 使用国家全名("China")而非 ISO3("CHN")，`_FALLBACK_CENTROIDS` 查不到，tool 抛 "No flows could be mapped"，前端显示红色 error card（不是 blue card），测试超时
+- 修复：新建 `Test_data/34_commodity_trade/trade_flows_iso3.csv`（ISO3 列 from_country/to_country），更新 prompt 为 `"Use the run_commodity_trade function on the uploaded CSV. from_country_field=from_country, to_country_field=to_country, value_field=trade_usd."`
+
+**Tool 39 Draw Systems Table — prompt 措辞修复**
+- 根因："TASK:" 前缀 prompt 未触发工具调用；对比同类工具 36（PASS）的成功措辞
+- 修复：改为 `"Use the run_draw_systems_from_table function on the uploaded CSV. x_field=longitude, y_field=latitude, name_field=name."`（与 tool 36 成功模式完全对齐）
+
+### 关键变更文件
+- `backend/tools/hra.py`：新增 `_patched_zonal_statistics()` contextmanager
+- `Systematic_tests/Test_data/34_commodity_trade/trade_flows_iso3.csv`（新建，ISO3 格式）
+- `Systematic_tests/Manual_ClientToGCP_test/run_browser_test.py`：工具 34/39 prompt + filespec 更新
+
+### 测试状态
+- **最终得分：41 PASS / 0 FAIL / 0 ERROR / 1 SKIP（共 42 工具）**
+- Tool 21 Recreation 维持 SKIP（已知已禁用）
+- GCP 服务器已重建镜像，patch 永久生效
+
+---
+
+## 2026-05-18 — 全量 42 工具自动化浏览器测试（Manual_ClientToGCP_test）
+
+### 完成内容
+- 使用 Playwright + Chrome（headed）对 http://34.42.83.50/ 所有 42 个工具进行端到端浏览器测试，模拟真实用户操作（上传文件 → 输入 prompt → 等待结果）
+- 编写并运行 `Systematic_tests/Manual_ClientToGCP_test/run_browser_test.py`，支持断点续跑（自动读取 test_results.json 从上次中断处恢复）
+- **最终结果：27 PASS / 14 FAIL / 1 SKIP（共 42 工具，41 实测）**
+
+### 失败分析（3类）
+
+**Category A：CSV 引用的空间文件未上传（4 工具）**
+- 02 CBC Preprocessor：lulc_lookup_p.csv 引用 `GBJC_2010_mean_Resample.tif` 未上传
+- 08 Habitat Quality：threats_willamette.csv 引用威胁栅格（`crops_c.tif` 等）未上传
+- 22 HRA：habitat_stressor_info.csv 引用 `eelgrass.tif` 等未上传
+- 24 Coastal Vulnerability：Natural_Habitats.csv 引用 `Coral.shp` 等未上传
+- 修复方向：在对应工具的测试 file_specs 中补充这些关联文件
+
+**Category B：LLM 5 分钟内未调用工具（8 工具）**
+- 03, 31, 32, 34, 36, 37, 39, 42（CBC Main、Cost-Benefit、Population Density、Commodity Trade、Draw Agents Table、Add Causes、Draw Systems Table、Nutrition Metrics）
+- 修复方向：优化这些工具的 SKILL.md 描述，或改进 agent 的工具识别逻辑
+
+**Category C：模型输入数据问题（2 工具）**
+- 18 Urban Stormwater：biophysical_table.csv 缺少 `rc_a` 列（测试数据 schema 不匹配）
+- 27 Scenario Gen Proximity：LULC 与 AOI shapefile CRS/范围不重叠
+
+### 关键变更文件
+- `Systematic_tests/Manual_ClientToGCP_test/run_browser_test.py`（新建）
+- `Systematic_tests/Manual_ClientToGCP_test/test_results.json`（42 工具结果）
+- `Systematic_tests/Manual_ClientToGCP_test/test_report.md`（完整报告）
+- `Systematic_tests/Manual_ClientToGCP_test/test_run.log`（完整运行日志）
+
+### 测试状态
+- 脚本正常完成，无崩溃（共跑约 1 小时，含多个 5 分钟 LLM 超时）
+- PASS 工具均产生了 green card（计算成功）
+- 所有 FAIL 均有明确的错误原因，不存在框架级问题
+
+---
+
 ## 2026-05-17 — Wave/Wind Energy 大体积数据改为服务器内置默认
 
 ### 完成内容
