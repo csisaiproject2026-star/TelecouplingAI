@@ -1,3 +1,23 @@
+## 2026-05-25 — 前端 UX：默认开新会话 + 过期文件链接友好标记
+
+### 完成内容
+- **问题①：每次进入停在旧会话** — 根因：`App.jsx` 聊天记录持久化在 localStorage(`csis_chats`)，加载时 `activeId` 取 `chats[0].id`（最近会话）。改为进入时若最近会话非空则在最前插入空白「New Chat」并设为当前；最近会话已空则复用，避免堆叠重复空会话。旧会话仍保留在左侧 Recent 历史（Gemini/ChatGPT 风格）。
+- **问题②：文字仍在但文件链接失效** — 根因：聊天文字+文件 URL 存浏览器 localStorage（永久），实际文件在服务端 `/data/outputs/{session_id}/`，由 `/download/{session_id}/{path}` 直接读磁盘。文件被服务端清理（`SESSION_TTL_HOURS=24` 闲置过期 + `MAX_SESSIONS=50` LRU 驱逐 `shutil.rmtree`），重开旧会话即 404。用户选择「前端标记已过期」方案：
+  - `ResultFiles.jsx`：渲染下载项时对 URL 发 `HEAD` 探测，404/403 才标记 expired（乐观策略，网络抖动不误判），显示灰色删除线 + 「expired — re-run to regenerate」提示。
+  - `ImageRenderer.jsx`：`<img onError>` 兜底，失效时显示「Preview expired」占位，替代浏览器破图图标。
+
+### 关键变更文件
+- `frontend/src/App.jsx`（chats/activeId 初始化逻辑）
+- `frontend/src/components/ResultFiles.jsx`（HEAD 探测 + 过期标记，新增 useAvailability/FileRow）
+- `frontend/src/components/ImageRenderer.jsx`（onError 过期占位）
+
+### 测试状态
+- `npm run build` 通过（vite v5.4.21，1519 modules，built in 3.68s，AlertCircle 在 lucide-react 0.290 可用）
+- **已部署到 GCP**：tar frontend 源码 → `~/csis-platform/telecouplingAI-project/` → `docker compose build frontend-ui` → `up -d --force-recreate frontend-ui` → `restart nginx`（force-recreate 后刷新 upstream IP）。线上 bundle `index-DfUz-rei.js`（与本地构建 hash 一致）已含新字符串（New Chat / Preview expired / re-run to regenerate），http://34.42.83.50/ 生效
+- **线上浏览器测试通过（8/8）**：新增 `Systematic_tests/Manual_ClientToGCP_test/test_ux_newchat_expired.py`（Playwright headless，localStorage 注入，无需 LLM）。Test A 验证进入开空白 New Chat + 旧会话留侧栏 + 旧文字不在当前视图；Test B 用真实死链(404)/活链(200)+死图片验证 expired 标记仅命中死链、活链仍可点、死图片显示 Preview expired。nginx `/download/` 路由确认无 SPA fallback、缺文件返回真 404
+
+---
+
 ## 2026-05-18 — 浏览器测试 14 工具修复：最终达到 41 PASS / 0 FAIL / 1 SKIP
 
 ### 完成内容

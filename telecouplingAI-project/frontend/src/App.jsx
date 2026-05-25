@@ -106,7 +106,16 @@ function App() {
 
   const [chats, setChats] = useState(() => {
     const saved = localStorage.getItem('csis_chats');
-    return saved ? JSON.parse(saved) : [{ id: 'default', title: 'New Chat', messages: [] }];
+    const restored = saved ? JSON.parse(saved) : [];
+    // Always open on a fresh empty chat; keep prior conversations as history
+    // in the sidebar (Gemini/ChatGPT-style). Reuse an already-empty top chat
+    // so we don't stack duplicate "New Chat" entries on every reload.
+    const top = restored[0];
+    if (top && (!top.messages || top.messages.length === 0)) {
+      return restored;
+    }
+    const fresh = { id: `chat_${Date.now()}`, title: 'New Chat', messages: [] };
+    return [fresh, ...restored];
   });
   const [activeId, setActiveId] = useState(chats[0].id);
   const [appSettings, setAppSettings] = useState(() => {
