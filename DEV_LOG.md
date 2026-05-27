@@ -2187,3 +2187,23 @@ Git commit: `4430259`
 - 原始 6 个 + 新增 20 个（含 Recreation & Tourism）
 
 Git commit: `eba653f`
+
+## 2026-05-27 — 迁移主仓库到新 GitHub + readme 英文化
+
+### 完成内容
+- 将主仓库迁移到新 GitHub 库 `csisaiproject2026-star/TelecouplingAI`（SSH，身份 dru1889 协作者）
+  - 原 `origin`（dru1889/CSIS_fulldev-backup，HTTPS+token）重命名为 `backup`，保留为备份
+  - 新库设为 `origin`，`master` 与 `feature/invest-expansion` 全历史推送并设上游
+  - 以后 `git push` 默认走新库；备份用 `git push backup <branch>`
+- 根目录 `readme.md` 目录结构树注释中文 → 英文（【】→[]，保持树形对齐）
+  - 用 ripgrep `\p{Han}` 全仓扫描确认：仅此一个 README 含中文，其余 30 个本就英文
+
+### 关键变更文件
+- `readme.md`（注释翻译，29 行替换）
+- git remote 配置（origin→新库 SSH，旧库→backup）
+
+### 测试状态
+- 迁移推送成功，两分支均跟踪新 origin
+- 复查全仓 README 无中文残留
+
+Git commit: `6373c5f`
