@@ -1,3 +1,21 @@
+## 2026-05-29 — 校验功能全面测试（26 工具 × 4 情形，GCP + MSU）
+
+### 完成内容
+- 新增 `_validation_full_test.py`:对 `TOOL_FILE_SPECS` 每个工具的**每个必填文件参数**,构造四种情形——**correct / missing / wrong-path / wrong-type**,直接驱动已部署的 `validate_file_params_exist` + `validate_input_files`(即 agent.py 派发前的真实校验链)。校验只看存在性+扩展名,故用各类型空占位文件即可穷尽逻辑,零 Gemini、零模型运行、确定性。
+- 用例总数 = 26 correct + 89 必填参数 × 3 错误情形 = **293**。
+
+### 测试状态
+- **GCP:26 工具 / 293 用例 / 293 PASS / 0 FAIL**。
+- **MSU:26 工具 / 293 用例 / 293 PASS / 0 FAIL**。
+- 正确输入放行;缺文件/路径错/类型错全部拦截并给 `VALIDATION_ERROR` 友好消息(路径已脱敏)。
+- happy-path 端到端另由全量回归(41 PASS / 1 SKIP)+ direct InVEST 运行覆盖。
+
+### 关键变更文件
+- `VALIDATION_TEST_REPORT.md`（详细报告,新建）
+- `Systematic_tests/AI_GCP_test/03_smoke_stress_test/_validation_full_test.py`（全面测试脚本）
+
+---
+
 ## 2026-05-29 — 修复 #23 Wave Energy "LLM 不调用工具"
 
 ### 完成内容
