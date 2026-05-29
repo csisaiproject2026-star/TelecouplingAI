@@ -1,3 +1,22 @@
+## 2026-05-29 — 通用文件存在性预检（覆盖所有工具，第 1 步）
+
+### 完成内容
+- 新增 `shared/utils.py::validate_file_params_exist(params)`：凡参数名以 `_path` 结尾、值是**绝对本地路径却在磁盘上不存在**的,统一报友好的"file not found / 可能没上传或路径错"。放在 **agent.py 派发 Celery 前**(只在 backend 一个容器,早拦、省一次往返),**一处改动覆盖全部工具**,无需逐工具写 spec。
+- **保守设计**(近零误拦):只查 `_path` 键;跳过 URL、含 `output`/`workspace` 的键、相对路径、非字符串/空值。
+- 这是"全工具加预检"的**第 1 步(广覆盖)**;第 2 步(逐工具加栅格/矢量/CSV 类型 spec)按批推进。
+
+### 关键变更文件
+- `backend/shared/utils.py`（新增 `validate_file_params_exist`）
+- `backend/agent.py`（import + 派发前预检；命中即发 error 事件 + 喂回 Gemini，跳过派发）
+- `Systematic_tests/AI_GCP_test/03_smoke_stress_test/_generic_validate_test.py`（单元测试）
+
+### 测试状态
+- **单元测试 8/8 PASS**：缺文件能拦；URL/输出路径/工作区/相对路径/非路径参数均正确跳过(不误拦)。
+- **GCP 全量 41 工具 LLM 回归：0 误拦**(无 file-not-found/VALIDATION_ERROR)。唯一 FAIL=#23 Wave Energy "LLM did not call any tool"；**用原版 agent.py 复测同样 3/3 挂 → 预先存在的 LLM 路由问题,与本改动无关**(另记待查；该工具在 MSU 早前是过的,疑 GCP 当前 LLM 非确定性)。
+- GCP + MSU 均 live(cp+restart;镜像未重建,recreate 后需 rebuild)。
+
+---
+
 ## 2026-05-29 — 输入文件预检（habitat 参考实现）：忘传/路径错/类型错的友好提示
 
 ### 完成内容

@@ -31,7 +31,7 @@ from google.genai.client import HttpOptions
 import redis.asyncio as aioredis
 
 from config import settings
-from shared.utils import sanitize_error_message
+from shared.utils import sanitize_error_message, validate_file_params_exist, CSISError
 
 logger = logging.getLogger(__name__)
 
@@ -1451,6 +1451,27 @@ async def run_agent(
             tool_name = fc.name
             tool_input = dict(fc.args)
             logger.info(f"[agent] function_call: {tool_name}")
+
+            # ── Step 0: generic pre-flight — catch missing input files before
+            # dispatching, so the user gets a friendly "file not found / not
+            # uploaded" message instead of a cryptic crash inside the worker.
+            try:
+                validate_file_params_exist(tool_input)
+            except CSISError as ve:
+                safe_msg = sanitize_error_message(ve.message)
+                logger.info(f"[agent] pre-flight blocked {tool_name}: {safe_msg}")
+                await _maybe_await(event_callback({
+                    "type": "error",
+                    "message": safe_msg,
+                    "error_code": ve.error_code,
+                }))
+                function_response_parts.append(
+                    types.Part.from_function_response(
+                        name=tool_name,
+                        response={"error": safe_msg},
+                    )
+                )
+                continue
 
             # ── Step 1: dispatch Celery to obtain the real task_id ──────────
             queue = _TOOL_QUEUES.get(tool_name, "q_default")

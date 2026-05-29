@@ -191,6 +191,41 @@ _TABLE_EXTS = (".csv", ".tsv", ".txt")
 _KIND_EXTS = {"raster": _RASTER_EXTS, "vector": _VECTOR_EXTS, "table": _TABLE_EXTS}
 
 
+def validate_file_params_exist(params: dict) -> None:
+    """Generic, tool-agnostic pre-flight: flag '*_path' inputs that point at an
+    absolute local path which does not exist on disk — almost always a file the
+    user forgot to upload, or a wrong/expired path. Gives a friendly message for
+    EVERY tool without needing per-tool specs.
+
+    Conservative on purpose (near-zero false positives): only checks string
+    values on keys ending in '_path', that look like an absolute local path, are
+    not a URL, and are not an output/workspace path. Empty/optional values and
+    non-path params are ignored.
+    """
+    problems: list[str] = []
+    for key, val in params.items():
+        if not isinstance(val, str) or not val:
+            continue
+        if not key.endswith("_path"):
+            continue
+        if "output" in key or "workspace" in key:
+            continue
+        if val.startswith(("http://", "https://", "ftp://")):
+            continue
+        is_abs = val.startswith("/") or (len(val) > 1 and val[1] == ":")
+        if not is_abs:
+            continue
+        if not os.path.exists(val):
+            problems.append(
+                f"'{key}': file not found ({os.path.basename(val)}) — it may not "
+                f"have been uploaded, or the path is wrong."
+            )
+    if problems:
+        msg = ("The tool cannot run because some input files are missing:\n"
+               + "\n".join(f"- {sanitize_error_message(p)}" for p in problems))
+        raise CSISError(msg, "VALIDATION_ERROR", {"problems": problems})
+
+
 def validate_input_files(params: dict, file_specs: list[tuple]) -> None:
     """Pre-flight check of file inputs BEFORE running an (expensive) model.
 
