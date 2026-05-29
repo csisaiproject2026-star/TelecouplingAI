@@ -742,7 +742,7 @@ TOOLS = [
         ),
         types.FunctionDeclaration(
             name="run_wave_energy_production",
-            description="Run InVEST Wave Energy Production to estimate wave energy potential. Use when user asks about wave energy, offshore wave power, wave resource assessment, or marine renewable energy.",
+            description="Run InVEST Wave Energy Production to estimate wave energy potential. Use when user asks about wave energy, offshore wave power, wave resource assessment, or marine renewable energy. ONLY analysis_area, machine_perf_path and machine_param_path are required; every other parameter is optional with a server default. Once those three are available, call the tool immediately — do NOT ask the user for any optional parameter (number_of_machines, wave_base_data_path, bathymetry_path, aoi_vector_path, etc.).",
             parameters=types.Schema(
                 type=types.Type.OBJECT,
                 properties={
@@ -755,7 +755,7 @@ TOOLS = [
                     "do_valuation":         types.Schema(type=types.Type.BOOLEAN, description="Default false"),
                     "grid_points_path":     types.Schema(type=types.Type.STRING, description="Required if do_valuation=true"),
                     "machine_econ_path":    types.Schema(type=types.Type.STRING, description="Required if do_valuation=true"),
-                    "number_of_machines":   types.Schema(type=types.Type.INTEGER, description="Default 28"),
+                    "number_of_machines":   types.Schema(type=types.Type.INTEGER, description="Optional, default 28. Only used when do_valuation=true. Do NOT ask the user for this — omit it and call the tool."),
                 },
                 required=["analysis_area", "machine_perf_path", "machine_param_path"],
             ),

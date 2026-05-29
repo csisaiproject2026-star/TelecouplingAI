@@ -1,3 +1,22 @@
+## 2026-05-29 — 修复 #23 Wave Energy "LLM 不调用工具"
+
+### 完成内容
+- **现象**:LLM-path 跑 Wave Energy 稳定失败 "LLM did not call any tool"(用原版 agent.py 复测也 3/3 挂 → 预存在问题,非本轮校验改动引入)。
+- **根因**(抓 SSE 日志定位):Gemini 返回 HTTP 200 但回的是**文字反问**——"I still need `number_of_machines`: total number of turbines in the **wind farm**…",于是拒绝调用工具。但 `number_of_machines` 是**可选**(默认 28,仅 `do_valuation=true` 时用),FunctionDeclaration 的 `required` 列表本就没有它。纯属 LLM 把可选参数误判为必填(还把概念串成了"wind farm")。
+- **修复**(隔离在 wave energy 声明,不碰别的工具):
+  - tool description 加明确指令:"ONLY analysis_area/machine_perf_path/machine_param_path required; 其余可选有 server default;三者齐了立即调用,**不要问任何可选参数**(number_of_machines/wave_base_data_path/…)"。
+  - `number_of_machines` 描述改为 "Optional, default 28. Only used when do_valuation=true. Do NOT ask the user — omit it and call."
+
+### 关键变更文件
+- `backend/agent.py`（run_wave_energy_production 的 FunctionDeclaration 描述）
+
+### 测试状态
+- **GCP #23 连跑 5/5 PASS**、**MSU #23 连跑 3/3 PASS**(修复前 0/3)。
+- 改动隔离,不影响其它工具;全量回归现应为 **41 PASS / 1 SKIP**(#26 Recreation 设计性跳过)。
+- 两台已重建镜像固化(BuildKit 缓存命中、秒级、未重装 conda),health 200。
+
+---
+
 ## 2026-05-29 — Step 2 补完（26 个工具）+ 两台镜像永久化
 
 ### 完成内容
