@@ -1,3 +1,24 @@
+## 2026-05-29 — Step 2 补完（26 个工具）+ 两台镜像永久化
+
+### 完成内容
+- `tool_file_specs.py` 从 13 扩到 **26 个工具**(补:crop_regression、delineateit、routedem、urban_stormwater、urban_mental_health、scenario_gen、scenic_quality、coastal_vulnerability、cbc_preprocessor、cbc_main、hra、wave_energy、wind_energy)。
+- `utils._TABLE_EXTS` 增加 `.xlsx/.xls`(HRA criteria 等表可能是 Excel,防误拦);只放宽 table,不影响 raster/vector 判定。
+- **跳过项**(避免误拦):目录参数(precip_dir/et0_dir/wave_base_data_path)、有内置默认的参数(wave/wind 的 bathymetry/land_polygon)、纯 LLM 工具(add_*/draw_*)。
+- **永久化(固化进镜像)**:GCP `docker compose build`(缓存命中、秒级)→ recreate。**MSU 复用早前那次 build 留下的 BuildKit 缓存,这次 rebuild 同样秒级、未再装 conda** → recreate。
+
+### 关键变更文件
+- `backend/shared/tool_file_specs.py`（13 → 26 工具）
+- `backend/shared/utils.py`（`_TABLE_EXTS` 加 xlsx/xls）
+
+### 测试状态
+- **GCP 全量 41 工具回归:0 误拦**(无 VALIDATION_ERROR);40 PASS / 1 FAIL(#23 Wave Energy 预存在 no-call,与改动无关)/ 1 SKIP。
+- **两台均 recreate 后 baked specs=26、health 200、38 容器**;MSU 实测 Habitat ✓(2 文件)/ SDR ✓(11 文件)、GCP CBC Preprocessor ✓ —— 引擎正常。**改动已固化,扛 `compose up --force-recreate`。**
+
+### 教训
+- **MSU 是生产环境**。早前因 MSU 无 BuildKit 缓存,在其上现场 `docker compose build` 触发了从头重装 conda(~16min、全容器重启),风险偏高;正确做法是复用缓存/直接搬 GCP 镜像。本次已按此修正。
+
+---
+
 ## 2026-05-29 — Step 2 类型预检（13 个 InVEST 工具，集中式 spec 表）
 
 ### 完成内容

@@ -187,7 +187,7 @@ def validate_required(params: dict, required_keys: list[str]) -> None:
 
 _RASTER_EXTS = (".tif", ".tiff", ".img", ".vrt", ".bil", ".hgt")
 _VECTOR_EXTS = (".shp", ".gpkg", ".geojson", ".json", ".kml")
-_TABLE_EXTS = (".csv", ".tsv", ".txt")
+_TABLE_EXTS = (".csv", ".tsv", ".txt", ".xlsx", ".xls")
 _KIND_EXTS = {"raster": _RASTER_EXTS, "vector": _VECTOR_EXTS, "table": _TABLE_EXTS}
 
 

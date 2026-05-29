@@ -110,4 +110,78 @@ TOOL_FILE_SPECS: dict[str, list[tuple]] = {
         ("links_table", True, T),
         ("shapefile_path", True, V),
     ],
+    "run_crop_production_regression": [
+        ("landcover_raster_path", True, R),
+        ("landcover_to_crop_table_path", True, T),
+        ("fertilization_rate_table_path", True, T),
+        ("aggregate_polygon_path", False, V),
+    ],
+    "run_delineateit": [
+        ("dem_path", True, R),
+        ("outlet_vector_path", False, V),
+    ],
+    "run_routedem": [
+        ("dem_path", True, R),
+    ],
+    "run_urban_stormwater_retention": [
+        ("lulc_path", True, R),
+        ("soil_group_path", True, R),
+        ("precipitation_path", True, R),
+        ("biophysical_table", True, T),
+        ("aggregate_areas_path", False, V),
+        ("road_centerlines_path", False, V),
+    ],
+    "run_urban_mental_health": [
+        ("lulc_raster_path", True, R),
+        ("lulc_attribute_table", True, T),
+        ("population_raster_path", True, R),
+        ("admin_boundaries_vector_path", True, V),
+        ("population_group_radii_table", False, T),
+    ],
+    "run_scenario_gen_proximity": [
+        ("base_lulc_path", True, R),
+        ("aoi_path", False, V),
+    ],
+    "run_scenic_quality": [
+        ("aoi_vector_path", True, V),
+        ("structure_vector_path", True, V),
+        ("dem_path", True, R),
+    ],
+    "run_coastal_vulnerability": [
+        ("aoi_vector_path", True, V),
+        ("bathymetry_raster_path", True, R),
+        ("dem_path", True, R),
+        ("geomorphology_vector_path", True, V),
+        ("landmass_vector_path", True, V),
+        ("wwiii_vector_path", True, V),
+        ("habitat_table_path", False, T),
+        ("shelf_contour_vector_path", False, V),
+        ("slr_vector_path", False, V),
+        ("population_raster_path", False, R),
+    ],
+    "run_coastal_blue_carbon_preprocessor": [
+        ("landcover_snapshot_csv", True, T),
+        ("landcover_lookup_table", True, T),
+    ],
+    "run_coastal_blue_carbon": [
+        ("landcover_snapshot_csv", True, T),
+        ("landcover_transitions_table", True, T),
+        ("biophysical_table_path", True, T),
+        ("price_table_path", False, T),
+    ],
+    "run_habitat_risk_assessment": [
+        ("info_table_path", True, T),
+        ("criteria_table_path", True, T),
+        ("aoi_vector_path", True, V),
+    ],
+    "run_wave_energy_production": [
+        ("machine_perf_path", True, T),
+        ("machine_param_path", True, T),
+    ],
+    "run_offshore_wind_energy": [
+        ("aoi_vector_path", True, V),
+        ("global_wind_parameters_path", True, T),
+        ("turbine_parameters_path", True, T),
+        ("wind_data_path", True, T),
+    ],
 }
