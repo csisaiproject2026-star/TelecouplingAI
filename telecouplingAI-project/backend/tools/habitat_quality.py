@@ -10,11 +10,24 @@ from typing import Callable
 
 import natcap.invest.habitat_quality
 
-from shared.utils import CSISError, validate_required, generate_output_dir, scan_output_directory
+from shared.utils import (
+    CSISError, validate_required, generate_output_dir, scan_output_directory,
+    validate_input_files,
+)
 
 logger = logging.getLogger(__name__)
 
 REQUIRED_KEYS = ["lulc_cur_path", "threats_table_path", "sensitivity_table_path"]
+
+# (param_key, required, kind) — checked before the model runs.
+FILE_SPECS = [
+    ("lulc_cur_path",          True,  "raster"),
+    ("threats_table_path",     True,  "table"),
+    ("sensitivity_table_path", True,  "table"),
+    ("lulc_fut_path",          False, "raster"),
+    ("lulc_bas_path",          False, "raster"),
+    ("access_vector_path",     False, "vector"),
+]
 
 
 async def run_habitat_quality(
@@ -40,6 +53,9 @@ async def run_habitat_quality(
         "access_vector_path":     params.get("access_vector_path", ""),
         "half_saturation_constant": params.get("half_saturation_constant", 0.5),
     }
+
+    progress_callback(15, "Validating inputs...")
+    validate_input_files(params, FILE_SPECS)
 
     progress_callback(20, "Running InVEST Habitat Quality model...")
     try:

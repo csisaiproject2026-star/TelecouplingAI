@@ -1,3 +1,72 @@
+## 2026-05-29 — 输入文件预检（habitat 参考实现）：忘传/路径错/类型错的友好提示
+
+### 完成内容
+- **背景**：以前工具直接 `execute()`，用户忘传文件/传错文件 → 模型在底层崩溃、报天书。skill 里写"先问/先确认"是用 LLM 提示词兜底，脆弱且费 token（还导致过 Tier A 回归 habitat）。
+- **正确分工**：校验交给确定性代码，LLM 只负责把错误说成人话。新增 `shared/utils.py::validate_input_files(params, file_specs)`：按 `(参数, 必需?, 类型 raster/vector/table)` 检查 ① 必需文件在不在 ② 文件在磁盘上存不存在 ③ 扩展名类型对不对，命中即抛 `CSISError(VALIDATION_ERROR)`（路径已脱敏）。错误经现成链路(worker→error 事件→agent→用户+喂回 Gemini 解释)显示。
+- **关键决策**：**不**用 natcap 自带的 `validate()`——实测它在"把 CSV 当栅格"这种坏输入上会在内部线程崩溃(`check_raster` 对 None 调 `GetSpatialRef`)并卡死,正是我们要优雅处理的场景。故自己写轻量预检(毫秒级、不卡)。
+- **habitat 接入**：`tools/habitat_quality.py` 声明 `FILE_SPECS`，`execute()` 前调 `validate_input_files(params, FILE_SPECS)`。其余工具按同模式后续推广。
+
+### 关键变更文件
+- `backend/shared/utils.py`（新增 `validate_input_files` + `VALIDATION_ERROR` 码）
+- `backend/tools/habitat_quality.py`（FILE_SPECS + 预检调用）
+- `Systematic_tests/AI_GCP_test/03_smoke_stress_test/_hq_validate_test.py`（预检用例测试）
+
+### 测试状态
+- **GCP（测试环境）验证**：4 用例消息均清晰友好(忘传/路径错/类型错/全对)；happy path direct #8 仍 PASS(10s,2 文件)。
+- **MSU 同步**：同版本 cp+restart,4 用例一致。**两台 live 生效**(docker cp+restart;镜像未重建,recreate 后需 rebuild 才永久——待办)。
+- 工作流确认：今后**先在 GCP 测 → 通过后同步本地仓库 + MSU**。
+
+---
+
+## 2026-05-29 — MSU 容量/压力测试：瓶颈是 Gemini 配额，非硬件
+
+### 完成内容
+- **压测发现瓶颈不在硬件**：10 并发用户时服务器 CPU 仅 ~1.8%，但 Gemini 已返回 `429 RESOURCE_EXHAUSTED`。命中配额 = `gemini-2.5-flash` **付费 Tier 1：每分钟 100 万输入 token**（`GenerateContentPaidTierInputTokensPerModelPerMinute`），**MSU 与 GCP 共用同一 key、共享这 100 万**。
+- **Token 账（count_tokens 实测）**：每次调用固定开销 = system_instruction **14,657 token**，其中 **12,440 是全部 42 个工具的 PRE_EXECUTION skill**；跟进轮再加全部 42 个工具 schema ~12K。一次工具交互 ≈ 43K 输入 token。
+- **Tier A 优化（懒加载 skill）**：命中工具时只加载该工具 skill → system_instruction 14,657→2,544（省 83%）。**但经验证 Tier A 会回归 #8 Habitat Quality**（A/B 实测：原版过 2/2，Tier A 挂 3/3——单 skill 上下文使 Gemini 走"先问参数"而不调用）。**故 Tier A 不上线,已还原原版**;代码保留在本地 `backend/agent.py`(未提交)待加"参数齐即调用"的全局提示后重做。
+- **容量阶梯 10→100（fast 池,CPU/内存实录）**：CPU 全程 ≤7%、RAM 稳定 ~14/62GB,**32 核服务器自始至终空载**;吞吐恒定 ~20 次成功/分钟(即 1M TPM 天花板);失败全是 429 + 配额回退超时;延迟随并发升高(p50 6.8s→160s @100u,全耗在 429 退避)。
+- **结论**:硬件能轻松扛 100+,瓶颈在 LLM 配额。建议(按成本):① MSU/GCP **拆分 key**(各得 1M/min,免费~2×)② 升 Tier / 多 key 轮换 ③ 修好 Tier A 再降 token footprint。
+
+### 关键变更文件
+- `MSU_STRESS_REPORT.md`(新建,完整数据+CPU/内存表+结论)
+- `Systematic_tests/AI_GCP_test/03_smoke_stress_test/stress_msu.py`、`measure_tokens.py`(新建压测/测量工具)
+- `backend/agent.py`(本地有 Tier A 改动,**未提交、未上线**,因回归 habitat)
+
+### 测试状态
+- 阶梯压测:10u 95% / 25u 90% / 50u 87% / 75u 98% / 100u 77%(通过率波动源于配额时窗对齐,非负载);CPU≤7%、RAM~14GB 全程。
+- MSU 平台已还原:原版 agent.py(41/41 正确)、MAX_SESSIONS=50、38 容器健康、habitat 复测 PASS。临时文件已清理。
+
+---
+
+## 2026-05-28 — 部署 CSIS 平台到 MSU 新服务器（35.9.219.33，1:1 复制 GCP）
+
+### 完成内容
+- **新服务器**：RHEL 9.7，32 核 / 62G RAM / `/home` 637G，全新裸机。目标：1:1 复制 GCP 部署，让用户可初步使用。
+- **自主访问搭建**：生成专用 key `id_ed25519_msu`，`~/.ssh/config` 加 `csis-msu`/`csis-gcp` 别名；公钥装进服务器（粘贴会把注释甩到第二行 → 去掉注释 + `restorecon -Rv ~/.ssh` 修 SELinux 标签）；授权免密 sudo（`/etc/sudoers.d/jianan2`）。Claude 现可全自主操作新机。
+- **装 Docker**：RHEL 9 加 docker-ce CentOS 源，装 Docker 29.5.2 + Compose v5.1.4，`usermod -aG docker jianan2`。
+- **代码 + 数据从 GCP 直拉**：先在 MSU 生成 `id_gcp` 并把公钥加到 GCP（MSU 可直连 GCP）。rsync 在 GCP 缺失 → 改 `tar`-over-ssh。**关键坑**：`ssh 'bash -s' <<heredoc` 内层 `ssh 'tar cf -' | tar xf` 会把 heredoc 当 stdin 吃掉导致脚本截断 → 内层 ssh 加 `-n`。拉来 Test_data 1.7G + `/data/model_data` 71M；`datainput_for_demo` 重建为**相对软链** → `Systematic_tests/Test_data`。
+- **数据目录改放 `/home`**：`/home/jianan2/csis-data/{outputs,uploads,model_data}`（避开 root，`/home` 是 637G 大盘）。
+- **配置**：`.env`（HOST_* 指向 /home）+ `.env.docker`（同一 Gemini key，`FILE_SERVER_URL` 改 `http://35.9.219.33:8001/download/`）。`docker compose config` 校验通过。
+- **镜像直接搬运而非重建**：`docker save csic_backend:latest csic_frontend:latest` GCP→MSU 流式 `docker load`（避开 20–40min conda 构建 + 版本漂移），`docker compose up -d` 起 **38 容器**。
+- **防火墙**：firewalld 开 http(80) + 8001/tcp。
+
+### 关键变更文件
+- 本地 `~/.ssh/config`（新增 csis-msu/csis-gcp）、新增 `~/.ssh/id_ed25519_msu`
+- 服务器 `~/csis-platform/telecouplingAI-project/`（代码+数据+`.env`/`.env.docker`+相对软链）
+- `msu_dev.md`（完整部署日志/运维手册，新建）、`DEPLOY_NEW_SERVER_MSU.md`（计划+清单，新建）
+
+### 测试状态
+- **38/38 容器 Up**，`tele-backend` healthy（`CSIS backend started ✅`）。
+- 服务器本地 + 服务器请求自身公网 IP：`GET /` 与 `/health` 均 **200**。
+- **Agent 端到端**：`POST /api/chat "list all tools"` 用 Gemini key 返回完整工具目录 ✅。
+- **工具端到端（LLM→celery→worker）**：#28 OLS ✓ / #30 CO2 ✓ / #5 Crop Production Percentile（InVEST + model_data 挂载）✓，全 PASS。
+- **端口/访问（修正）**：之前误判"MSU 拦 80"。实测从本机 raw TCP：**80 通 / 22 通 / 8001 不通**；那个 503 是**本机自己的代理** `127.0.0.1:29758`(VPN/代理客户端)挡的，`curl --noproxy` 直连即 200。**网站 + 文件下载都走 80 即可**——遂把 `FILE_SERVER_URL` 从 `:8001` 改到 `http://35.9.219.33/download/`(nginx 已有 `/download/` → fileserver 反代)，本机经 80 下载实测 200。浏览器若显示 503，关掉本机代理或给该 IP 设直连即可。公网(校外真实出口)可达性未测(Claude 跑在本机，经校园网到服务器)。
+- **Gemini key 轮换**：旧 key 被 Google 自动吊销(经 GitHub 推送泄露，`.env` 被跟踪且含真实 key)。用户提供新 key，**MSU + GCP 两台**均更新 `.env.docker` 并重建容器、重启 nginx 刷 upstream，对话恢复。新 key 只存在于两台服务器 gitignore 的 `.env.docker`，未进仓库。
+- **全量 41 工具人工浏览器测试(headless Chrome,逐工具上传+prompt+截图)**：截图存 `MSUmanualscreenshot/`，逐张人工查看判断。**最终 41/41 活跃工具端到端可用**；#26 Recreation 设计性 SKIP。自动检测误报 7 个 FAIL，看图+复测后**7 个全是误报**：#28/#31/#34 截图本就显示完整结果(检测器 5min 超时漏看绿卡);#21/#24/#36 浏览器 UI 偶发没触发工具,LLM-path 复测全 PASS;**#18 Urban Stormwater 经核实并非数据问题**——本地与服务器 7 个输入文件 md5 全一致、均 EPSG:26915 且范围重叠,direct 测试 MSU/GCP 各出 13 文件,浏览器重跑也 PASS(12 结果文件),原批量那次 "bounding boxes do not intersect" 是偶发(多文件上传时序/Gemini 非确定性)。Gemini key 为后付费(非免费档),限流非主因。报告见 `MSUmanualscreenshot/REPORT.md`。
+- **更正记录**：本条最初写成"40/41,#18 是测试数据问题",经 md5 + 坐标系核对 + direct/浏览器复跑后证实为误判,已订正为 41/41。
+
+---
+
 ## 2026-05-25 — 前端 UX：默认开新会话 + 过期文件链接友好标记
 
 ### 完成内容

@@ -50,6 +50,7 @@ class CSISError(Exception):
 ERROR_CODES = {
     "MISSING_PARAMS":   "Missing required parameters",
     "INVALID_PARAMS":   "Invalid parameter format",
+    "VALIDATION_ERROR": "Input validation failed",
     "TOOL_FAILED":      "Tool execution failed",
     "QGIS_TIMEOUT":     "QGIS render timeout (120s)",
     "QGIS_FAILED":      "QGIS render failed",
@@ -182,6 +183,49 @@ def validate_required(params: dict, required_keys: list[str]) -> None:
             f"Missing required parameters: {', '.join(missing)}",
             "MISSING_PARAMS", {"missing": missing},
         )
+
+
+_RASTER_EXTS = (".tif", ".tiff", ".img", ".vrt", ".bil", ".hgt")
+_VECTOR_EXTS = (".shp", ".gpkg", ".geojson", ".json", ".kml")
+_TABLE_EXTS = (".csv", ".tsv", ".txt")
+_KIND_EXTS = {"raster": _RASTER_EXTS, "vector": _VECTOR_EXTS, "table": _TABLE_EXTS}
+
+
+def validate_input_files(params: dict, file_specs: list[tuple]) -> None:
+    """Pre-flight check of file inputs BEFORE running an (expensive) model.
+
+    file_specs: list of (param_key, required: bool, kind: 'raster'|'vector'|'table').
+    Catches the common user mistakes — forgot to upload, wrong path, wrong file
+    type — and raises CSISError(VALIDATION_ERROR) with an actionable message,
+    instead of letting the model crash deep inside with a cryptic error.
+
+    Deliberately does NOT call natcap.invest's own validate(): that crashes /
+    stalls in a worker thread on malformed inputs (e.g. a CSV where a raster is
+    expected) — exactly the case we need to handle gracefully.
+    """
+    problems: list[str] = []
+    for key, required, kind in file_specs:
+        val = params.get(key)
+        if not val:
+            if required:
+                problems.append(f"'{key}': required {kind} file is missing — please upload it.")
+            continue
+        name = os.path.basename(str(val))
+        if not os.path.isfile(val):
+            problems.append(
+                f"'{key}': file not found ({name}) — it may not have been uploaded, "
+                f"or the path is wrong."
+            )
+            continue
+        exts = _KIND_EXTS.get(kind, ())
+        if exts and not str(val).lower().endswith(exts):
+            problems.append(
+                f"'{key}': expected a {kind} file ({'/'.join(exts)}), but got '{name}'."
+            )
+    if problems:
+        msg = ("The model cannot run because of a problem with the input files:\n"
+               + "\n".join(f"- {sanitize_error_message(p)}" for p in problems))
+        raise CSISError(msg, "VALIDATION_ERROR", {"problems": problems})
 
 
 async def scan_output_directory(workspace_dir: str, tool_name: str) -> list[dict]:
