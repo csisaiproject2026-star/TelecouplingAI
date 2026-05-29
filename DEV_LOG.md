@@ -1,3 +1,22 @@
+## 2026-05-29 — Step 2 类型预检（13 个 InVEST 工具，集中式 spec 表）
+
+### 完成内容
+- 新增 `backend/shared/tool_file_specs.py`：`TOOL_FILE_SPECS{工具名: [(参数, 必需?, raster/vector/table)]}`,覆盖 **13 个 InVEST 工具**(habitat/carbon/AWY/SDR/NDR/SWY/forest_carbon/pollination/urban_cooling/urban_flood/urban_nature/crop_percentile/network)。
+- `agent.py` 派发前查表 → 调 `validate_input_files` 做"**类型对不对**"检查(该栅格的别传成 CSV)。**集中式设计**:只动 backend 一个容器,不用逐工具改、不用动 33 个 worker、不用重建镜像。
+- 目录参数(precip_dir/et0_dir/model_data_path)和标量参数不纳入;SWY 的 `_dir` 也因此安全跳过。
+- 注:network 的 `nodes_table`/`links_table` 不以 `_path` 结尾(Step1 漏查),Step2 用显式参数名补上。
+
+### 关键变更文件
+- `backend/shared/tool_file_specs.py`（新建,集中式 spec 表）
+- `backend/agent.py`（派发前查表 + 类型校验,与 Step1 存在性检查同一处）
+
+### 测试状态
+- **GCP 全量 41 工具 LLM 回归:0 误拦**(无 VALIDATION_ERROR/file-not-found);40 PASS / 1 FAIL / 1 SKIP,唯一 FAIL=#23 Wave Energy 预存在的 no-call(与本改动无关)。
+- GCP + MSU 均 live(cp+restart)。
+- **剩余工具**(crop_regression/delineateit/routedem/urban_stormwater/scenario_gen/scenic_quality/coastal_vulnerability/hra/cbc_preprocessor/cbc_main/wave_energy/wind_energy 等)后续往 `tool_file_specs.py` 加条目即可,无需改别处。
+
+---
+
 ## 2026-05-29 — 通用文件存在性预检（覆盖所有工具，第 1 步）
 
 ### 完成内容

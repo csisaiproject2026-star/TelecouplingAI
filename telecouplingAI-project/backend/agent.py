@@ -31,7 +31,8 @@ from google.genai.client import HttpOptions
 import redis.asyncio as aioredis
 
 from config import settings
-from shared.utils import sanitize_error_message, validate_file_params_exist, CSISError
+from shared.utils import sanitize_error_message, validate_file_params_exist, validate_input_files, CSISError
+from shared.tool_file_specs import TOOL_FILE_SPECS
 
 logger = logging.getLogger(__name__)
 
@@ -1457,6 +1458,9 @@ async def run_agent(
             # uploaded" message instead of a cryptic crash inside the worker.
             try:
                 validate_file_params_exist(tool_input)
+                _specs = TOOL_FILE_SPECS.get(tool_name)
+                if _specs:
+                    validate_input_files(tool_input, _specs)
             except CSISError as ve:
                 safe_msg = sanitize_error_message(ve.message)
                 logger.info(f"[agent] pre-flight blocked {tool_name}: {safe_msg}")
