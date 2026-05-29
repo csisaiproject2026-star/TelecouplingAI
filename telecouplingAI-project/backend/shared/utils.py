@@ -188,7 +188,9 @@ def validate_required(params: dict, required_keys: list[str]) -> None:
 _RASTER_EXTS = (".tif", ".tiff", ".img", ".vrt", ".bil", ".hgt")
 _VECTOR_EXTS = (".shp", ".gpkg", ".geojson", ".json", ".kml")
 _TABLE_EXTS = (".csv", ".tsv", ".txt", ".xlsx", ".xls")
-_KIND_EXTS = {"raster": _RASTER_EXTS, "vector": _VECTOR_EXTS, "table": _TABLE_EXTS}
+_HTML_EXTS = (".html", ".htm", ".txt")
+_KIND_EXTS = {"raster": _RASTER_EXTS, "vector": _VECTOR_EXTS,
+              "table": _TABLE_EXTS, "html": _HTML_EXTS}
 
 
 def validate_file_params_exist(params: dict) -> None:

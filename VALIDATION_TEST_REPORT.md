@@ -2,7 +2,7 @@
 
 **Feature under test:** the new pre-flight input validation added this session
 - **Step 1** `validate_file_params_exist` — existence check (forgot to upload / wrong path) for every tool
-- **Step 2** `validate_input_files` + `TOOL_FILE_SPECS` — file-type check (raster vs vector vs table) for 26 file-heavy tools
+- **Step 2** `validate_input_files` + `TOOL_FILE_SPECS` — file-type check (raster / vector / table / html) for **all 41 file-taking tools**
 - Plus the **Wave Energy routing fix** (optional param no longer wrongly demanded)
 
 **Servers tested:** GCP `34.42.83.50` **and** MSU `35.9.219.33` (both, baked into the running images)
@@ -14,8 +14,8 @@
 
 | Server | Tools | Test cases | Pass | Fail |
 |---|---|---|---|---|
-| **GCP** | 26 | **293** | **293** | **0** |
-| **MSU** | 26 | **293** | **293** | **0** |
+| **GCP** | 41 | **359** | **359** | **0** |
+| **MSU** | 41 | **359** | **359** | **0** |
 
 **Every tool, every case, on both servers: PASS.** The validation correctly
 **allows** valid inputs and **blocks** all three error conditions with a clear,
@@ -37,7 +37,7 @@ tool, for **every tool** and **every required file parameter**:
 
 Validation checks existence + extension only, so empty placeholder files of each
 type exercise the full logic deterministically (no model runs, no Gemini).
-Total = 26 correct-cases + 89 required file-params × 3 error-cases = **293 cases**.
+Total = 41 correct-cases + 106 required file-params × 3 error-cases = **359 cases**.
 
 ---
 
@@ -73,11 +73,28 @@ Each tool's cases = 1 (correct) + 3 × (number of required file params). GCP and
 | 24 | run_habitat_risk_assessment | 3 | 10 | ✅ ALL PASS |
 | 25 | run_wave_energy_production | 2 | 7 | ✅ ALL PASS |
 | 26 | run_offshore_wind_energy | 4 | 13 | ✅ ALL PASS |
-|  | **Total** | **89** | **293** | **✅ 293/293** |
+| 27 | run_model_selection_ols | 1 | 4 | ✅ ALL PASS |
+| 28 | run_co2_emissions | 1 | 4 | ✅ ALL PASS |
+| 29 | run_cost_benefit_analysis | 2 | 7 | ✅ ALL PASS |
+| 30 | run_food_security | 1 | 4 | ✅ ALL PASS |
+| 31 | run_factor_analysis_mixed_data | 1 | 4 | ✅ ALL PASS |
+| 32 | run_commodity_trade | 1 | 4 | ✅ ALL PASS |
+| 33 | run_nutrition_metrics | 1 | 4 | ✅ ALL PASS |
+| 34 | run_population_count_density | 1 | 4 | ✅ ALL PASS |
+| 35 | run_draw_radial_flows | 1 | 4 | ✅ ALL PASS |
+| 36 | run_add_agents_interactively | 1 | 4 | ✅ ALL PASS |
+| 37 | run_draw_agents_from_table | 1 | 4 | ✅ ALL PASS |
+| 38 | run_add_causes_interactively | 1 | 4 | ✅ ALL PASS |
+| 39 | run_add_systems_interactively | 1 | 4 | ✅ ALL PASS |
+| 40 | run_draw_systems_from_table | 1 | 4 | ✅ ALL PASS |
+| 41 | run_add_media_flows | 2 (html_file + country_reference_csv) | 7 | ✅ ALL PASS |
+|  | **Total** | **106** | **359** | **✅ 359/359** |
 
-> All 26 tools in `TOOL_FILE_SPECS` covered. The remaining non-file / pure-LLM tools
-> (add_agents, draw_*, etc.) take no file inputs and are intentionally not type-specced;
-> they still get `validate_required` + the generic existence check.
+> **All 41 active tools are covered** — including the add_*/draw_* tools, which
+> (despite the "interactively" name) actually read an uploaded CSV. The only tools
+> without a file spec are `render_spatial_file` / `read_file_content` (they act on
+> already-produced output files) and Recreation (disabled). Every tool also still
+> runs `validate_required` + the generic existence check.
 
 ---
 
@@ -109,7 +126,7 @@ them) via the existing error channel.
 
 ## 4. Correct-case (happy path) end-to-end coverage
 
-Beyond the 26 "correct → allow" validation cases above, real tool execution on
+Beyond the 41 "correct → allow" validation cases above, real tool execution on
 valid data was verified separately this session:
 - Full 41-tool LLM-path regression on GCP: **40 PASS / 1 SKIP** before the Wave
   Energy fix; with that fix it is now **41 PASS / 1 SKIP** (#26 Recreation is a
@@ -129,7 +146,7 @@ So valid inputs run the models; invalid inputs are blocked with a clear message.
 - Directory params (precip_dir, et0_dir, wave_base_data_path) and params with
   built-in server defaults (wave/wind bathymetry & land polygon) are intentionally
   not type-checked, to avoid false positives.
-- The 293-case suite tests the validation **logic** directly (the exact deployed
+- The 359-case suite tests the validation **logic** directly (the exact deployed
   functions). The agent→user glue was verified separately (habitat broken-input
   surfaced the message end-to-end).
 
@@ -138,6 +155,6 @@ So valid inputs run the models; invalid inputs are blocked with a clear message.
 ## 6. Conclusion
 
 The new input-validation feature is **fully verified on both GCP and MSU**:
-- ✅ 26 tools, 293 cases, **293/293 PASS on each server**
+- ✅ 41 tools, 359 cases, **359/359 PASS on each server**
 - ✅ valid inputs allowed; missing / wrong-path / wrong-type all blocked with clear messages
 - ✅ baked into both production images (survives container recreate)

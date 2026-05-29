@@ -12,7 +12,7 @@ Coverage is incremental — tools not listed here still get the generic
 existence check (validate_file_params_exist) + validate_required.
 """
 
-R, V, T = "raster", "vector", "table"
+R, V, T, H = "raster", "vector", "table", "html"
 
 TOOL_FILE_SPECS: dict[str, list[tuple]] = {
     "run_habitat_quality": [
@@ -183,5 +183,56 @@ TOOL_FILE_SPECS: dict[str, list[tuple]] = {
         ("global_wind_parameters_path", True, T),
         ("turbine_parameters_path", True, T),
         ("wind_data_path", True, T),
+    ],
+
+    # --- CSV / table-based analytical & telecoupling tools ---
+    "run_model_selection_ols": [
+        ("input_csv", True, T),
+    ],
+    "run_co2_emissions": [
+        ("input_csv", True, T),
+    ],
+    "run_cost_benefit_analysis": [
+        ("input_csv", True, T),
+        ("economic_data_csv", True, T),
+    ],
+    "run_food_security": [
+        ("fao_csv", True, T),
+    ],
+    "run_factor_analysis_mixed_data": [
+        ("input_csv", True, T),
+    ],
+    "run_commodity_trade": [
+        ("trade_csv", True, T),
+        ("centroids_csv", False, T),
+    ],
+    "run_nutrition_metrics": [
+        ("population_csv", True, T),
+    ],
+    "run_population_count_density": [
+        ("input_csv", True, T),
+        ("second_period_csv", False, T),
+    ],
+    "run_draw_radial_flows": [
+        ("input_csv", True, T),
+    ],
+    "run_add_agents_interactively": [
+        ("input_csv", True, T),
+    ],
+    "run_draw_agents_from_table": [
+        ("input_csv", True, T),
+    ],
+    "run_add_causes_interactively": [
+        ("input_csv", True, T),
+    ],
+    "run_add_systems_interactively": [
+        ("input_csv", True, T),
+    ],
+    "run_draw_systems_from_table": [
+        ("input_csv", True, T),
+    ],
+    "run_add_media_flows": [
+        ("html_file", True, H),
+        ("country_reference_csv", True, T),
     ],
 }

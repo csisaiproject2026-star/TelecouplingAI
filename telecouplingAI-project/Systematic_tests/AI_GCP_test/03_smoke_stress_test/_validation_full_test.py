@@ -22,12 +22,13 @@ from shared.tool_file_specs import TOOL_FILE_SPECS
 
 TMP = tempfile.mkdtemp(prefix="valtest_")
 DUMMY = {}
-for kind, ext in (("raster", ".tif"), ("vector", ".shp"), ("table", ".csv")):
+for kind, ext in (("raster", ".tif"), ("vector", ".shp"), ("table", ".csv"), ("html", ".html")):
     p = os.path.join(TMP, f"dummy{ext}")
     open(p, "w").close()
     DUMMY[kind] = p
-# a real file of the WRONG kind (raster<->table, vector->table)
-WRONG = {"raster": DUMMY["table"], "vector": DUMMY["table"], "table": DUMMY["raster"]}
+# a real file of the WRONG kind (a .tif raster never matches table/vector/html)
+WRONG = {"raster": DUMMY["table"], "vector": DUMMY["table"],
+         "table": DUMMY["raster"], "html": DUMMY["raster"]}
 
 
 def run_preflight(params, specs):

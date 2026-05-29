@@ -1,3 +1,21 @@
+## 2026-05-29 — 文件类型检查扩到全部 41 个工具
+
+### 完成内容
+- 之前只给 26 个空间/InVEST 工具做了"文件类型对不对"检查。复查时发现:那些名字带 "Interactively" 的工具(Add/Draw Agents、Causes、Systems、Radial Flows 等)**其实也都要上传一个 CSV**(不是纯对话生成),`add_media_flows` 还要上传一个 HTML 文件。
+- 所以又给剩下 **15 个收文件的工具**补上了类型检查(基本都是 CSV;为 `html_file` 新增了 `html` 文件类型,接受 .html/.htm/.txt)。**现在 41 个活跃工具全部覆盖。**
+- 唯二没纳入的:`render_spatial_file` / `read_file_content`(它们处理的是已生成的输出文件)和 Recreation(已禁用)。
+
+### 关键变更文件
+- `backend/shared/tool_file_specs.py`（26 → 41 个工具）
+- `backend/shared/utils.py`（新增 html 文件类型)
+
+### 测试状态
+- 全面测试:每个工具 × 4 情形(正确/缺文件/路径错/类型错)=**359 个用例,GCP 359/359、MSU 359/359 全过**。
+- GCP 全量 41 工具 LLM 回归:**41 通过 / 0 失败 / 1 跳过**(Recreation),新加的 CSV 工具一个都没被误拦。
+- 两台都重建了后端镜像把改动存进去(很快,依赖有缓存,没重装)。报告:`VALIDATION_TEST_REPORT.md`。
+
+---
+
 ## 2026-05-29 — 校验功能全面测试（26 工具 × 4 情形，GCP + MSU）
 
 ### 完成内容
