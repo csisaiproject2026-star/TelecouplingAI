@@ -234,6 +234,14 @@ PATTERNS: dict[str, dict[str, list[str]]] = {
         "csv": ["nutrition_metrics_results.csv", "nutrition_metrics_summary.csv"],
         "image": ["nutrition_ller_chart.png"],
     },
+    "geodetector": {
+        "csv": ["geodetector_factor.csv", "geodetector_interaction.csv",
+                "geodetector_risk.csv", "geodetector_ecological.csv"],
+    },
+    "spatial_moran": {
+        "csv": ["moran_global.csv", "moran_local_lisa.csv", "moran_lisa_summary.csv"],
+        "download": ["moran_lisa.geojson"],
+    },
     "recreation": {
         "qgis": ["pud_results*.shp", "pud_results*.gpkg",
                  "tud_results*.shp", "tud_results*.gpkg",

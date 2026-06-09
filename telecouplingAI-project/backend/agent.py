@@ -132,6 +132,8 @@ TOOL_TO_SKILL: dict[str, str] = {
     "run_add_media_flows":                   "run-add-media-flows",
     "run_food_security":                     "run-food-security",
     "run_nutrition_metrics":                 "run-nutrition-metrics",
+    "run_geographical_detector":             "run-geographical-detector",
+    "run_spatial_autocorrelation_moran":     "run-spatial-moran",
 }
 
 # ---------------------------------------------------------------------------
@@ -1075,6 +1077,35 @@ TOOLS = [
                 required=["population_csv"],
             ),
         ),
+        types.FunctionDeclaration(
+            name="run_geographical_detector",
+            description="Run the Geographical Detector (Geodetector, Wang Jinfeng) on tabular data to find which categorical factors drive the spatial variation of a continuous variable. Returns factor q-statistics, factor interactions, risk (stratum means), and ecological detectors. Use when user asks about geodetector, geographical detector, spatial stratified heterogeneity, q-statistic, driving factors, or factor/interaction detection.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "input_csv":     types.Schema(type=types.Type.STRING, description="Path to input CSV/xlsx with the dependent variable and factor columns"),
+                    "y_variable":    types.Schema(type=types.Type.STRING, description="Column name of the continuous dependent variable Y (e.g. incidence)"),
+                    "x_variables":   types.Schema(type=types.Type.STRING, description="Comma-separated list of CATEGORICAL factor column names (X). Continuous factors must be discretized into strata beforehand."),
+                    "alpha":         types.Schema(type=types.Type.NUMBER, description="Significance level, default 0.05"),
+                },
+                required=["input_csv", "y_variable", "x_variables"],
+            ),
+        ),
+        types.FunctionDeclaration(
+            name="run_spatial_autocorrelation_moran",
+            description="Compute spatial autocorrelation (Moran's I) on a vector layer: global Moran's I with a significance test, plus local Moran (LISA) classifying each feature as hot spot (HH), cold spot (LL), or spatial outlier (HL/LH). Use when user asks about Moran's I, spatial autocorrelation, spatial clustering, hot spot / cold spot analysis, or LISA.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "input_vector":  types.Schema(type=types.Type.STRING, description="Path to a vector file (shapefile .shp, GeoJSON, or GPKG) with geometry and the value field"),
+                    "value_field":   types.Schema(type=types.Type.STRING, description="Name of the numeric attribute column to analyse for spatial autocorrelation"),
+                    "weights_type":  types.Schema(type=types.Type.STRING, description="Spatial weights: 'queen' (default) or 'rook' contiguity for polygons, or 'knn' for points/k-nearest neighbours"),
+                    "k_neighbors":   types.Schema(type=types.Type.INTEGER, description="Number of neighbours when weights_type='knn', default 8"),
+                    "permutations":  types.Schema(type=types.Type.INTEGER, description="Permutations for the pseudo p-value, default 999"),
+                },
+                required=["input_vector", "value_field"],
+            ),
+        ),
         # ── Utility tools ──────────────────────────────────────────────────────
         types.FunctionDeclaration(
             name="read_file_content",
@@ -1292,6 +1323,8 @@ async def run_agent(
         "run_add_media_flows":                  "q_add_media",
         "run_food_security":                    "q_food_security",
         "run_nutrition_metrics":                "q_nutrition",
+        "run_geographical_detector":            "q_geodetector",
+        "run_spatial_autocorrelation_moran":    "q_spatial_moran",
     }
 
     client = _get_client()

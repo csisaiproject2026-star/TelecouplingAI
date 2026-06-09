@@ -235,4 +235,10 @@ TOOL_FILE_SPECS: dict[str, list[tuple]] = {
         ("html_file", True, H),
         ("country_reference_csv", True, T),
     ],
+    "run_geographical_detector": [
+        ("input_csv", True, T),
+    ],
+    "run_spatial_autocorrelation_moran": [
+        ("input_vector", True, V),
+    ],
 }

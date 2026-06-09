@@ -1,3 +1,79 @@
+## 2026-06-09 — 集成两个空间分析工具进平台（莫兰指数 + 地理探测器）41→43
+
+### 完成内容
+- 两个新工具按现有 41 工具同样的接线方式全量集成（自定义工具，非 InVEST）：
+  - **地理探测器** `run_geographical_detector`（队列 q_geodetector，skill run-geographical-detector）：纯 numpy/pandas/scipy 四探测器，吃 CSV/xlsx。
+  - **莫兰指数** `run_spatial_autocorrelation_moran`（队列 q_spatial_moran，skill run-spatial-moran）：PySAL(esda+libpysal)，吃矢量 shp/geojson/gpkg，全局 I + 局部 LISA，输出 CSV + 分类 geojson。
+- 工具实现移植自已验证原型（q 值、Moran I 均与 QGIS/官方一致）。
+
+### 关键变更文件
+- 新增 `backend/tools/geodetector.py`、`backend/tools/spatial_moran.py`
+- `backend/workers/task_queue.py`（import + tool_map 各 2 条）
+- `backend/agent.py`（TOOL_TO_SKILL、FunctionDeclaration、_TOOL_QUEUES 各 2 条）
+- `backend/shared/tool_file_specs.py`（input_csv=table / input_vector=vector）
+- `backend/renderers/output_router.py`（geodetector / spatial_moran 输出分类）
+- `backend/Dockerfile`（pip 加 esda + libpysal + openpyxl）
+- `docker-compose.yml`（新 worker `celery-worker-spatial-stats`，消费 q_geodetector+q_spatial_moran）
+- 新增 2 个 SKILL.md
+- 测试数据：`Systematic_tests/Test_data/43_spatial_moran/columbus.geojson`、`44_geodetector/disease_data.csv`（官方疾病数据）
+- `Systematic_tests/AI_GCP_direct_test/run_AI_GCP_direct_test.py`（加 43/44，范围扩到 1..44）
+
+### 测试状态
+- **本地验证通过**：直接调后端两个工具函数跑测试数据 → 地理探测器 4 CSV（q region0.638/level0.607/type0.386 = 官方值）；莫兰 4 输出（全局 I=0.5002，3 csv + 1 geojson 分类正确）。
+- 全部改动文件 py_compile OK；docker-compose YAML 解析 OK（39 services）。
+- **部署**：GCP + MSU 服务器路径均为 `~/csis-platform/telecouplingAI-project/`（CLAUDE.md 写的 GCP 路径已过时，实为同 MSU 结构）；compose 服务名是 `api-server`（不是 backend），构建用 `docker compose build api-server`。
+  - **GCP 完成 ✅**：镜像重建（含 esda 2.9.0 + libpysal 4.14.1）；`up -d` 重建；新 worker `tele-celery-spatial-stats` Up；容器内 end-to-end 跑两工具 = 4+4 文件，q 值/Moran I 与官方一致。
+  - **MSU 进行中**：镜像重建到 exporting 阶段。**下一步**：MSU `up -d` → 容器内验证 43/44 → 本地 commit + push 到 feature/invest-expansion。
+
+---
+
+## 2026-06-09 — 规划：新增两个空间分析工具（莫兰指数 + 地理探测器）【讨论，未动手】
+
+### 背景 / 需求
+- 用户提出再加两个工具，来源是 **QGIS 社区插件**：
+  - **空间莫兰指数 (Moran's I)** — QGIS 里对应 Hotspot Analysis 插件(PySAL)/Lattice Data 插件。作用：检验地图数据是否空间聚集，给全局 I 值+p 值，局部 LISA 可分类热点/冷点/异常点。
+  - **地理探测器 (Geodetector，王劲峰 2017)** — QGIS 插件 "Geographical detector"(GitHub: gsnrguo/QGIS-Geographical-detector)。作用：探测哪个分类因子 X 最能解释 Y 的空间分异，四个探测器(因子/交互/风险/生态)。
+- 二者均归"自定义/Telecoupling 工具"，非 InVEST。加完 41 → 43。
+
+### 已确认的实现结论
+- **纯 Python 可实现，无需 QGIS 运行时**。worker conda 环境已自带 numpy/pandas/scipy/GDAL/shapely。
+- **地理探测器**：纯原生 pandas/numpy，**零新依赖**，套路同 `backend/tools/ols.py`(吃 CSV→写多个 CSV→return files)。
+- **莫兰指数**：算法纯 numpy；唯一变量是空间权重构建。推荐**路 A = pip 装 PySAL(esda+libpysal，纯 Python 轻量，与 QGIS Hotspot 插件同库)**；备选路 B = 用现有 GDAL/shapely 原生写邻接+置换(零新依赖但代码多)。
+
+### 待用户拍板（动手前）
+1. 输入格式：莫兰建议吃 **矢量(shp/GeoJSON)+属性字段名**(建权重需几何)；地理探测器吃 **CSV**(Y 列+分类 X 列)。是否也让地理探测器支持读 shp 属性表？
+2. 莫兰范围：只做**全局**(统计表+散点图) 还是连**局部 LISA**(多出 HH/LL 分类矢量→可 render 成图)？
+3. 空间权重默认类型：Queen/Rook 邻接 vs 距离 vs KNN，开放哪些。
+4. 地理探测器：四个探测器全做 vs 先做核心(因子+交互)；连续 X 是否由工具自动离散化(分位数/自然断点)还是要求传入即分类。
+5. 依赖口径：是否允许 pip 装 esda+libpysal(否则莫兰走原生路 B)。
+
+### 落地需改的位置（每个工具）
+- `backend/tools/spatial_moran.py` / `geodetector.py`(Celery 任务)
+- `docker-compose.yml`(各加 worker)
+- `backend/agent.py`(FunctionDeclaration)
+- `backend/shared/tool_file_specs.py`(输入类型校验)
+- `renderers/output_router.py`(输出分类规则)
+- `.claude/skills/run-*/SKILL.md`(AI 调用指南)
+
+### 原型验证（已完成，独立脚本，未集成进平台）
+- 目录 `telecouplingAI-project/_prototype_spatial_tools/`，依赖装进 conda 环境 **TeleCouplingAI**（新增 `esda 2.9.0` + `libpysal 4.14.1`；`geopandas` 已有；`xlwt` 仅为导入参照插件类）。
+- `moran_prototype.py`：用 PySAL（esda.Moran/Moran_Local）跑 libpysal 自带 columbus 数据集。
+  - 全局 **Moran's I = 0.5002**（columbus.CRIME，Queen 行标准化），= 该数据集公认教科书值；p_sim=0.001 显著聚集。
+  - LISA 分出 11 热点 / 7 冷点 / 2 异常点。**esda 正是 QGIS Hotspot 插件底层库 → 天然对齐 QGIS。**
+- `geodetector_prototype.py`：四探测器**纯原生 numpy/pandas/scipy** 实现 + 与真实 QGIS 插件源码 1:1 对照。
+  - 参照插件 `_ref_qgis_geodetector.py`（vendored from gsnrguo/QGIS-Geographical-detector）。
+  - 同一份可复现样例数据上，native vs 插件：factor q / p-value / interaction q **max|diff| = 0.000e+00 → 完全一致**。
+  - 公式锚点（与插件一致）：q=1−SSW/SST（总体方差 ddof=0）；F 检验用非中心 F（nc=[Σȳ_h²−(Σ√n_h·ȳ_h)²/n]/样本方差）；风险=Levene 门控 t 检验；生态=SSW_i/SSW_j 比 F 临界。
+- 结论：**两个算法都能纯 Python 复刻且与 QGIS 对齐**。地理探测器零新依赖；莫兰需 esda+libpysal（纯 Python，轻）。
+- 官方数据锚点（已完成）：用户下载官方 `GeoDetector_2018_Example(Disease Dataset)_test.xlsm`（185 样本，列 incidence + type/region/level）放入 `_prototype_spatial_tools/`。`geodetector_prototype.py` 已改为优先加载该官方数据集（缺失时回退合成数据）。
+  - 三层验证全部通过：① 原生 vs 插件源码 `max|q diff|=7.8e-16`（机器精度）；② 用官方 2018 疾病数据集；③ 算得 **q(region)=0.6378 / q(level)=0.6067 / q(type)=0.3857 = 官方公开发表值**。交互探测全 Enhance_bi-，与官方一致。
+  - 结论坐实：**地理探测器原生实现 = QGIS 插件 = 官方 GeoDetector，三方一致。**
+
+### 测试状态
+- 原型级验证通过（见上）。平台集成（Celery/worker/agent/SKILL）未开始 —— 仍需按"待拍板"5 点（输入格式/莫兰范围/权重类型/探测器范围/依赖口径）定方向后开工。
+
+---
+
 ## 2026-06-09 — MSU 服务器配置 443/HTTPS（配合 MSU WAF 公网访问）
 
 ### 完成内容

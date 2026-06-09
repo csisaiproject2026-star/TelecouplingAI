@@ -46,6 +46,7 @@ _ALL_SUBDIRS = [
     "32_population_density", "33_radial_flows", "34_commodity_trade",
     "35_add_agents", "36_draw_agents_table", "37_add_causes", "38_add_systems",
     "39_draw_systems_table", "40_add_media_flows", "41_food_security", "42_nutrition_metrics",
+    "43_spatial_moran", "44_geodetector",
 ]
 for _d in _ALL_SUBDIRS:
     os.makedirs(os.path.join(OUTDIR, _d, "output"), exist_ok=True)
@@ -847,6 +848,18 @@ TELEBOX_TOOLS = [
      {"population_csv": td("42_nutrition_metrics", "nutrition_data.csv"),
       "age_col": "age_group", "sex_col": "sex",
       "weight_col": "weight_kg", "population_col": "population"}),
+
+    (43, "Spatial Moran's I",
+     lambda: __import__("tools.spatial_moran", fromlist=["run_spatial_autocorrelation_moran"])
+             .run_spatial_autocorrelation_moran,
+     {"input_vector": td("43_spatial_moran", "columbus.geojson"),
+      "value_field": "CRIME", "weights_type": "queen"}),
+
+    (44, "Geographical Detector",
+     lambda: __import__("tools.geodetector", fromlist=["run_geographical_detector"])
+             .run_geographical_detector,
+     {"input_csv": td("44_geodetector", "disease_data.csv"),
+      "y_variable": "incidence", "x_variables": "type,region,level"}),
 ]
 
 
@@ -870,7 +883,7 @@ def main(ids: list[int]) -> None:
             if tool_id in id_set:
                 run_invest_fn(tool_id, name, fn)
 
-    telebox_ids = [i for i in ids if 28 <= i <= 42]
+    telebox_ids = [i for i in ids if 28 <= i <= 44]
     if telebox_ids:
         print(f"\n  ── Section B: TeleBox tools ─────────────────────────────────────────", flush=True)
         for tool_id, name, fn_factory, params in TELEBOX_TOOLS:
@@ -905,8 +918,8 @@ def main(ids: list[int]) -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--ids", default="",
-                        help="Comma-separated tool IDs 1-42 (default: all)")
+                        help="Comma-separated tool IDs 1-44 (default: all)")
     args = parser.parse_args()
     ids = ([int(x.strip()) for x in args.ids.split(",") if x.strip()]
-           if args.ids else list(range(1, 43)))
+           if args.ids else list(range(1, 45)))
     main(ids)

@@ -86,6 +86,8 @@ def execute_tool(tool_name: str, params: dict, session_id: str, task_id: str, pr
     from tools.famd import run_factor_analysis_mixed_data
     from tools.food_security import run_food_security
     from tools.nutrition_metrics import run_nutrition_metrics
+    from tools.geodetector import run_geographical_detector
+    from tools.spatial_moran import run_spatial_autocorrelation_moran
 
     tool_map = {
         "run_network_analysis_grouping":        run_network_analysis,
@@ -132,6 +134,8 @@ def execute_tool(tool_name: str, params: dict, session_id: str, task_id: str, pr
         "run_factor_analysis_mixed_data":       run_factor_analysis_mixed_data,
         "run_food_security":                    run_food_security,
         "run_nutrition_metrics":                run_nutrition_metrics,
+        "run_geographical_detector":            run_geographical_detector,
+        "run_spatial_autocorrelation_moran":    run_spatial_autocorrelation_moran,
     }
     func = tool_map.get(tool_name)
     if func is None:

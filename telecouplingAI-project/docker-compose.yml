@@ -889,6 +889,29 @@ services:
         limits:
           memory: 512M
 
+  celery-worker-spatial-stats:
+    image: csic_backend:latest
+    container_name: tele-celery-spatial-stats
+    command: >
+      celery -A workers.task_queue worker
+      --queues=q_geodetector,q_spatial_moran
+      --concurrency=2
+      --pool=prefork
+      --loglevel=info
+      --hostname=worker-spatial-stats@%h
+    env_file: .env.docker
+    volumes:
+      - ${HOST_SHARED_DIR:-/data/outputs}:/data/outputs
+      - ${HOST_UPLOADS_DIR:-/data/uploads}:/data/uploads
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
   # ── Redis ────────────────────────────────────────────────────────────────
   redis:
     image: redis:alpine
