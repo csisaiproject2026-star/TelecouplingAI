@@ -23,7 +23,16 @@
 - 全部改动文件 py_compile OK；docker-compose YAML 解析 OK（39 services）。
 - **部署**：GCP + MSU 服务器路径均为 `~/csis-platform/telecouplingAI-project/`（CLAUDE.md 写的 GCP 路径已过时，实为同 MSU 结构）；compose 服务名是 `api-server`（不是 backend），构建用 `docker compose build api-server`。
   - **GCP 完成 ✅**：镜像重建（含 esda 2.9.0 + libpysal 4.14.1）；`up -d` 重建；新 worker `tele-celery-spatial-stats` Up；容器内 end-to-end 跑两工具 = 4+4 文件，q 值/Moran I 与官方一致。
-  - **MSU 进行中**：镜像重建到 exporting 阶段。**下一步**：MSU `up -d` → 容器内验证 43/44 → 本地 commit + push 到 feature/invest-expansion。
+  - **MSU 完成 ✅**：镜像重建（esda 2.9.0 + libpysal 4.14.1 + openpyxl 3.1.5）；`up -d` 重建；新 worker `tele-celery-spatial-stats` Up；容器内 end-to-end = 4+4 文件，q 值/Moran I 与 GCP/官方完全一致。
+
+### 根治 nginx 502 坑（已填平 ✅）
+- 病根：`nginx/nginx.conf` 用 `upstream backend { server api-server:8000; }`，nginx 启动时把容器名解析成 IP 永久缓存；`up -d` 重建 api-server 换 IP 后 nginx 仍发往旧 IP → 502，必须手动 restart nginx。
+- 根治：删掉 `upstream {}` 块，改用 **Docker 内置 DNS `resolver 127.0.0.11 valid=10s ipv6=off` + 变量化 `proxy_pass http://$backend`**（$frontend/$fileserver 同理）。变量形式让 nginx 按请求重新解析（TTL 10s），容器换 IP 后 ≤10s 自动跟上，无需重启。
+- 验证：两机 reload 新配置后 `nginx -t` OK；`docker compose up -d --force-recreate api-server`（不碰 nginx）→ health 自动 502→200（仅 app 启动那 1–2s 是 502，DNS 不再卡死）；`/` `/health` `/download/` 全 200，路由未受影响。
+  - 两机 `/health` 均 200。
+- **已 commit + push**：`feat(tools): add Geographical Detector + Spatial Moran's I (41->43 tools)` → feature/invest-expansion（cc812ef..99024b3，12 文件 +640）。Test_data/ 按仓库惯例 gitignore，未入库（已单独 tar 部署到两机）。
+
+> 设计取舍记录（最终）：地理探测器吃 CSV、莫兰吃矢量(shp/geojson/gpkg)；莫兰默认 Queen 行标准化、点要素自动转 KNN，全局+局部 LISA 都做；地理探测器四探测器全做、要求 X 已分类（不自动离散化）；依赖用 esda+libpysal（轻量纯 Python）。两个工具合用一个 worker(`spatial-stats`)。
 
 ---
 
