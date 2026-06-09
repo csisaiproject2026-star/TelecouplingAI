@@ -1,3 +1,31 @@
+## 2026-06-09 — MSU 服务器配置 443/HTTPS（配合 MSU WAF 公网访问）
+
+### 完成内容
+- **背景**:MSU 网络团队配好了 `ai.telecoupling.msu.edu` 域名 + WAF 公网通道,要求服务器侧自己跑 443/HTTPS(WAF 终结公网 TLS,再连源站 :443)。证书方案选**自签名**(WAF→源站这一段绝大多数不验证源站证书)。
+- nginx 在**同一个 server 块**里加 `listen 443 ssl`(80 保留不强制跳转,校园网直连不受影响),共用全部既有 location,零重复。
+- docker-compose 的 nginx 服务加 `443:443` 端口 + 挂载 `./nginx/certs:/etc/nginx/certs:ro`。
+- 服务器上 `openssl` 生成自签名证书(CN/SAN=`ai.telecoupling.msu.edu`,825 天)到 `nginx/certs/`。
+- `.gitignore` 加 `nginx/certs/*.key|*.crt|*.pem`(私钥绝不提交;证书只在服务器生成)。
+
+### 关键变更文件
+- `telecouplingAI-project/nginx/nginx.conf`(加 443 ssl 监听)
+- `telecouplingAI-project/docker-compose.yml`(nginx 加 443 端口 + certs 挂载)
+- `telecouplingAI-project/.gitignore`(忽略证书私钥)
+- `CLAUDE.md`(服务器信息表加 MSU + HTTPS;"已实现工具"6→41,改为指向权威清单)
+
+### 测试状态
+- **服务器侧全部通过**:`docker compose up -d nginx` 重建,`nginx -t` 语法 OK,容器端口 `0.0.0.0:80` + `0.0.0.0:443`。
+  - 源站 `https://localhost/health`=200、`https://localhost/`=200、`http://localhost/`=200(80 仍正常)。
+  - `https://35.9.219.33/health`(公网 IP)=200。TLS 证书正确返回(CN=ai.telecoupling.msu.edu)。
+  - firewalld 早已放行 `http`+`https`,无需改动。
+- **公网仍不通,已确诊 = MSU 边界挡 inbound 443**:
+  - 公网经 WAF 报 "proxy failed to connect to web server, TCP connection timeout"。
+  - 但**校园网/VPN 内浏览器访问 `https://35.9.219.33/` 可以打开**(自签名证书警告→继续即可)=源站 443 在边界内完全正常,问题只在"边界外→源站"这一段。(注:命令行 curl 在本机测 443 超时/80 报 503,经核实是 curl 未走 VPN 通道的假信号,以浏览器结果为准。)
+  - nginx 日志佐证:命中过的客户端 IP 只有 docker 网关 172.18.0.1 和本机自测 35.9.219.33,无任何 WAF/外部 IP,无 TLS 握手错误。
+  - **结论:服务器侧要求已 100% 完成并验证;不通卡在 MSU 边界防火墙(inbound 443 未放行),只有 MSU IT 能改。** = 部署文档 P7 早标记的遗留项。下一步:回邮件请 MSU IT 在边界放行 inbound 443 到 35.9.219.33(至少 WAF 源 IP)。
+
+---
+
 ## 2026-05-29 — 文件类型检查扩到全部 41 个工具
 
 ### 完成内容

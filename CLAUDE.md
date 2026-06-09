@@ -20,12 +20,18 @@
 
 ## 服务器信息
 
-| 项目 | 值 |
-|------|----|
-| GCP 服务器 IP | **34.42.83.50**（唯一正确的 IP，不要用其他 IP） |
-| 访问地址 | http://34.42.83.50/ |
-| 服务器路径 | `~/csis-platform/` |
-| Docker Dockerfile | `~/csis-platform/backend/Dockerfile`（build 必须在 backend/ 目录下执行） |
+平台部署在两台服务器上（结构 1:1 一致，均非 git 仓库）：
+
+| 项目 | GCP（源/主） | MSU（新服务器） |
+|------|-------------|----------------|
+| IP | **34.42.83.50** | **35.9.219.33** |
+| SSH | `ssh csis-gcp`（user `csisaiproject2026`） | `ssh csis-msu`（user `jianan2`，需校园网/VPN） |
+| 访问地址 | http://34.42.83.50/ | http://35.9.219.33/（校园网）<br>https://ai.telecoupling.msu.edu/（公网，经 MSU WAF） |
+| 服务器路径 | `~/csis-platform/` | `~/csis-platform/telecouplingAI-project/` |
+
+- **GCP IP 唯一正确就是 34.42.83.50，不要用其他 IP。**
+- **MSU 公网访问经 MSU 的 WAF 转发**：WAF 终结公网 TLS → 连源站 `:443`。源站 nginx 已配 `listen 443 ssl`（自签名证书在 `nginx/certs/`，端口 80/443 均开）。SSH(22) 不走 WAF，管理服务器仍需 VPN。
+- Docker Dockerfile：`~/csis-platform/backend/Dockerfile`（build 必须在 backend/ 目录下执行）。
 
 ---
 
@@ -81,16 +87,19 @@ fulldev/
 
 ---
 
-## 已实现工具（6 个）
+## 已实现工具（41 个活跃工具）
 
-| 工具 | Python 模块 | 状态 |
-|------|-------------|------|
-| Seasonal Water Yield | `natcap.invest.seasonal_water_yield` | ✅ |
-| Coastal Blue Carbon Preprocessor | `natcap.invest.coastal_blue_carbon.preprocessor` | ✅ |
-| Coastal Blue Carbon (Main) | `natcap.invest.coastal_blue_carbon.coastal_blue_carbon` | ✅ |
-| Crop Production Percentile | `natcap.invest.crop_production_percentile` | ✅ |
-| Crop Production Regression | `natcap.invest.crop_production_regression` | ✅ |
-| Network Analysis | 自定义 | ✅ |
+平台目前有 **41 个活跃工具**（26 个 InVEST 模型 + 15 个自定义/Telecoupling 工具）。
+工具数量已稳定，逐条列表容易过时——**权威清单见这三处，不要在本文件维护明细：**
+
+- `backend/shared/tool_file_specs.py` — 41 个工具的输入文件参数与类型定义（最准的"活跃工具"集合）
+- `.claude/skills/run-*` — 每个工具一个 SKILL.md（AI 调用指南）
+- `INVEST_MODELS_REFERENCE.md` — InVEST 模型参考文档
+
+> 历史：POC 阶段只有 6 个工具（SWY / CBC 预处理 / CBC 主模型 / Crop Percentile / Crop Regression / Network Analysis）；
+> 后续在 `feature/invest-expansion` 分支扩展到 41 个。
+> 未纳入 file-spec 校验的两个例外：`render_spatial_file` / `read_file_content`（处理已生成的输出文件）；
+> Recreation 工具已禁用。
 
 ---
 

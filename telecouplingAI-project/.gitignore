@@ -2,6 +2,11 @@
 .env
 *.env
 
+# TLS 证书/私钥（在服务器上生成，绝对不能提交）
+nginx/certs/*.key
+nginx/certs/*.crt
+nginx/certs/*.pem
+
 # Python
 __pycache__/
 *.pyc
