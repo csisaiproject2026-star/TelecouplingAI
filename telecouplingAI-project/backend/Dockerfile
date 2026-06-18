@@ -39,6 +39,7 @@ RUN pip install --no-cache-dir \
         "google-genai>=0.8.0" \
         "python-multipart==0.0.21" \
         "aiofiles>=23.0.0" \
+        "sse-starlette>=2.1.0" \
         "pydantic-settings>=2.0.0" \
         "celery[redis]>=5.3.0" \
         "redis>=5.0.0" \

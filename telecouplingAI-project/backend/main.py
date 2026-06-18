@@ -3,9 +3,10 @@ CSIS Ecosystem Intelligence Platform — FastAPI backend.
 
 Endpoints:
   POST   /api/chat                          SSE streaming chat (X-Session-ID header)
-  POST   /api/upload                        File upload
+  POST   /api/upload                        File upload (supports folder uploads w/ relative paths)
   POST   /api/render/zoom                   QGIS zoom/pan re-render
   GET    /download/{session_id}/{path}      File download
+  POST   /api/download_zip/{session_id}     Bundle a specific set of result files into one ZIP
   DELETE /api/sessions/{session_id}         Delete session and outputs
   GET    /health                            Health check
 """
@@ -14,13 +15,37 @@ import asyncio
 import json
 import logging
 import os
+import re
+import tempfile
 import uuid
+import zipfile
 from pathlib import Path
+
+from starlette.background import BackgroundTask
+
+# Catch LLM-hallucinated inline base64 image data so it never gets persisted
+# into chat history (the frontend already blocks rendering, but we don't want
+# multi-KB junk haunting future turns or session JSON dumps).
+_INLINE_BASE64_IMG_RE = re.compile(
+    r'!?\[[^\]]*\]\(data:image/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/=\s]{50,}\)'
+    r'|data:image/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/=\s]{50,}',
+    re.IGNORECASE,
+)
+
+# Strip absolute filesystem paths (Linux container paths like /data/outputs/...,
+# /app/..., /tmp/...) from anything the AI writes back to the user — only the
+# filename should survive. The system prompt already forbids this but Gemini
+# leaks paths anyway, so we enforce it on the wire.
+_LEAK_PATH_RE = re.compile(
+    r'(?:/(?:data|app|tmp|home|opt|var|root|mnt)/)[\w./\-]+?/([\w\-.]+\.[A-Za-z0-9]{1,6})'
+)
 
 import aiofiles
 from fastapi import FastAPI, Form, Header, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
+from pydantic import BaseModel
+from sse_starlette.sse import EventSourceResponse, ServerSentEvent
 import uvicorn
 
 from config import settings
@@ -101,11 +126,16 @@ async def chat_endpoint(
             message = "I have uploaded these files. Please analyze them and suggest which InVEST models I can run, or describe what they contain."
         else:
             async def empty_prompt_stream():
-                yield f"data: {json.dumps({'type': 'error', 'message': 'Please input prompt to let me know how to process it', 'error_code': 'EMPTY_PROMPT'}, ensure_ascii=False)}\n\n"
-            return StreamingResponse(
+                yield ServerSentEvent(
+                    data=json.dumps(
+                        {'type': 'error', 'message': 'Please input prompt to let me know how to process it', 'error_code': 'EMPTY_PROMPT'},
+                        ensure_ascii=False,
+                    ),
+                    id="0",
+                )
+            return EventSourceResponse(
                 empty_prompt_stream(),
-                media_type="text/event-stream",
-                headers={"X-Session-ID": session_id},
+                headers={"X-Session-ID": session_id, "X-Accel-Buffering": "no"},
             )
 
     # Save any uploaded files and build file context list
@@ -186,6 +216,7 @@ async def chat_endpoint(
         agent_task = asyncio.create_task(run())
 
         ai_text_parts: list[str] = []
+        event_seq = 0  # monotonic id per event — enables Last-Event-ID resume in Tier 3
         try:
             while True:
                 event = await queue.get()
@@ -193,7 +224,14 @@ async def chat_endpoint(
                     break
 
                 if event.get("type") == "text_chunk":
-                    ai_text_parts.append(event.get("content", ""))
+                    content = event.get("content", "")
+                    # Defensive sanitization: strip absolute paths and
+                    # hallucinated inline base64 images before the chunk goes
+                    # to the user or into chat history.
+                    content = _LEAK_PATH_RE.sub(r'\1', content)
+                    content = _INLINE_BASE64_IMG_RE.sub('[inline image suppressed]', content)
+                    event = {**event, "content": content}
+                    ai_text_parts.append(content)
 
                 if event.get("type") == "tool_result":
                     event = _enrich_file_urls(event, session_id)
@@ -205,11 +243,18 @@ async def chat_endpoint(
                             for f in output_files if f.get("path")
                         ])
 
-                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+                yield ServerSentEvent(
+                    data=json.dumps(event, ensure_ascii=False),
+                    id=str(event_seq),
+                )
+                event_seq += 1
 
-            # Save the model's reply so future turns can reference this exchange
+            # Save the model's reply so future turns can reference this exchange.
+            # Strip any hallucinated inline base64 image data first so it doesn't
+            # bloat the session JSON or leak into subsequent prompts.
             ai_text = "".join(ai_text_parts)
             if ai_text:
+                ai_text = _INLINE_BASE64_IMG_RE.sub('[inline image suppressed]', ai_text)
                 sm.add_chat_turn(session_id, "model", ai_text)
         finally:
             # Client disconnected or stream ended — cancel the agent task to
@@ -223,9 +268,13 @@ async def chat_endpoint(
                 except (asyncio.CancelledError, Exception):
                     pass
 
-    return StreamingResponse(
+    # EventSourceResponse(ping=15) emits a comment frame ": ping\n\n" every 15s
+    # whenever the generator is idle. That defeats MSU WAF idle timeouts (which
+    # otherwise sever the connection during long tool runs and surface as a
+    # "Failed to fetch" in the browser).
+    return EventSourceResponse(
         event_stream(),
-        media_type="text/event-stream",
+        ping=15,
         headers={
             "Cache-Control": "no-cache",
             "X-Accel-Buffering": "no",
@@ -256,9 +305,28 @@ def _enrich_file_urls(event: dict, session_id: str) -> dict:
 # POST /api/upload — standalone file upload (without chat)
 # ---------------------------------------------------------------------------
 
+def _safe_relpath(rel: str, fallback: str) -> str:
+    """Turn a browser webkitRelativePath into a safe relative path.
+
+    Folder uploads (``<input webkitdirectory>``) send each file's path relative
+    to the chosen folder (e.g. ``Input/habitat_layers/eelgrass.tif``). We keep
+    that structure so CSV files that reference sibling files by relative path
+    still resolve — but we strip anything that could escape the upload dir
+    (leading slashes, ``..`` segments, a Windows drive prefix).
+    """
+    rel = (rel or "").replace("\\", "/").strip()
+    parts = [seg for seg in rel.split("/") if seg not in ("", ".", "..")]
+    if parts and len(parts[0]) == 2 and parts[0][1] == ":":   # drop "C:" etc.
+        parts = parts[1:]
+    if not parts:
+        return os.path.basename(fallback) or "file"
+    return "/".join(parts)
+
+
 @app.post("/api/upload")
 async def upload_endpoint(
     files: list[UploadFile] = File(...),
+    paths: list[str] = Form(default=[]),
     x_session_id: str | None = Header(default=None),
 ):
     sm = get_session_manager()
@@ -268,17 +336,26 @@ async def upload_endpoint(
 
     upload_dir = os.path.join(settings.UPLOADS_DIR, session_id)
     os.makedirs(upload_dir, exist_ok=True)
+    upload_root = Path(upload_dir).resolve()
 
     saved = []
-    for uf in files:
+    for i, uf in enumerate(files):
         if not uf.filename:
             continue
-        dest = os.path.join(upload_dir, uf.filename)
+        # When a whole folder is uploaded, the parallel `paths` field carries
+        # each file's relative path so we can recreate the sub-directory layout.
+        rel = _safe_relpath(paths[i] if i < len(paths) else "", uf.filename)
+        dest = os.path.join(upload_dir, *rel.split("/"))
+        # Defence-in-depth: never let a crafted path escape the session dir.
+        if not str(Path(dest).resolve()).startswith(str(upload_root)):
+            rel = os.path.basename(uf.filename)
+            dest = os.path.join(upload_dir, rel)
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
         async with aiofiles.open(dest, "wb") as f:
             await f.write(await uf.read())
         sm.add_uploaded_file(session_id, dest)
-        saved.append({"filename": uf.filename, "path": dest})
-        logger.info(f"[upload] {uf.filename} → {dest}")
+        saved.append({"filename": rel, "path": dest})
+        logger.info(f"[upload] {rel} → {dest}")
 
     return {"session_id": session_id, "uploaded": saved}
 
@@ -336,6 +413,64 @@ async def download_file(session_id: str, file_path: str):
     if not full_path.is_file():
         raise HTTPException(status_code=404, detail="File not found")
     return FileResponse(str(full_path), filename=full_path.name)
+
+
+# ---------------------------------------------------------------------------
+# POST /api/download_zip/{session_id} — bundle a SPECIFIC set of result files
+# ---------------------------------------------------------------------------
+
+class ZipRequest(BaseModel):
+    paths: list[str] = []   # internal paths of the files to bundle (one tool run)
+
+
+@app.post("/api/download_zip/{session_id}")
+def download_zip(session_id: str, req: ZipRequest):
+    """Stream a ZIP of exactly the files the caller lists — scoped to one result
+    card (one tool run), NOT the whole session.
+
+    Each requested path is re-validated to live under this session's output dir
+    (blocks traversal / grabbing another session). Sync def → FastAPI runs it in
+    a threadpool so zipping big rasters never blocks the event loop; the temp zip
+    is removed after the response via a BackgroundTask.
+    """
+    shared_root = Path(settings.SHARED_DIR).resolve()
+    session_root = (shared_root / session_id).resolve()
+
+    seen: set[str] = set()
+    members: list[tuple[str, str]] = []   # (abs_path, name_inside_zip)
+    for p in req.paths:
+        if not p or p in seen:
+            continue
+        seen.add(p)
+        abs_p = Path(p).resolve()
+        try:                              # must live under THIS session's dir
+            abs_p.relative_to(session_root)
+        except ValueError:
+            continue
+        if not abs_p.is_file():           # skip anything cleaned up / expired
+            continue
+        members.append((str(abs_p), abs_p.relative_to(session_root).as_posix()))
+
+    if not members:
+        raise HTTPException(
+            status_code=404,
+            detail="No result files available to download (they may have expired).",
+        )
+
+    tmp = tempfile.NamedTemporaryFile(prefix="csis_results_", suffix=".zip", delete=False)
+    tmp_path = tmp.name
+    tmp.close()
+    with zipfile.ZipFile(tmp_path, "w", zipfile.ZIP_DEFLATED) as zf:
+        for abs_p, arc in members:
+            zf.write(abs_p, arcname=arc)
+
+    logger.info(f"[download_zip] {len(members)} files → {tmp_path} ({session_id})")
+    return FileResponse(
+        tmp_path,
+        media_type="application/zip",
+        filename=f"csis_results_{session_id[:12]}.zip",
+        background=BackgroundTask(os.unlink, tmp_path),
+    )
 
 
 # ---------------------------------------------------------------------------

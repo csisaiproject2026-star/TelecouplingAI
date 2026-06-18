@@ -17,7 +17,8 @@ SKIP_DIRS = {
     "intermediate_outputs",   # SWY, CBC Preprocessor etc.
     "intermediate_output",    # Crop Percentile, Crop Regression
     "intermediate",           # CBC Main
-    "taskgraph_cache",        # All InVEST models
+    "taskgraph_cache",        # Most InVEST models
+    "_work_tokens",           # DelineateIt and other pygeoprocessing-based models
 }
 
 PATTERNS: dict[str, dict[str, list[str]]] = {

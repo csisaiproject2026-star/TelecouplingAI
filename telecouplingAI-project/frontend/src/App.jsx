@@ -3,9 +3,10 @@ import ReactMarkdown from 'react-markdown';
 import {
   MessageSquare, Plus, Send, Paperclip, Settings,
   Trash2, X, Edit2, Menu, Sparkles, Download, Upload,
+  Folder, Archive,
 } from 'lucide-react';
 import { streamChat } from './lib/streaming';
-import { getOrCreateSessionId } from './lib/session';
+import { getOrCreateSessionId, resetSessionId } from './lib/session';
 import ToolStatusCard from './components/ToolStatusCard';
 import CsvRenderer from './components/CsvRenderer';
 import ChartRenderer from './components/ChartRenderer';
@@ -37,7 +38,7 @@ const SUGGESTED_PROMPTS = [
 // Message renderer — handles all SSE event types
 // ---------------------------------------------------------------------------
 
-function MessageContent({ msg }) {
+function MessageContent({ msg, sessionId }) {
   if (msg.role === 'user') {
     return (
       <div className="bg-[#f0f4f9] px-6 py-4 rounded-3xl max-w-[85%] ml-auto">
@@ -61,6 +62,15 @@ function MessageContent({ msg }) {
               return (
                 <div key={i} className="text-[15px] leading-relaxed markdown-body">
                   <ReactMarkdown
+                    urlTransform={(url) => {
+                      // Block inline base64 image data — the LLM occasionally
+                      // hallucinates fake PNG bytes and tries to embed them via
+                      // ![](data:image/png;base64,...). The real renders go
+                      // through the render_spatial_file tool and are shown by
+                      // ImageRenderer, not by markdown img.
+                      if (typeof url === 'string' && url.startsWith('data:')) return '';
+                      return url;
+                    }}
                     components={{
                       h1: ({node, ...p}) => <h1 className="text-xl font-bold mt-3 mb-1" {...p} />,
                       h2: ({node, ...p}) => <h2 className="text-lg font-bold mt-3 mb-1" {...p} />,
@@ -72,6 +82,14 @@ function MessageContent({ msg }) {
                       p: ({node, ...p}) => <p className="mb-2 last:mb-0" {...p} />,
                       pre: ({node, ...p}) => <pre className="bg-gray-100 p-2 rounded text-sm font-mono my-1 whitespace-pre-wrap overflow-x-auto" {...p} />,
                       code: ({node, ...p}) => <code className="bg-gray-100 px-1 rounded text-sm font-mono" {...p} />,
+                      img: ({node, src, alt}) => {
+                        // After urlTransform, fake inline images arrive with src=''.
+                        // Replace them with a small explainer instead of a broken-image icon.
+                        if (!src) {
+                          return <span className="text-xs text-gray-400 italic">[inline image suppressed — please ask to render the map]</span>;
+                        }
+                        return <img src={src} alt={alt} className="max-w-full rounded" loading="lazy" />;
+                      },
                     }}
                   >{block.content}</ReactMarkdown>
                 </div>
@@ -87,7 +105,7 @@ function MessageContent({ msg }) {
             case 'image':
               return <ImageRenderer key={i} url={block.url} filename={block.filename} extent={block.extent} />;
             case 'file_download':
-              return <ResultFiles key={i} files={block.files} />;
+              return <ResultFiles key={i} files={block.files} sessionId={sessionId} />;
             default:
               return null;
           }
@@ -131,6 +149,7 @@ function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => window.innerWidth >= 768);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(null);  // {loaded, total, percent} | null
   const [editingId, setEditingId] = useState(null);
   const [tempTitle, setTempTitle] = useState('');
 
@@ -138,6 +157,7 @@ function App() {
 
   const chatEndRef = useRef(null);
   const fileInputRef = useRef(null);
+  const folderInputRef = useRef(null);
   const currentChat = chats.find(c => c.id === activeId) || chats[0];
 
   useEffect(() => { localStorage.setItem('csis_chats', JSON.stringify(chats)); }, [chats]);
@@ -243,11 +263,18 @@ function App() {
         sessionId.current,
         appSettings.selectedModel,
         (event) => handleSSEEvent(chatId, event),
+        { onUploadProgress: setUploadProgress },
       );
     } catch (err) {
-      appendBlock(chatId, { type: 'text', content: `❌ Connection error: ${err.message}` });
+      // Network errors are now handled silently inside streamChat (transparent
+      // retry with backoff). If it still throws here, it's already past the
+      // "warm up" phase — re-running would re-trigger the whole agent on the
+      // server, so we just log and leave the user to retry manually. No UI
+      // toast or "Connection error" banner per UX preference.
+      console.warn('[chat] stream ended with error:', err);
     } finally {
       setIsLoading(false);
+      setUploadProgress(null);  // hide progress bar when chat fully done (or errored)
     }
   };
 
@@ -331,6 +358,11 @@ function App() {
   // ---------------------------------------------------------------------------
 
   const createNewChat = () => {
+    // Mint a fresh backend session_id so the new chat doesn't drag along the
+    // previous conversation's chat_history (which makes the LLM replay old
+    // tool errors instead of actually re-dispatching tools).
+    sessionId.current = resetSessionId();
+
     const newId = Date.now().toString();
     setChats([{ id: newId, title: 'New Chat', messages: [] }, ...chats]);
     setActiveId(newId);
@@ -494,7 +526,7 @@ function App() {
             <div className="space-y-8 pb-20">
               {currentChat.messages.map((msg, idx) => (
                 <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : ''}`}>
-                  <MessageContent msg={msg} />
+                  <MessageContent msg={msg} sessionId={sessionId.current} />
                 </div>
               ))}
               {isLoading && (
@@ -508,6 +540,34 @@ function App() {
           )}
         </div>
 
+        {/* Upload progress bar — two phases:
+              uploading  — bytes are leaving the browser, progress climbs to 100%
+              processing — browser pushed all bytes, server still receiving / inspecting
+                           (this is where the MSU WAF spends most of its time)
+              Hidden once status === 'done' (server acked, chat phase takes over) */}
+        {uploadProgress && uploadProgress.status !== 'done' && (
+          <div className="px-6 pb-2">
+            <div className="max-w-[800px] mx-auto bg-blue-50 border border-blue-200 rounded-2xl px-4 py-3">
+              <div className="flex items-center justify-between text-xs text-blue-800 mb-1">
+                <span className="font-medium">
+                  {uploadProgress.status === 'processing'
+                    ? 'Server receiving upload… please wait (large rasters can take a few minutes through the MSU WAF)'
+                    : `Uploading files… ${(uploadProgress.loaded / (1024 * 1024)).toFixed(1)} MB / ${(uploadProgress.total / (1024 * 1024)).toFixed(1)} MB`}
+                </span>
+                {uploadProgress.status === 'uploading' && (
+                  <span className="font-mono">{Math.round(uploadProgress.percent)}%</span>
+                )}
+              </div>
+              <div className="h-1.5 bg-blue-100 rounded-full overflow-hidden">
+                <div
+                  className={`h-full bg-blue-500 transition-all duration-150 ${uploadProgress.status === 'processing' ? 'animate-pulse' : ''}`}
+                  style={{ width: `${Math.min(100, uploadProgress.percent)}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Input area */}
         <div className="p-6">
           <div className="max-w-[800px] mx-auto bg-[#f0f4f9] rounded-3xl px-5 py-3 flex flex-col gap-2 focus-within:bg-white focus-within:shadow-xl focus-within:ring-1 focus-within:ring-gray-200 transition-all">
@@ -515,17 +575,25 @@ function App() {
               <div className="flex flex-wrap gap-2">
                 {selectedFiles.map((f, i) => (
                   <div key={i} className="flex items-center gap-1 text-xs bg-white px-2 py-1 rounded-full border shadow-sm text-blue-600">
-                    <Paperclip size={10} /> {f.name}
+                    <Paperclip size={10} /> {f.webkitRelativePath || f.name}
                     <button onClick={() => setSelectedFiles(prev => prev.filter((_, j) => j !== i))} className="ml-1 text-gray-400 hover:text-red-500">×</button>
                   </div>
                 ))}
               </div>
             )}
             <div className="flex items-center gap-3">
-              <button onClick={() => fileInputRef.current.click()} className="p-2 text-gray-500 hover:text-blue-600">
+              <button onClick={() => fileInputRef.current.click()} title="Attach files" className="p-2 text-gray-500 hover:text-blue-600">
                 <Plus size={22} />
               </button>
+              <button onClick={() => folderInputRef.current.click()} title="Upload a whole folder (keeps sub-folders)" className="p-2 text-gray-500 hover:text-blue-600">
+                <Folder size={20} />
+              </button>
               <input type="file" ref={fileInputRef} hidden multiple
+                onChange={e => setSelectedFiles(prev => [...prev, ...Array.from(e.target.files)])} />
+              {/* webkitdirectory turns this picker into a folder selector; each
+                  File carries webkitRelativePath, sent to the backend to rebuild
+                  the sub-folder layout (e.g. for HRA's habitat_layers/...). */}
+              <input type="file" ref={folderInputRef} hidden multiple webkitdirectory=""
                 onChange={e => setSelectedFiles(prev => [...prev, ...Array.from(e.target.files)])} />
               <input
                 className="flex-1 bg-transparent outline-none py-2 text-gray-800 placeholder-gray-500"

@@ -313,6 +313,12 @@ Users often provide parameters across multiple messages. Follow this pattern:
 - When listing output files, mention only the filename (e.g. `aligned_lulc_2010.tif`), not the full path
 - internal_path values in tool results are for your internal tool calls only — do NOT echo them to the user
 - Uploaded file paths prepended to messages are for tool parameter resolution only — do NOT repeat them to the user
+
+## Image / Map Output Rules (CRITICAL)
+- NEVER write inline image data in your text response. Specifically: do NOT emit `![...](data:image/png;base64,...)`, do NOT emit any `data:image/*;base64,...` URLs, and do NOT emit fake/fabricated base64 byte strings.
+- The ONLY way to show a rendered map or image is to call the `render_spatial_file` tool. The frontend will display the resulting PNG automatically — you do not need to embed it in your reply.
+- If a rendered image was already produced earlier in the conversation, do NOT regenerate or re-embed it in markdown. Just refer to it by filename and tell the user it is already shown above.
+- You cannot draw images yourself. If asked to "show a map" or "visualize" and no rendered file exists yet, call `render_spatial_file` on the relevant .tif / .shp file.
 """
 
 # ---------------------------------------------------------------------------
@@ -1110,10 +1116,12 @@ TOOLS = [
         types.FunctionDeclaration(
             name="read_file_content",
             description=(
-                "Read and return the content of an output file (CSV or TXT) so you can analyze, "
-                "summarize, or answer questions about it. Use this whenever the user asks to "
-                "summarize, analyze, explain, or ask questions about a specific output file "
-                "(e.g. a network_stats CSV, a result_table CSV). "
+                "Read and return the content of an output file (CSV, TXT, JSON, or HTML) so you can "
+                "analyze, summarize, or answer questions about it. HTML support is intended for "
+                "InVEST report.html files — tables are flattened to pipe-separated rows and "
+                "headings preserved. Use this whenever the user asks to summarize, analyze, "
+                "explain, or ask questions about a specific output file (e.g. a network_stats CSV, "
+                "a result_table CSV, an InVEST report.html). "
                 "Pass the full absolute internal_path of the file."
             ),
             parameters=types.Schema(

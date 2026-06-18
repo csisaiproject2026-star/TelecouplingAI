@@ -52,8 +52,9 @@
 **服务器不是 git 仓库**，不能用 `git pull`。正确方式：
 
 ```bash
-# 1. 本地打包传输
-tar czf - telecouplingAI-project/ | ssh user@34.42.83.50 "cd ~/csis-platform && tar xzf -"
+# 1. 本地打包传输（必须排除 env 文件——每台服务器各有自己的 .env.docker，不能被本地覆盖）
+tar czf - --exclude='telecouplingAI-project/.env.docker' --exclude='telecouplingAI-project/.env' \
+    telecouplingAI-project/ | ssh user@34.42.83.50 "cd ~/csis-platform && tar xzf -"
 
 # 2. 服务器上重建镜像（在 backend/ 目录）
 cd ~/csis-platform/backend
@@ -63,6 +64,10 @@ docker build -t csis-backend:latest .
 cd ~/csis-platform
 docker compose up -d --force-recreate
 ```
+
+> ⚠️ **env 文件是 per-server 配置，永不随 tar 部署**（否则会重演 2026-06-10 的下载全失效：本地 `localhost:8001` 覆盖掉 GCP 修好的下载地址）。
+> 每台服务器的 `.env.docker` 在服务器本地维护；仓库里 `.env.docker.gcp` / `.env.docker.msu` 只是模板，首次部署时在对应服务器上 `cp .env.docker.<server> .env.docker` 并填入真实 `GOOGLE_API_KEY`。
+> 换 IP / 域名时只改一个变量 `SERVER_BASE_URL`，`FILE_SERVER_URL` 由 `backend/config.py` 自动派生为 `<base>/download/`。
 
 ---
 

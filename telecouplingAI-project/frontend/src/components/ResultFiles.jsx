@@ -9,7 +9,7 @@
  * URL with a HEAD request and render an "expired" hint when the file is gone.
  */
 import { useState, useEffect } from 'react';
-import { Download, AlertCircle } from 'lucide-react';
+import { Download, AlertCircle, Archive } from 'lucide-react';
 
 const ICON = {
   download: '📦',
@@ -72,12 +72,57 @@ function FileRow({ file }) {
   );
 }
 
-export default function ResultFiles({ files }) {
+export default function ResultFiles({ files, sessionId }) {
+  const [zipping, setZipping] = useState(false);
   if (!files || files.length === 0) return null;
+
+  // Bundle ONLY this card's files (one tool run) — not the whole session. We
+  // POST the exact internal paths of these files; the server re-validates each
+  // is under this session's dir, zips them, and streams the blob back.
+  const downloadZip = async () => {
+    const paths = files.map((f) => f.path).filter(Boolean);
+    if (paths.length === 0 || zipping) return;
+    setZipping(true);
+    try {
+      const res = await fetch(`/api/download_zip/${sessionId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paths }),
+      });
+      if (!res.ok) {
+        alert('These result files are no longer available (they may have expired). Re-run the tool to regenerate them.');
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'results.zip';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      alert('Could not build the ZIP — please try downloading the files individually.');
+    } finally {
+      setZipping(false);
+    }
+  };
+
   return (
     <div className="p-4 bg-gray-50 rounded-2xl border border-gray-200">
-      <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
-        Result Files
+      <div className="flex items-center justify-between mb-3 gap-2">
+        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+          Result Files
+        </div>
+        {sessionId && files.some((f) => f.path) && (
+          <button
+            onClick={downloadZip}
+            disabled={zipping}
+            className="flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700 bg-white border border-blue-200 hover:border-blue-400 px-2.5 py-1 rounded-full shadow-sm shrink-0 disabled:opacity-50"
+            title="Download these result files as a single ZIP"
+          >
+            <Archive size={13} /> {zipping ? 'Zipping…' : 'Download all (.zip)'}
+          </button>
+        )}
       </div>
       <ul className="space-y-2">
         {files.map((file, i) => (

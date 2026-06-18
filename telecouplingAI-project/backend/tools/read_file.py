@@ -1,5 +1,5 @@
 """
-read_file — allows the AI to read and analyze output files (CSV, TXT).
+read_file — allows the AI to read and analyze output files (CSV, TXT, JSON, HTML).
 Returns a text summary that Gemini can use for analysis and Q&A.
 """
 from __future__ import annotations
@@ -39,8 +39,10 @@ async def run_read_file(params: dict, session_id: str, task_id: str, progress_ca
         content = _read_csv(file_path, filename)
     elif suffix in (".txt", ".log", ".json"):
         content = _read_text(file_path, filename)
+    elif suffix in (".html", ".htm"):
+        content = _read_html(file_path, filename)
     else:
-        raise ValueError(f"Unsupported file type: {suffix}. Supported: .csv, .txt, .json")
+        raise ValueError(f"Unsupported file type: {suffix}. Supported: .csv, .txt, .json, .html")
 
     progress_callback(100, "Done")
 
@@ -88,3 +90,41 @@ def _read_text(file_path: str, filename: str) -> str:
     with open(file_path, encoding="utf-8-sig", errors="replace") as f:
         text = f.read()
     return f"File: {filename}\n\n{text}"
+
+
+def _read_html(file_path: str, filename: str) -> str:
+    """Extract readable text from HTML — typically InVEST's report.html.
+
+    Strips <script>/<style>, flattens <table> rows to "cell | cell | cell",
+    and prefixes headings so the AI can still see the document structure.
+    """
+    from bs4 import BeautifulSoup
+
+    with open(file_path, encoding="utf-8", errors="replace") as f:
+        soup = BeautifulSoup(f, "html.parser")
+
+    for tag in soup(["script", "style", "noscript"]):
+        tag.decompose()
+
+    # Flatten <table> rows into pipe-separated lines so structure survives
+    # plain-text extraction (InVEST reports rely heavily on tables).
+    for table in soup.find_all("table"):
+        rows = []
+        for tr in table.find_all("tr"):
+            cells = [c.get_text(" ", strip=True) for c in tr.find_all(["th", "td"])]
+            if any(cells):
+                rows.append(" | ".join(cells))
+        table.replace_with("\n".join(rows))
+
+    # Prefix headings so the AI can navigate sections
+    for level in range(1, 7):
+        for h in soup.find_all(f"h{level}"):
+            prefix = "#" * level + " "
+            h.insert_before(prefix)
+
+    text = soup.get_text("\n", strip=True)
+    # Collapse runs of blank lines
+    lines = [ln for ln in (l.strip() for l in text.splitlines()) if ln]
+    cleaned = "\n".join(lines)
+
+    return f"File: {filename}\n\n{cleaned}"

@@ -19,16 +19,30 @@ function generateUUID() {
   });
 }
 
+const SESSION_KEY = "csis_session_id";
+
 /**
  * Get or create a session ID stored in sessionStorage.
  * @returns {string} Session ID of the form "csis_<uuid>"
  */
 export function getOrCreateSessionId() {
-  const key = "csis_session_id";
-  let id = sessionStorage.getItem(key);
+  let id = sessionStorage.getItem(SESSION_KEY);
   if (!id) {
     id = `csis_${generateUUID()}`;
-    sessionStorage.setItem(key, id);
+    sessionStorage.setItem(SESSION_KEY, id);
   }
+  return id;
+}
+
+/**
+ * Force-mint a fresh session ID and persist it. Used when the user starts a
+ * new chat — without this the backend would keep replaying the previous
+ * chat_history under the same session_id and the LLM would loop on stale
+ * tool errors instead of actually re-dispatching tools.
+ * @returns {string} The new session ID
+ */
+export function resetSessionId() {
+  const id = `csis_${generateUUID()}`;
+  sessionStorage.setItem(SESSION_KEY, id);
   return id;
 }
