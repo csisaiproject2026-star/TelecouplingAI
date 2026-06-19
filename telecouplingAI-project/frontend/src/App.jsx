@@ -3,7 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import {
   MessageSquare, Plus, Send, Paperclip, Settings,
   Trash2, X, Edit2, Menu, Sparkles, Download, Upload,
-  Folder, Archive,
+  Folder, Archive, Brain, ChevronDown,
 } from 'lucide-react';
 import { streamChat } from './lib/streaming';
 import { getOrCreateSessionId, resetSessionId } from './lib/session';
@@ -38,6 +38,51 @@ const SUGGESTED_PROMPTS = [
 // Message renderer — handles all SSE event types
 // ---------------------------------------------------------------------------
 
+// Collapsible "thinking" block (Claude Desktop style): shows a pulsing
+// "Thinking…" header while the model reasons; click to expand the reasoning.
+function ThinkingBlock({ content, done }) {
+  const [open, setOpen] = useState(false);
+  // Tidy the reasoning: drop fenced/inline code (no raw python), collapse blank
+  // runs, trim — so it reads as clean prose rather than a code dump.
+  const clean = (content || '')
+    .replace(/```[\s\S]*?```/g, '')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+  return (
+    <div className="border border-gray-200 rounded-xl bg-gray-50/70 text-[13px]">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="flex items-center gap-2 w-full px-3 py-2 text-gray-500 hover:text-gray-700"
+      >
+        <Brain size={14} className={done ? '' : 'animate-pulse text-blue-500'} />
+        <span className="font-medium">{done ? 'Thought process' : 'Thinking…'}</span>
+        <ChevronDown size={14} className={`ml-auto transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div
+          className="px-3 pb-3 pt-1 text-gray-500 border-t border-gray-100 leading-relaxed overflow-y-auto markdown-body"
+          style={{ maxHeight: '16rem' }}
+        >
+          <ReactMarkdown
+            components={{
+              p:      ({node, ...p}) => <p className="mb-1.5 last:mb-0" {...p} />,
+              h1:     ({node, ...p}) => <p className="font-semibold text-gray-600 mt-2 mb-1" {...p} />,
+              h2:     ({node, ...p}) => <p className="font-semibold text-gray-600 mt-2 mb-1" {...p} />,
+              h3:     ({node, ...p}) => <p className="font-semibold text-gray-600 mt-2 mb-1" {...p} />,
+              ul:     ({node, ...p}) => <ul className="list-disc pl-4 my-1 space-y-0.5" {...p} />,
+              ol:     ({node, ...p}) => <ol className="list-decimal pl-4 my-1 space-y-0.5" {...p} />,
+              strong: ({node, ...p}) => <strong className="font-semibold text-gray-600" {...p} />,
+              code:   ({node, ...p}) => <span {...p} />,
+              pre:    ({node, ...p}) => <div {...p} />,
+            }}
+          >{clean || '…'}</ReactMarkdown>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function MessageContent({ msg, sessionId }) {
   if (msg.role === 'user') {
     return (
@@ -58,6 +103,8 @@ function MessageContent({ msg, sessionId }) {
       <div className="flex-1 space-y-3">
         {msg.blocks && msg.blocks.map((block, i) => {
           switch (block.type) {
+            case 'thinking':
+              return <ThinkingBlock key={i} content={block.content} done={block.done} />;
             case 'text':
               return (
                 <div key={i} className="text-[15px] leading-relaxed markdown-body">
@@ -113,6 +160,32 @@ function MessageContent({ msg, sessionId }) {
       </div>
     </div>
   );
+}
+
+// ---------------------------------------------------------------------------
+// Conversation export — assistant messages live in `blocks`, not `content`,
+// so flatten each block (thinking + answer text + tool/file notes) to markdown.
+// ---------------------------------------------------------------------------
+
+function blockToMarkdown(b) {
+  switch (b.type) {
+    case 'thinking':      return `**🧠 Thought process**\n\n${(b.content || '').trim()}`;
+    case 'text':          return b.content || '';
+    case 'tool_status':   return `_[Tool ran: ${b.tool}]_`;
+    case 'warning':       return `> ⚠️ ${b.message}`;
+    case 'file_download':
+      return `**Files:**\n` + (b.files || [])
+        .map(f => `- ${f.filename}${f.url ? ` — ${f.url}` : ''}`).join('\n');
+    case 'image':         return `_[Image: ${b.filename || ''}]_`;
+    case 'csv_table':     return `_[Table: ${b.filename || ''}]_`;
+    case 'chart':         return `_[Chart]_`;
+    default:              return '';
+  }
+}
+
+function messageToMarkdown(m) {
+  if (m.role === 'user') return m.content || '';
+  return (m.blocks || []).map(blockToMarkdown).filter(Boolean).join('\n\n');
 }
 
 // ---------------------------------------------------------------------------
@@ -206,6 +279,28 @@ function App() {
     }));
   };
 
+  // Accumulate streamed thinking text into the trailing thinking block.
+  const appendThinkingBlock = (chatId, text) => {
+    updateLastAssistantBlock(chatId, last => {
+      const blocks = [...(last.blocks || [])];
+      const lastBlock = blocks[blocks.length - 1];
+      if (lastBlock && lastBlock.type === 'thinking' && !lastBlock.done) {
+        blocks[blocks.length - 1] = { ...lastBlock, content: lastBlock.content + text };
+      } else {
+        blocks.push({ type: 'thinking', content: text, done: false });
+      }
+      return { ...last, blocks };
+    });
+  };
+
+  // Mark thinking blocks finished (stops the pulse, relabels to "Thought process").
+  const finalizeThinking = (chatId) => {
+    updateLastAssistantBlock(chatId, last => ({
+      ...last,
+      blocks: (last.blocks || []).map(b => b.type === 'thinking' ? { ...b, done: true } : b),
+    }));
+  };
+
   const updateToolBlock = (chatId, taskId, updates) => {
     setChats(prev => prev.map(c => {
       if (c.id !== chatId) return c;
@@ -284,11 +379,18 @@ function App() {
 
   const handleSSEEvent = (chatId, event) => {
     switch (event.type) {
+      case 'thinking':
+        appendThinkingBlock(chatId, event.content);
+        break;
+
       case 'text_chunk':
+        // Real answer started → the current thinking turn is done.
+        finalizeThinking(chatId);
         appendTextBlock(chatId, event.content);
         break;
 
       case 'tool_start':
+        finalizeThinking(chatId);
         appendBlock(chatId, {
           type: 'tool_status',
           task_id: event.task_id,
@@ -348,6 +450,8 @@ function App() {
         break;
 
       case 'done':
+        finalizeThinking(chatId);
+        break;
       default:
         break;
     }
@@ -383,7 +487,7 @@ function App() {
   const exportChat = (chat, e) => {
     e.stopPropagation();
     const content = chat.messages
-      .map(m => `### ${m.role === 'user' ? 'User' : 'AI'}\n${m.content || ''}\n`)
+      .map(m => `### ${m.role === 'user' ? 'User' : 'AI'}\n${messageToMarkdown(m)}\n`)
       .join('\n---\n');
     const blob = new Blob([content], { type: 'text/markdown' });
     const url = URL.createObjectURL(blob);

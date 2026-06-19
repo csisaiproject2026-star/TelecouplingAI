@@ -78,6 +78,16 @@ class SessionManager:
         raw = self.r.hget(f"session:{session_id}", "output_files")
         return json.loads(raw.decode()) if raw else []
 
+    def set_workflow_plan(self, session_id: str, plan: dict) -> None:
+        """Stash the most recently proposed workflow plan (for confirm -> execute)."""
+        self.r.hset(f"session:{session_id}", "workflow_plan", json.dumps(plan))
+        self.touch_session(session_id)
+
+    def get_workflow_plan(self, session_id: str) -> dict | None:
+        """Return the last proposed workflow plan, or None."""
+        raw = self.r.hget(f"session:{session_id}", "workflow_plan")
+        return json.loads(raw.decode()) if raw else None
+
     def add_chat_turn(self, session_id: str, role: str, text: str) -> None:
         """Append one turn to the session's conversation history."""
         if not text.strip():

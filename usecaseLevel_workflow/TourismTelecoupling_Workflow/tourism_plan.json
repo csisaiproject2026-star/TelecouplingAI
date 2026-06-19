@@ -1,0 +1,71 @@
+{
+  "case_name": "wolong_tourism_telecoupling",
+  "description": "Tourists flow from Chinese provinces (and the world) to Wolong Nature Reserve. Map systems, group the global arrival network, draw tourist flows, estimate transport CO2, and find the factors behind visitation (FAMD).",
+  "required_inputs": [
+    { "id": "systems_table",  "label": "Systems coordinate table", "file_kind": "table",  "description": "name/role/lon/lat per system (Wolong=Receiving, provinces=Sending)" },
+    { "id": "network_nodes",  "label": "Network nodes",            "file_kind": "table",  "description": "country code + arrivals (sender/receiver)" },
+    { "id": "network_links",  "label": "Network links",            "file_kind": "table",  "description": "sender,receiver,arrivals edges" },
+    { "id": "world_countries","label": "World countries layer",    "file_kind": "vector", "description": "country polygons with ISO_3_CODE" },
+    { "id": "flows_table",    "label": "Tourist flows table",      "file_kind": "table",  "description": "origin/destination XY of tourist flows" },
+    { "id": "flows_with_distance", "label": "Flows + distance",    "file_kind": "table",  "description": "flows table with a length_km column (for CO2)" },
+    { "id": "famd_table",     "label": "FAMD survey table",        "file_kind": "table",  "description": "per-system survey variables: affin, gdplog, dist" }
+  ],
+  "steps": [
+    {
+      "id": "s1_systems", "component": "systems", "tool": "run_draw_systems_from_table",
+      "rationale": "Render the telecoupling systems as point features.",
+      "inputs": {
+        "input_csv": { "source": "input", "ref": "systems_table" },
+        "x_field":   { "source": "literal", "value": "LON" },
+        "y_field":   { "source": "literal", "value": "LAT" }
+      },
+      "produces": ["systems_from_table.shp"]
+    },
+    {
+      "id": "s2_network", "component": "systems", "tool": "run_network_analysis_grouping",
+      "rationale": "Group countries into communities by tourist-arrival flows.",
+      "inputs": {
+        "nodes_table":          { "source": "input", "ref": "network_nodes" },
+        "links_table":          { "source": "input", "ref": "network_links" },
+        "shapefile_path":       { "source": "input", "ref": "world_countries" },
+        "nodes_join_attri":     { "source": "literal", "value": "CODE" },
+        "layer_join_attri":     { "source": "literal", "value": "ISO_3_CODE" },
+        "clustering_algorithm": { "source": "literal", "value": "walktrap" }
+      },
+      "produces": ["network_stats.csv", "network_plot.pdf"]
+    },
+    {
+      "id": "s3_flows", "component": "flows", "tool": "run_draw_radial_flows",
+      "rationale": "Draw geodesic tourist flow lines from each origin to Wolong.",
+      "inputs": {
+        "input_csv":    { "source": "input", "ref": "flows_table" },
+        "from_x_field": { "source": "literal", "value": "FROM_X" },
+        "from_y_field": { "source": "literal", "value": "FROM_Y" },
+        "to_x_field":   { "source": "literal", "value": "TO_X" },
+        "to_y_field":   { "source": "literal", "value": "TO_Y" }
+      },
+      "produces": ["radial_flows.shp"]
+    },
+    {
+      "id": "s4_co2", "component": "effects", "tool": "run_co2_emissions",
+      "rationale": "Estimate transport CO2 per flow (Boeing-777 factor 29 kg/km).",
+      "inputs": {
+        "input_csv":           { "source": "input", "ref": "flows_with_distance" },
+        "animal_count_field":  { "source": "literal", "value": "Quantity" },
+        "length_km_field":     { "source": "literal", "value": "length_km" },
+        "capacity_per_trip":   { "source": "literal", "value": 1 },
+        "co2_per_km_per_trip": { "source": "literal", "value": 29 }
+      },
+      "produces": ["co2_emissions_results.csv"]
+    },
+    {
+      "id": "s5_famd", "component": "causes", "tool": "run_factor_analysis_mixed_data",
+      "rationale": "Find latent factors behind tourist visitation (affinity, GDP, distance).",
+      "inputs": {
+        "input_csv":               { "source": "input", "ref": "famd_table" },
+        "quantitative_variables":  { "source": "literal", "value": "affin,gdplog,dist" }
+      },
+      "produces": ["famd outputs"]
+    }
+  ]
+}

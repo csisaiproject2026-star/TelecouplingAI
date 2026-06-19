@@ -50,9 +50,33 @@ _DEFAULT_WEIGHTS = {
 }
 PAL_LOWER = 1.55
 
+# Accept common spellings / abbreviations / locales for the sex column and map them
+# to the two BMR keys. Anything not listed here is treated as "unrecognized" and
+# surfaced as a warning/error rather than silently scored as 0 LLER.
+_SEX_ALIASES: dict[str, set[str]] = {
+    "male":   {"male", "m", "man", "men", "boy", "boys", "男", "男性"},
+    "female": {"female", "f", "woman", "women", "girl", "girls", "女", "女性"},
+}
+_SEX_LOOKUP = {alias: canon for canon, aliases in _SEX_ALIASES.items() for alias in aliases}
 
-def _ller_per_person(sex: str, age_group: str, weight_kg: float) -> float:
-    eq = _BMR_EQUATIONS.get(sex.lower(), {}).get(age_group)
+
+def _normalize_sex(raw) -> str | None:
+    """Map a raw sex value to 'male'/'female', or None if unrecognized."""
+    return _SEX_LOOKUP.get(str(raw).strip().lower())
+
+
+def _normalize_age_group(raw) -> str:
+    """Light normalization so '0 – 3', '0—3' etc. match the '0-3' BMR keys."""
+    s = str(raw).strip()
+    for dash in ("–", "—", "−"):
+        s = s.replace(dash, "-")
+    return s.replace(" ", "")
+
+
+def _ller_per_person(sex: str | None, age_group: str, weight_kg: float) -> float:
+    if sex is None:
+        return 0.0
+    eq = _BMR_EQUATIONS.get(sex, {}).get(age_group)
     if eq is None:
         return 0.0
     bmr = eq["a"] * weight_kg + eq["b"]
@@ -90,10 +114,20 @@ async def run_nutrition_metrics(
     df[count_field] = pd.to_numeric(df[count_field], errors="coerce").fillna(0)
 
     ller_rows = []
+    unmatched_sex: dict[str, int] = {}
+    unmatched_age: dict[str, int] = {}
     for _, row in df.iterrows():
-        sex = str(row[sex_field]).lower().strip()
-        age_grp = str(row[age_field]).strip()
+        raw_sex = str(row[sex_field]).strip()
+        raw_age = str(row[age_field]).strip()
+        sex = _normalize_sex(raw_sex)
+        age_grp = _normalize_age_group(raw_age)
         count = float(row[count_field])
+
+        # Track why a row could not be scored (so we never silently emit a 0).
+        if sex is None:
+            unmatched_sex[raw_sex] = unmatched_sex.get(raw_sex, 0) + 1
+        elif age_grp not in _BMR_EQUATIONS[sex]:
+            unmatched_age[raw_age] = unmatched_age.get(raw_age, 0) + 1
 
         if weight_field and weight_field in df.columns:
             weight = float(row[weight_field])
@@ -113,6 +147,35 @@ async def run_nutrition_metrics(
 
     result_df = pd.DataFrame(ller_rows)
 
+    # BUG 7 fix: never produce a silent all-zero (empty) chart. Build diagnostics
+    # for any rows we could not score, and hard-fail if NOTHING was scored.
+    warnings: list[str] = []
+    if unmatched_sex:
+        warnings.append(
+            "Unrecognized sex value(s), scored as 0 LLER: "
+            + ", ".join(f"'{k}'×{v}" for k, v in unmatched_sex.items())
+            + ". Expected male/female (also accepts m/f/man/woman/男/女)."
+        )
+    if unmatched_age:
+        warnings.append(
+            "Unrecognized age_group value(s), scored as 0 LLER: "
+            + ", ".join(f"'{k}'×{v}" for k, v in unmatched_age.items())
+            + ". Expected one of: " + ", ".join(_BMR_EQUATIONS["male"].keys()) + "."
+        )
+
+    if result_df.empty or result_df["ller_kcal_total_day"].sum() == 0:
+        detail = " ".join(warnings) if warnings else (
+            "All computed LLER values are zero — check the sex/age_group/population columns."
+        )
+        raise CSISError(
+            "Nutrition Metrics produced an all-zero result, so the chart would be empty. "
+            + detail,
+            "INVALID_PARAMS",
+        )
+
+    for w in warnings:
+        logger.warning("[nutrition_metrics] %s", w)
+
     workspace_dir, _ = generate_output_dir("nutrition_metrics", session_id)
     os.makedirs(workspace_dir, exist_ok=True)
 
@@ -131,7 +194,10 @@ async def run_nutrition_metrics(
     # Chart: LLER by age group
     fig, ax = plt.subplots(figsize=(10, 5))
     pivot = result_df.groupby([age_field, sex_field])["ller_kcal_total_day"].sum().unstack(fill_value=0)
-    pivot.plot(kind="bar", ax=ax, color=["#2196F3", "#E91E63"])
+    # Guard the 2-color palette: extra/fewer sex categories must not crash the plot.
+    ncol = pivot.shape[1]
+    plot_color = ["#2196F3", "#E91E63"][:ncol] if ncol <= 2 else None
+    pivot.plot(kind="bar", ax=ax, color=plot_color)
     ax.set_title("Total LLER (kcal/day) by Age Group and Sex")
     ax.set_xlabel("Age Group")
     ax.set_ylabel("LLER (kcal/day)")
@@ -142,4 +208,7 @@ async def run_nutrition_metrics(
 
     progress_callback(90, "Scanning outputs...")
     files = await scan_output_directory(workspace_dir, "nutrition_metrics")
-    return {"files": files}
+    result = {"files": files}
+    if warnings:
+        result["warnings"] = warnings
+    return result

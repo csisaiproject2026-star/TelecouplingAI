@@ -78,6 +78,16 @@ csis:user:{session_id}:requests → sorted set of request_ids (for "show my rece
 
 ---
 
+## Next up — Use-Case Level Workflow（用户给目标，AI 规划+串多工具完成）
+
+- 设计草案：`usecaseLevel_workflow/WORKFLOW_DESIGN.md`（v0.1）。
+- 交互模型已敲定：**用户说目标 → AI 给计划 + 列数据清单(A) → 用户传文件/确认 → 确定性编排器执行 → 结果 + 解读**；缺数据时边跑边补问(B 兜底)。架构 = Plan → Confirm → Execute → Synthesize（LLM 只管规划+解读，执行交确定性编排器）。
+- 第一个案例：卧龙生态旅游，数据 + 工具映射见 `usecaseLevel_workflow/TourismTelecoupling_Workflow/WORKFLOW.md`（5 步：Systems→Network→Flows→CO2→FAMD，3 步零改数据、2 步已预处理好）。
+- 依赖：长任务执行底座建在 **Tier 3** 上（建议合建或 Tier 3 先行）。
+- MVP 验收：tourism 在 GCP dev 端到端跑通、出图对照论文 Fig。落地步骤见设计草案 §10（先零开发 spike）。
+
+---
+
 ## Backlog（未排期）
 
 来自 Run 1 用户系统测试反馈（详见 `Systematic_tests/UserSystematicTest_Run1_20260610/FeedbackResults/`）：
@@ -91,12 +101,14 @@ csis:user:{session_id}:requests → sorted set of request_ids (for "show my rece
   - 根因（代码已核实）：前端只有收到 `render_spatial_file` 真正执行后发出的 `tool_result`(`render_type='image'`)/`image_url` 事件才显示图（`App.jsx` 311–316）。无图=**LLM 根本没调用渲染工具，只是用文字"演"了成功**。两个叠加原因：① `_TOOL_KEYWORDS` 里没有 render/show/可视化 → 渲染调用 100% 靠 LLM 非确定性自觉，无兜底；② 系统提示词第 317 行 *"若之前已渲染过则不要重生成，只按文件名说'已显示在上面'"* —— 会话里已存在早先的 `systems_render.png` 时，模型误判"已渲染"并照此句剧本谎报。
   - 修法：①收紧提示词——用户明确 show/render/display 某文件时必须对该文件调用 `render_spatial_file`；删/收窄"已显示在上面"逃生口（仅限上一轮刚渲染同一文件）；严禁未真正调用就声称出图。②可选加兜底：检测 "show/render/可视化"+`.shp`/`.tif` 文件名时偏向/强制走渲染工具。
   - 时机：待 Run 2 工具自测（37→44）跑完再改 `agent.py` + 重新部署 MSU，避免扰动在测流程。
+  - ✅ **已修（GCP dev，2026-06-18）**：`agent.py` 系统提示词——删掉宽口径"已渲染过就说已显示在上面"逃生口（收窄为"仅上一轮我自己刚渲染过同一文件"才可免调）；新增硬规则"未真正调用 `render_spatial_file` 就声称/暗示已出图 = hard error，会给用户留下无图"；用户 show/render/display/可视化 某 .tif/.shp 时必须调渲染工具。已部署 GCP，39/39 healthy。**行为侧需真人聊天验证**（不在此自动测 LLM）。**MSU 暂未同步**。可选的"关键词强制兜底"留作后续。
 - **BUG 7 — Nutrition Metrics 对 sex 取值不健壮：不匹配就静默出空图（2026-06-18 自测中发现）**：
   - 症状：工具 42 输出 `nutrition_ller_chart.png` 全空（无 bar 无线）。
   - 根因（源码核实）：`nutrition_metrics.py` 的 `_BMR_EQUATIONS`/`_DEFAULT_WEIGHTS` 用 `male`/`female` 做 key；样本 CSV `sex` 列是 `M`/`F`，`.lower()` 后是 `m`/`f`，匹配不上 → `_ller_per_person()` 每行返回 0.0 → 全部 LLER=0 → 柱状图全 0 高 → 空图。**且全程无报错/无警告**。
   - 已临时修复（仅测试数据）：把 `42_nutrition_metrics/input_data/nutrition_data.csv` 的 sex 改成 `male`/`female`。
   - 产品侧待修（需改 `nutrition_metrics.py` + 重部署）：① 归一化 sex 取值（`m`/`male`/`Male`/`男`→male，`f`/`female`/`Female`/`女`→female）；② 当某行 age_group 或 sex 匹配不到公式时，至少记一条 warning 事件，避免"静默 0"；③ 同理 age_group 也应容错。
   - 时机：与 BUG 6 一起，待 Run 2 跑完再改后端重部署。
+  - ✅ **已修（GCP dev，2026-06-18）**：`nutrition_metrics.py`——加 `_normalize_sex()`（`m/male/man/boy/男→male`，`f/female/woman/girl/女→female`，不认的归 None）+ `_normalize_age_group()`（统一 en/em dash、去空格）；统计未匹配的 sex/age 值；**全零结果直接抛 `CSISError`（绝不静默出空图）**，部分未匹配则在返回里带 `warnings`；图表配色对 ≠2 类做防御。GCP 容器内实测：`M/F` 输入产出 33KB 真图、总 LLER=7,088,367 kcal/day（修复前=0）；乱码 sex 输入抛清晰错误。**MSU 暂未同步**。
 - **UX — 上传页面预先说明文件类型**（zyt / 郭玉婷）
 - ✅ **UX — 一键打包下载结果（ZIP）**（zyt；**2026-06-18 已实现并部署 MSU**）
   - **范围=单张结果卡（一次工具运行）**，不是整会话（用户反馈初版把整会话都打包了，已修正）。

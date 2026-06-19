@@ -65,6 +65,57 @@ async def _generate_with_retry(client, model_name: str, contents, config, max_re
                 else:
                     raise
 
+
+class _StreamedResponse:
+    """Minimal stand-in for a GenerateContentResponse, assembled from a stream so
+    the rest of run_agent (function-call extraction, history append, empty-recovery)
+    works unchanged. content.parts is None when nothing usable streamed."""
+    def __init__(self, content):
+        self.candidates = [types.Candidate(content=content)]
+
+
+async def _generate_streaming(client, model_name: str, contents, config, emit,
+                              max_retries: int = 4):
+    """Like _generate_with_retry but STREAMS: emits `thinking`/`text_chunk` events
+    live as deltas arrive (so the UI's thinking block grows in real time), then
+    returns the fully assembled response. Falls back through the same 429/503 retry."""
+    import random, inspect
+    for attempt in range(max_retries):
+        async with _GEMINI_SEMAPHORE:
+            try:
+                collected = []
+                maybe = client.aio.models.generate_content_stream(
+                    model=model_name, contents=contents, config=config,
+                )
+                stream = await maybe if inspect.isawaitable(maybe) else maybe
+                async for chunk in stream:
+                    cand = chunk.candidates[0] if getattr(chunk, "candidates", None) else None
+                    if not cand or cand.content is None or not cand.content.parts:
+                        continue
+                    for part in cand.content.parts:
+                        if part.function_call is not None:
+                            collected.append(part)
+                        elif part.text:
+                            if getattr(part, "thought", False):
+                                await _maybe_await(emit({"type": "thinking", "content": part.text}))
+                            else:
+                                await _maybe_await(emit({"type": "text_chunk", "content": part.text}))
+                            collected.append(part)
+                content = (types.Content(role="model", parts=collected)
+                           if collected else types.Content(role="model"))
+                return _StreamedResponse(content)
+            except Exception as e:
+                err_str = str(e).lower()
+                is_rate_limit = "429" in err_str or "quota" in err_str or "resource_exhausted" in err_str
+                is_server_err = "503" in err_str or "unavailable" in err_str
+                if (is_rate_limit or is_server_err) and attempt < max_retries - 1:
+                    wait = (2 ** attempt) + random.uniform(0, 1)
+                    logger.warning(f"[agent] Gemini stream {'rate limit' if is_rate_limit else 'server error'} "
+                                   f"(attempt {attempt+1}/{max_retries}), retrying in {wait:.1f}s")
+                    await asyncio.sleep(wait)
+                else:
+                    raise
+
 # ---------------------------------------------------------------------------
 # Gemini client — lazy singleton, created on first use
 # ---------------------------------------------------------------------------
@@ -317,8 +368,10 @@ Users often provide parameters across multiple messages. Follow this pattern:
 ## Image / Map Output Rules (CRITICAL)
 - NEVER write inline image data in your text response. Specifically: do NOT emit `![...](data:image/png;base64,...)`, do NOT emit any `data:image/*;base64,...` URLs, and do NOT emit fake/fabricated base64 byte strings.
 - The ONLY way to show a rendered map or image is to call the `render_spatial_file` tool. The frontend will display the resulting PNG automatically — you do not need to embed it in your reply.
-- If a rendered image was already produced earlier in the conversation, do NOT regenerate or re-embed it in markdown. Just refer to it by filename and tell the user it is already shown above.
-- You cannot draw images yourself. If asked to "show a map" or "visualize" and no rendered file exists yet, call `render_spatial_file` on the relevant .tif / .shp file.
+- NEVER claim, state, or imply that you rendered/showed/displayed a map or image (e.g. "Here is the rendered map", "the image is shown above", "you can download this image") UNLESS you actually called `render_spatial_file` for that exact file. Describing or announcing a render you did not perform is a hard error — it produces NO image for the user.
+- When the user asks to show / render / display / visualize / 可视化 a specific .tif or .shp file, you MUST call `render_spatial_file` on that file. Never answer with text alone claiming it is done.
+- The ONLY exception to calling `render_spatial_file` again: if you yourself called it for the SAME file in the IMMEDIATELY preceding turn of THIS conversation, you may say it is already shown above. In every other case — including when an older render exists earlier in the history — you MUST call `render_spatial_file` again.
+- You cannot draw images yourself. If asked to "show a map" or "visualize" and you have not rendered that file this turn, call `render_spatial_file` on the relevant .tif / .shp file.
 """
 
 # ---------------------------------------------------------------------------
@@ -1161,6 +1214,33 @@ TOOLS = [
 ]
 
 
+# ── Use-case workflow planning + execution layer (confirm-gated) ─────────────
+from workflow.catalog import (
+    PROPOSE_WORKFLOW_PLAN_DECLARATION, EXECUTE_WORKFLOW_PLAN_DECLARATION,
+    CAPABILITY_CATALOG, WORKFLOW_PROMPT, plan_from_llm_args, input_map_from_llm_args,
+)
+from workflow import plan_from_dict, validate_plan
+from workflow.engine import run_plan_async
+TOOLS[0].function_declarations.append(PROPOSE_WORKFLOW_PLAN_DECLARATION)
+TOOLS[0].function_declarations.append(EXECUTE_WORKFLOW_PLAN_DECLARATION)
+
+
+def _format_plan_summary(plan_dict: dict) -> str:
+    """Deterministic plain-language plan summary (fallback if the model emits no text)."""
+    steps = plan_dict.get("steps", [])
+    reqs = plan_dict.get("required_inputs", [])
+    lines = [f"**{plan_dict.get('description') or plan_dict.get('case_name', 'Workflow plan')}**", "", "**Steps:**"]
+    for i, s in enumerate(steps, 1):
+        rat = f" — {s.get('rationale')}" if s.get("rationale") else ""
+        lines.append(f"{i}. `{s.get('tool')}`{rat}")
+    if reqs:
+        lines.append("\n**Files to upload:**")
+        for r in reqs:
+            lines.append(f"- {r.get('label', r.get('id'))}")
+    lines.append("\nConfirm and upload these files, and I'll run it.")
+    return "\n".join(lines)
+
+
 # ---------------------------------------------------------------------------
 # Keyword-based tool routing
 # ---------------------------------------------------------------------------
@@ -1340,7 +1420,12 @@ async def run_agent(
 
     # Phase 1: build system instruction with PRE_EXECUTION skill sections
     pre_execution_context = _build_pre_execution_context()
-    system_instruction = _BASE_SYSTEM_INSTRUCTION + pre_execution_context
+    system_instruction = (
+        _BASE_SYSTEM_INSTRUCTION
+        + "\n\n" + WORKFLOW_PROMPT
+        + "\n\n" + CAPABILITY_CATALOG
+        + pre_execution_context
+    )
 
     # Build initial user message (uploaded + previous output file paths prepended)
     from shared.session_manager import SessionManager as _SM
@@ -1404,6 +1489,10 @@ async def run_agent(
 
     # Agentic loop
     max_iterations = 10
+    # Gemini 2.5 supports "thinking": ask for thought summaries so the UI can show
+    # a collapsible "Thinking…" block. Older models don't accept the config.
+    thinking_cfg = types.ThinkingConfig(include_thoughts=True) if "2.5" in model_name else None
+
     for iteration in range(max_iterations):
         logger.info(f"[agent] iteration={iteration} session={session_id} model={model_name}")
 
@@ -1415,13 +1504,15 @@ async def run_agent(
             system_instruction=system_instruction,
             tools=active_tools,
             temperature=base_temperature,
+            thinking_config=thinking_cfg,
         )
 
-        response = await _generate_with_retry(
+        response = await _generate_streaming(
             client,
             model_name,
             contents,
-            config=gen_cfg,
+            gen_cfg,
+            event_callback,
         )
 
         if not response.candidates:
@@ -1453,8 +1544,9 @@ async def run_agent(
                     system_instruction=system_instruction,
                     tools=active_tools,
                     temperature=retry_temp,
+                    thinking_config=thinking_cfg,
                 )
-                resp2 = await _generate_with_retry(client, model_name, retry_contents, config=retry_cfg)
+                resp2 = await _generate_streaming(client, model_name, retry_contents, retry_cfg, event_callback)
                 c0 = resp2.candidates[0] if resp2.candidates else None
                 if c0 and c0.content is not None and c0.content.parts is not None:
                     response = resp2
@@ -1476,23 +1568,135 @@ async def run_agent(
             if part.function_call is not None
         ]
 
-        # Stream any text parts to frontend
-        for part in candidate.content.parts:
-            if part.text:
-                await _maybe_await(event_callback({
-                    "type": "text_chunk",
-                    "content": part.text,
-                }))
+        # NOTE: text/thinking are already streamed live to the frontend inside
+        # _generate_streaming as deltas arrive — do NOT re-emit them here.
 
         if not function_calls:
             break
 
         function_response_parts: list[types.Part] = []
+        workflow_proposed = False        # propose_workflow_plan is terminal for the turn
+        plan_summary_fallback = ""
 
         for fc in function_calls:
             tool_name = fc.name
             tool_input = dict(fc.args)
             logger.info(f"[agent] function_call: {tool_name}")
+
+            # ── Workflow planning: validate + surface the plan; do NOT execute.
+            # The confirm-gate: the model proposes, the user confirms later.
+            if tool_name == "propose_workflow_plan":
+                try:
+                    plan_dict = plan_from_llm_args(tool_input)
+                    plan = plan_from_dict(plan_dict)
+                    plan_errors = validate_plan(plan, available_tools=set(TOOL_FILE_SPECS))
+                except Exception as pe:  # malformed plan args
+                    plan_dict = tool_input
+                    plan_errors = [f"could not parse plan: {pe}"]
+                await _maybe_await(event_callback({
+                    "type": "workflow_plan",
+                    "plan": plan_dict,
+                    "valid": not plan_errors,
+                    "errors": plan_errors,
+                }))
+                if plan_errors:
+                    fr = {"status": "invalid_plan", "errors": plan_errors,
+                          "instruction": "Fix these issues and call propose_workflow_plan again."}
+                else:
+                    # Stash the valid plan so a later confirm turn can execute it.
+                    try:
+                        from shared.session_manager import SessionManager as _SMx
+                        _SMx().set_workflow_plan(session_id, plan_dict)
+                    except Exception:
+                        logger.exception("[agent] failed to stash workflow plan")
+                    workflow_proposed = True
+                    plan_summary_fallback = _format_plan_summary(plan_dict)
+                    fr = {"status": "plan_proposed", "n_steps": len(plan_dict.get("steps", [])),
+                          "files_needed": [ri.get("label", ri.get("id"))
+                                           for ri in plan_dict.get("required_inputs", [])],
+                          "instruction": ("Plan is valid and saved. Summarize the steps in plain language, list "
+                                          "the files the user must upload, and ask them to confirm before running. "
+                                          "Do NOT claim it has run.")}
+                function_response_parts.append(
+                    types.Part.from_function_response(name=tool_name, response={"result": fr})
+                )
+                continue
+
+            # ── Workflow execution: run the confirmed plan (reconcile + stream each step).
+            if tool_name == "execute_workflow_plan":
+                from shared.session_manager import SessionManager as _SMx
+                _sm = _SMx()
+                stored = _sm.get_workflow_plan(session_id)
+                if not stored:
+                    function_response_parts.append(types.Part.from_function_response(
+                        name=tool_name, response={"result": {
+                            "status": "no_plan",
+                            "instruction": "No saved plan; call propose_workflow_plan first."}}))
+                    continue
+                wf_plan = plan_from_dict(stored)
+                inputs_map = input_map_from_llm_args(tool_input)
+                unmapped = sorted(wf_plan.input_ids - set(inputs_map))
+                missing = sorted([p for p in inputs_map.values() if not os.path.exists(p)])
+                if unmapped or missing:
+                    function_response_parts.append(types.Part.from_function_response(
+                        name=tool_name, response={"result": {
+                            "status": "need_files", "unmapped_inputs": unmapped, "missing_files": missing,
+                            "instruction": "Ask the user to provide the missing files, then call execute_workflow_plan again."}}))
+                    continue
+
+                # Bridge engine events -> the tool-card events the frontend already renders.
+                async def _wf_emit(ev: dict) -> None:
+                    t = ev.get("type")
+                    if t == "step_started":
+                        await _maybe_await(event_callback({
+                            "type": "tool_start", "tool": ev["tool"], "task_id": ev["step"],
+                            "message": f"[{ev['index']}/{ev['total']}] {ev['tool']}"}))
+                    elif t == "step_progress":
+                        await _maybe_await(event_callback({
+                            "type": "tool_progress", "task_id": ev["step"],
+                            "progress": ev["progress"], "message": ev["message"]}))
+                    elif t == "step_done":
+                        await _maybe_await(event_callback({
+                            "type": "tool_result", "task_id": ev["step"],
+                            "files": ev.get("files", []), "content": ""}))
+                        await _maybe_await(event_callback({"type": "done", "task_id": ev["step"]}))
+                    elif t == "step_error":
+                        await _maybe_await(event_callback({
+                            "type": "error", "task_id": ev["step"], "error_code": "TOOL_FAILED",
+                            "message": f"step {ev['step']}: {ev['error']}"}))
+                    elif t == "plan_reconciled":
+                        fixes = "; ".join(f"{f['param']}:{f['from']}->{f['to']}" for f in ev["fixes"])
+                        await _maybe_await(event_callback({"type": "text_chunk", "content": f"\n(Calibrated columns: {fixes})\n"}))
+                    elif t == "plan_reconcile_failed":
+                        mm = "; ".join(f"{m['step']}.{m['param']}='{m['value']}'" for m in ev["mismatches"])
+                        await _maybe_await(event_callback({
+                            "type": "error", "error_code": "INVALID_PARAMS",
+                            "message": f"Column mismatch, cannot run: {mm}"}))
+
+                try:
+                    wf_ctx = await run_plan_async(wf_plan, inputs_map, session_id, _wf_emit)
+                except Exception as wfe:
+                    logger.exception("[agent] workflow execution failed")
+                    function_response_parts.append(types.Part.from_function_response(
+                        name=tool_name, response={"error": sanitize_error_message(str(wfe))}))
+                    continue
+
+                try:
+                    _sm.add_output_files(session_id, wf_ctx.get("files", []))
+                except Exception:
+                    pass
+
+                fr = {"status": wf_ctx.get("status"),
+                      "steps": {sid: s.get("status") for sid, s in wf_ctx.get("steps", {}).items()},
+                      "n_files": len(wf_ctx.get("files", [])),
+                      "output_files": [f.get("filename") for f in wf_ctx.get("files", [])],
+                      "warnings": wf_ctx.get("warnings", []),
+                      "mismatches": wf_ctx.get("mismatches", []),
+                      "instruction": ("Summarize for the user which steps ran, key outputs, and any warnings. "
+                                      "Output files are already shown as cards above; do not re-list raw paths.")}
+                function_response_parts.append(types.Part.from_function_response(
+                    name=tool_name, response={"result": fr}))
+                continue
 
             # ── Step 0: generic pre-flight — catch missing input files before
             # dispatching, so the user gets a friendly "file not found / not
@@ -1604,6 +1808,18 @@ async def run_agent(
                 )
             finally:
                 await r_sub.aclose()
+
+        # A proposed plan is terminal for this turn: stop now so we don't run a
+        # second LLM turn (which would re-think and re-summarize -> duplicate plans).
+        # The user confirms in the next message, which triggers execute_workflow_plan.
+        if workflow_proposed:
+            has_answer_text = any(
+                getattr(p, "text", None) and not getattr(p, "thought", False)
+                for p in candidate.content.parts
+            )
+            if not has_answer_text and plan_summary_fallback:
+                await _maybe_await(event_callback({"type": "text_chunk", "content": plan_summary_fallback}))
+            break
 
         # Feed all function responses back to Gemini for final reply
         contents.append(

@@ -3766,3 +3766,558 @@ Git commit: `6373c5f`
   - 前端 `ResultFiles.jsx`：按钮改 `<button onClick>`，POST 本卡 `files.map(f=>f.path)` → 收 blob 触发下载，加 `zipping` 态（"Zipping…"）+ 过期/失败 alert；数据来源：tool_result 的 file 对象本就带内部 `path`（`_enrich_file_urls` 用 `{**f,url}` 保留）
 - 重部署：tar backend+frontend → build 两镜像 → up -d；验证：新 POST 路由返回我端点 json、旧 GET=404、容器用新镜像、health ok、公网经 WAF POST 通过
 - 待用户强刷复测：每张卡按钮只下当前运行的文件
+
+### Git 提交 + 推送 GitHub
+- commit `67c0ef0`（19 文件，+2196/-75）：代码（main.py ZIP/folder-upload、agent.py、render worker、read_file、output_router、前端 App/ResultFiles/streaming/session）+ 文档（DEV_LOG/ROADMAP/CLAUDE）+ env 模板（占位 key，无密钥）
+- push 到 `origin`（csisaiproject2026-star/TelecouplingAI）分支 `feature/invest-expansion`：`b6b367c..67c0ef0`
+- **测试数据未提交**（按用户要求"只推代码"）：Run2(441M)/AI_GCP_direct_test(154M)/Run1/references/截图 等大体积目录全部排除，与已 gitignore 的 `Test_data/` 同待遇
+- `backup` 远程（dru1889/CSIS_fulldev-backup）未推（用户只说推 github，待确认是否也同步）
+
+---
+
+## 2026-06-18 — 状态盘点（无代码改动）
+
+### 完成内容
+- 用户要求"继续工作"，先做全量状态盘点并汇报，未改任何代码。
+- 核实当前状态：最新提交 `67c0ef0`（scoped ZIP 下载 + 文件夹上传 + Run 2 文档）已推 `origin/feature/invest-expansion`；工作区唯一未提交改动是 DEV_LOG 的 commit/push 补记；其余未跟踪目录均为故意排除的测试数据/截图/原型。
+- 确认 Run 2 真人自测（2026-06-18）= **43/43 全过**，测试中失败全是测试数据/打包问题，已在跑测中修掉，非产品 bug。
+
+### 关键结论 / 待办盘点（依据 ROADMAP.md）
+- 🔴 两个真实产品 bug 当初约定"等 Run 2 跑完再改"，现 Run 2 已完成 → **解锁**：
+  - BUG 6 假渲染：LLM 未真正调 `render_spatial_file`，被系统提示词"已显示在上面"逃生口诱导，纯文字演成功 → 收紧 `agent.py` 提示词 + 可选关键词兜底。
+  - BUG 7 营养指标静默空图：`nutrition_metrics.py` 用 `male/female` 当 key，CSV 是 `M/F` 匹配不上 → 全 LLER=0、无报错 → 归一化 sex + 无匹配记 warning（目前只临时改了测试数据）。
+  - 两者同批改后端 + 同次 MSU 重部署最省事。
+- 🟡 小清理：3 个测试 prompt（33/39/42）传了不存在的参数名，无害可顺手清。
+- 🟢 Tier 3（任务 ID 解耦 + 断点续传）排下周（2026-06-22 那周）单独开 PR。
+
+### 待用户拍板
+- `backup` 远程（dru1889/CSIS_fulldev-backup）是否也同步本次提交。
+- 下一步是否就开始修 BUG 6 + BUG 7（已建议作为最合理的下一动作）。
+
+### 测试状态
+- 本会话无代码改动，无新测试。
+
+---
+
+## 2026-06-18 — Use-case level workflow 可行性分析（读 PDF，无代码改动）
+
+### 完成内容
+- 读了 `usecaseLevel_workflow/ES-2017-9696.pdf` = Tonini & Liu 2017《Telecoupling Toolbox》(Ecology and Society 22(4):11)，PyMuPDF 提全文（pdftoppm/poppler 缺失，改 Python 提取）。
+- 该论文是 Telecoupling Toolbox 奠基论文，把框架拆成五组件 **Systems→Agents→Flows→Causes→Effects**，并用卧龙保护区两个真实案例演示多工具串联（即用户想要的 use-case workflow）。
+- 两个案例的工具路径已逐一拆解：
+  - 案例1 熊猫租借：Systems → Agents → Radial Flow → FAMD(causes) → CO2 + Cost-Benefit(effects)。论文 Fig.3 即一张工具 DAG。
+  - 案例2 旅游：前四步同上，Effects 改用 Habitat Quality(InVEST)，含 1998/2009 分区情景对比。
+
+### 关键发现（可行性结论）
+- 核对 `tool_file_specs.py` 43 个 key：两案例所需 11 个工具**一个不缺**，且与论文五 toolset 逐一对应。**这篇论文本质就是我们 15 个 Telecoupling 工具的原始设计 spec。**
+- 查证 `agent.py`：工具输入均为 STRING 路径参；输出带 `internal_path`；系统提示词第 314 行已规定 internal_path 供"内部工具调用"用（render/read 已在消费上一步输出）→ **链式"上一步输出→下一步输入"的原语已存在，不需重构架构。缺的是编排/规划层，不是管道。**
+
+### 真正缺口
+- 任务分解/规划层（现 agent 逐轮反应式，无 DAG 规划）；输出→输入自动接线（靠 LLM 自觉，无强制/校验）；跨步实体一致性（systems/flows/CBA 引用同一批实体无保证）；可靠性（BUG6 暴露的"该调工具却文字演"在多步链路放大）；长链路撞 SSE/WAF 超时 = Tier 3 解决的问题；真实数据供给（靠用户带数据，刚上线的文件夹上传正好用上）。
+
+### 建议路线 / 下一步
+- 三选一：A 纯涌现式(最省力最飘) / B 显式 DAG 模板(最可靠最重) / **C 混合式 LLM 规划+确认+编排器逐步执行(推荐)**。
+- 第一步 spike（≈零开发）：用现有数据手工把案例1 熊猫租借 6 步端到端串通，验证接线+实体一致性，再定投 B 还是 C。
+- 依赖关系：**Tier 3 升级为前置依赖**（长链路需连接存活）；**BUG 6 须先修**（多步链路里致命）。
+
+### 待用户拍板
+- 是否直接做 spike（手工串通熊猫租借 6 步）；还是先讨论编排架构 B vs C。
+
+### 测试状态
+- 本会话无代码改动，无新测试。
+
+---
+
+## 2026-06-18 — 把最新版本（= MSU 那版 / 本地 67c0ef0）同步部署到 GCP，作为 workflow 开发的 dev 环境
+
+### 目标
+- GCP 升到与 MSU 一致的最新代码，当 use-case workflow 开发的 dev 环境用；**MSU 一律不动**（全程只操作 `csis-gcp`）。
+
+### 部署前查证（两个历史地雷，确认安全）
+- **nginx 地雷已不存在（memory 过时）**：GCP nginx 现已是动态 resolver 版（`resolver 127.0.0.11 valid=10s` + `proxy_pass http://$backend` 变量），`nginx/certs/` 有 server.crt/server.key（6/10 生成），`nginx -t` 通过。→ **重建后端换 IP 后 nginx 自动重解析，不会 502，无需重启 nginx。**
+- **下载链接 env 无回归**：GCP `.env.docker` 仍是旧格式 `FILE_SERVER_URL=http://34.42.83.50/download/`（无 `SERVER_BASE_URL`）。核 `config.py`：validator 只在 `SERVER_BASE_URL` 非空时才覆盖 FILE_SERVER_URL，故旧格式被原样保留 → 正确。**env 全程不动（tar 排除）。**
+- 前端用同源相对路径（`/api/upload`、`/api/chat`），无硬编码 host、无 `frontend/.env`、无 VITE build-time URL → GCP 内 `npm build` 安全。
+- 源码是 `COPY . .`（Dockerfile 最后一层）烤进镜像、非 volume 挂载 → 必须 rebuild；但 conda/pip 在前、缓存命中，rebuild 快。
+
+### 执行（仅 GCP）
+- 打包 `telecouplingAI-project/{backend,frontend}`（163KB），排除 node_modules/dist/__pycache__/*.pyc + **backend 内的 .env/.env.deleted/dump.rdb/Dockerfile_bkp 垃圾**（backend/.env 本就是空壳无密钥）→ `ssh csis-gcp` 解到 `~/csis-platform`。
+- `docker compose build api-server frontend-ui`：两镜像重建成功（~2.5min；pip 层这次 cache miss 重跑 139s，natcap.invest/pygeoprocessing 重新编 wheel，OK）。
+- `docker compose up -d`：backend + 34 worker + frontend 全部重建；nginx/redis 未动。
+
+### 验证（全绿）
+- 39/39 容器 up，无 restarting/exited；tele-backend `Up ... (healthy)`。
+- `settings.FILE_SERVER_URL = http://34.42.83.50/download/`（env 未被覆盖）；`download_zip` 在运行中的 main.py 出现 5 次（新代码已生效）。
+- 服务器侧：`/health`={"status":"ok"}，homepage=200；**backend 换 IP 后 nginx 未 502**（动态 resolver 生效）。
+- 外网（dev 机 `--noproxy`）：`http://34.42.83.50/health`=ok，homepage=200。
+
+### 注意点 / 后续
+- GCP 镜像 pip 依赖因 Dockerfile 未 pin + 重建时间不同，可能比 MSU（早期 docker save/load 来的）略新；代码一致，功能等价，dev 环境可接受。
+- GCP 现为 dev 环境：后续 workflow 开发在此迭代、重部署，不影响 MSU 公网交付。
+- 清理：本地临时 tar 已删。
+
+### 测试状态
+- ✅ GCP 部署后端到端验证通过（容器/健康/配置/内外网 HTTP）。
+- 未做工具级 e2e 跑测（本次只做版本同步）。
+
+---
+
+## 2026-06-18 — 在 GCP dev 环境修复 BUG 6（假渲染）+ BUG 7（营养静默空图）并部署验证
+
+### 背景
+- 先核对代码确认两 bug 都还没修（产品代码原样，只 BUG7 测试数据被临时改过）。用户拍板"在 GCP 上改"。GCP 已是 dev 环境，MSU 不动。
+
+### 改动
+- **BUG 6 — `backend/agent.py` 系统提示词（Image/Map Output Rules）**：
+  - 删宽口径逃生口"earlier in the conversation 已渲染就说已显示在上面"，收窄为"仅当我自己在**上一轮**渲染过**同一文件**"才可免调。
+  - 新增硬规则：未真正调用 `render_spatial_file` 就声称/暗示已出图 = hard error（会给用户留无图）。
+  - 明确：用户 show/render/display/可视化 某 .tif/.shp 时**必须**调渲染工具，不得只用文字声称完成。
+- **BUG 7 — `backend/tools/nutrition_metrics.py`**：
+  - 新增 `_normalize_sex()`（m/male/man/boy/男→male；f/female/woman/girl/女→female；不认→None）与 `_normalize_age_group()`（统一 –/—/− 破折号、去空格）。
+  - `_ller_per_person` 接受 None sex；主循环统计未匹配的 sex/age 值。
+  - **全零结果直接 `raise CSISError`（绝不静默出空图）**；部分未匹配 → 返回 `warnings` 并 log。
+  - 图表配色对 sex 类别数 ≠2 做防御（避免 color 列表越界崩溃）。
+
+### 验证
+- 本地：`py_compile` 两文件 OK；helper 单测 `M→male/F→female/男女/dash`；`M@18-30,65kg` LLER=2593.9（修前=0）；乱码 sex → CSISError。
+- 部署 GCP（仅 backend，tar 排除 env/junk → `docker compose build api-server` 秒级，pip 层缓存命中 → `up -d` 重建 backend+34 worker）。
+- GCP 容器内 e2e：`M/F` 输入 → `nutrition_ller_chart.png` **33,057 bytes 真图**、total LLER=**7,088,367 kcal/day**（修前=0 空图）、warnings=none；乱码 sex → CSISError 清晰报错。agent.py 新规则已在运行镜像里（grep=1）。39/39 容器 healthy。
+
+### 注意点 / 后续
+- **BUG 6 行为侧需真人聊天验证**（show 某 .shp 看是否真出图）——按既定约定不在此自动跑 LLM agent，留用户在 GCP UI 验。
+- **MSU 暂未同步**这两个修复；等 GCP 验稳后由用户决定哪天同步过去。
+- 可选未做：BUG 6 的"render/show 关键词强制兜底"（ROADMAP 标为可选），先靠提示词收紧。
+- ROADMAP 两条 BUG 已标 ✅（GCP dev）。
+
+### 测试状态
+- ✅ BUG 7 GCP 容器内端到端验证通过（真图 + 非零 LLER + 乱码报错）。
+- ✅ BUG 6 代码已部署，行为待真人聊天验证。
+- 本地无新增 pytest（改动以现有工具逻辑为主，已用容器内实跑替代）。
+
+---
+
+## 2026-06-18 — Use-case workflow 架构方向讨论（仅讨论，无代码）
+
+### 核心设计判断
+- **把"规划"和"执行"拆开**，不让 LLM 一边想一边连环调工具（有 BUG6 这类单步非确定性硬证据，6 步链路会放大失败、黑箱、跨步实体对不上）。
+- 推荐架构 **Plan → Confirm → Execute → Synthesize**：
+  1. **规划（LLM）**：喂 五组件框架 + 43 工具能力目录(按组件打标 + I/O 签名) + 上传清单 → 经专用工具 `propose_workflow_plan(steps=[...])` 产出**结构化计划**（数据，非隐式链）。
+  2. **校验+确认（后端+人）**：校验工具存在/输入有着落/类型对（复用 `tool_file_specs.py` 预检）→ 渲染成可读 DAG 给用户确认/改/取消（实体一致性 + 缺数据在此暴露）。
+  3. **执行（确定性编排器，非 LLM）**：按 DAG 解析输入(上传路径 or 上游步骤输出)→ 现有 Celery 队列 → 登记到按步骤 id 的运行上下文。**输出→输入接线由编排器做**，把可靠性风险从链式调用拿掉。
+  4. **解读（LLM）**：拿全部输出写叙述分析（对应论文 Results）。
+- **通用性来自规划阶段 + 知识文档**，不写死模板；论文两案例（熊猫租借/旅游）当验证样例/few-shot，非唯一支持 case。
+- **Tier 3 是 workflow 的执行底座**（长任务 + 断点续传），建议先行或合建，不是抢资源。
+
+### 复用 vs 新建
+- 复用：43 Celery 工具、`tool_file_specs.py` 校验、session 工作区文件交接、output_router。
+- 新建 4 块：workflow 知识文档、`propose_workflow_plan` 工具 + 计划 schema、编排器、计划渲染 UI。
+
+### 落地分期
+- ① spike（手工零代码，GCP 上手动串熊猫租借 6 步验接线/实体一致性）→ ② MVP（schema + propose 工具 + 校验器 + 线性链编排器 + 确认 UI，跑通 2 案例）→ ③ 加固（完整 DAG/并行、单步重试、Tier3 续传、解读步骤）。
+
+### 待用户拍板的 3 个岔路口（我的倾向）
+1. 执行自主度：一口气跑完 vs **逐步放行**（dev 阶段好调试，我倾向后者）。
+2. 范围：任意 case vs **先精选 2 论文 case 做扎实**（我倾向后者）。
+3. UX：揉进现聊天 vs **单独 workflow 模式**（与单工具聊天解耦，我倾向后者）。
+
+### 下一步
+- 等用户对 3 个岔路口表态后，再决定先做 spike 还是直接进 MVP 设计。
+
+### 测试状态
+- 无代码改动。
+
+---
+
+## 2026-06-18 — 盘点 workflow 测试数据 / 参考结果（仅排查，无代码）
+
+### 结论
+- **没有连贯的案例数据集**。我们有全部 7 个相关工具（systems/agents/flows/co2/cba/famd/habitat_quality）的单工具测试数据，但它们是各自手搓的玩具数据、**实体互不引用**（systems=长江/林区，flows=北京→上海，co2=FarmA→MarketX，cba=造林/湿地，famd=抽象问卷），凑不成一个 telecoupling；habitat_quality 还是 InVEST 的 Willamette 默认样例（与熊猫无关）。
+- 全仓**没有**熊猫租借/旅游案例数据。原版 ArcGIS 工具箱（`references/Telecoupling+Toolbox_ArcGISProV3.3/`）只导出了 schema（列模板，如 `RecordSet.csv`=`Role,LAT,LONG`）+ 脚本 + UI 图标，**未带案例数据**。
+- **参考结果在论文里**：Fig 4–11（systems/agents/flows 地图、FAMD 三图、CO2 图、CBA 回报图、栖息地退化图）+ Table 2/3（FAMD 特征值/贡献）。PDF 不含数据文件，只给数据来源且部分是模拟/聚合值。
+
+### 影响 / 下一步
+- workflow 落地第一步**不是写代码，是造数据**：照论文 + schema 造一份合成"熊猫租借"数据集，让同一批实体（卧龙=sending、各国动物园=receiving、荷兰=spillover）贯穿 systems→flows→co2→cba，FAMD 用论文那份模拟问卷；论文 Fig/Table 当验收。
+- 用户提议：先去 paper 的 supplementary files 看有没有现成数据 → 待排查。
+
+### 测试状态
+- 无代码改动。
+
+---
+
+## 2026-06-19 — 找到 tourism 案例真数据（推翻"需自造数据"结论）
+
+### 排查 supplementary（结论：期刊无）
+- 抓 `ecologyandsociety.org/vol22/iss4/art11/`（curl 200；WebFetch 被 403 挡）：附加内容只有 PDF + figure1–11.html + table1–3.html + responses，**无任何 appendix/supplement 数据文件**。期刊侧拿不到数据。
+
+### 关键发现：`usecaseLevel_workflow/SampleData_TourismTelecoupling/` 就是 tourism 工作流的完整咬合数据
+- 目录按 telecoupling 组件分好，每个文件夹对应一个工具：
+  - `Systems-UploadSystems/tourism_Systems.csv`（57 系统：Wolong=Receiving + 56 Sending；列 `NAME,Role,LON,LAT`）→ 38/39 Systems
+  - `Systems-NetworkGrouping/`（nodes.csv 124 国到访量 + links.csv 6585 客流 + World_countries_2002.shp）→ 01 Network Analysis
+  - `Flows/tourism_Flows.csv`（49 条"省→Wolong"；列 `FID,Location_from,FROM_X/Y,Location_to,TO_X/Y,Quantity`）→ 33 Radial Flows
+  - `Effect-CO2/tourism_Flows.csv`（同一份 Flows）→ 30 CO2
+  - `Effect-FAMD/Systems_withSimulatedTourism.shp`（dbf 挂模拟问卷字段）→ 29 FAMD
+  - `Cause/Wolong_NatReserve.shp`（卧龙边界 2013）→ 空间上下文/栖息地
+- **咬合证据（已验）**：Flows 起点 46/49 精确命中 Systems 名（3 个 NewZealand/CostaRica/SouthKorea 是有无空格的格式差异）；CO2 用的就是同一份 Flows。→ 同一批实体贯穿 Systems→Flows→CO2，是真工作流数据，不是玩具。
+
+### 必须先解决的实操坑：列名不兼容
+- 原版数据列名 ≠ 我们移植后工具期望列名：Systems 原版 `NAME,Role,LON,LAT` vs 我们 `system_name,system_type,longitude,latitude,status`；Flows 原版 `Location_from,FROM_X,...,Quantity` vs 我们 `from_name,from_lon,...,flow_value,flow_type`。
+- → **不能直接丢进我们的工具**，需加一层列名映射，或确认/改工具接受原版列名。这是 spike 第一件要试的事。
+
+### 下一步（修正前一条结论）
+- **不必再自造合成数据**（tourism 这套现成）。下一步：最小 spike——把这份数据按"列名映射 → Systems → Flows → CO2"在 GCP 手动串通，对照论文 Fig 10 验收。
+- 待用户确认：是否也有 **panda loan** 那套 SampleData（本目录只有 tourism）。
+
+### 测试状态
+- 无代码改动（纯数据排查）。
+
+---
+
+## 2026-06-19 — Tourism workflow 研究 + 工具映射 + 数据预处理（在 TourismTelecoupling_Workflow/ 工作）
+
+### 发现：更多案例数据
+- `usecaseLevel_workflow/OneDrive_1_6-19-2026/` 还有 3 套：International Transport / Qilian Mountains / Soybean（+ Tourism）。本轮只聚焦 Tourism。
+
+### 关键纠正：之前担心的"列名不兼容"基本不成立
+- 我们的工具用**可配置字段参数**读列，不写死列名：
+  - `draw_systems_from_table` 要 `x_field/y_field` → 直接传 `LON/LAT`，零改数据。
+  - `draw_radial_flows` 要 `from_x/from_y/to_x/to_y_field` → 传 `FROM_X/FROM_Y/TO_X/TO_Y`，零改数据。
+  - `network_analysis` 的 nodes/links 已是 R 脚本期望格式（`graph_from_data_frame` 取 links 前两列 sender/receiver、nodes 第一列 CODE，脚本还用 `larrivals.sender` 属性）；join: `nodes_join_attri=CODE`, `layer_join_attri=ISO_3_CODE`（实测 World_countries_2002 的 ISO_3_CODE 与 nodes CODE **124/124 命中**）。零改数据。
+- **只有 2 步需要真预处理**：
+  - CO2：原版 flows 无距离列、而 `co2_emissions` 要求 `length_km`（工具不自算距离）→ 按 haversine 算测地距离。
+  - FAMD：调查变量在 shapefile 的 .dbf（`Systems_withSimulatedTourism`），导出成 CSV；变量= `affin`(亲和)/`gdplog`(logGDP)/`dist`(到卧龙距离)。
+
+### 产出（写入 `usecaseLevel_workflow/TourismTelecoupling_Workflow/`）
+- `WORKFLOW.md` — 5 步映射表（工具/输入/字段参数/期望输出/论文 Fig 对照）+ 咬合性验证 + 预处理说明 + 风险。
+- `prepare_data.py` — 可复现预处理（haversine 距离 + dbf→csv），需 `TeleCouplingAI` conda 环境。
+- `flows_with_distance.csv`（49 流，距离 54–18,817 km）、`famd_input.csv`（56 系统）。
+- `_inspect_shapefiles.py` — shapefile 字段勘察脚本。
+- 自检：演示总 CO2 ≈ 5.88M kg（论文熊猫案例 5.2M kg，量级一致）。
+
+### 已知缺口
+- 栖息地退化这步缺数据：本 SampleData 无 LULC 栅格 + 分区，论文 tourism 的 Habitat Quality 跑不了。
+- 本目录数据/产物未入 git（测试数据，按"只推代码"惯例）。
+
+### 下一步
+- 在 GCP dev 环境按 WORKFLOW.md 逐步手动跑通（Systems→Flows→CO2→Network/FAMD），对照论文 Fig 验收。
+
+### 测试状态
+- 无后端代码改动；本地用 `TeleCouplingAI` 环境跑通预处理脚本，产物已生成校验。
+
+---
+
+## 2026-06-19 — Workflow 交互模型敲定（讨论，无代码）
+
+### 决策：采用"对话式向导"交互模型（用户明确倾向此方案）
+- 流程：**用户说目标 → AI 拆解步骤并给计划 → AI 像 Claude Desktop 那样主动问用户要文件 → 用户确认 → 执行 → 给结果 + 解读**。
+- 相对"一股脑全传 + 一句命令全自动"：这版更友好（用户无需提前知道要哪些文件，AI 引导），且是成熟 agent 工具验证过的范式。
+- 底层架构不变，仍是 **Plan → Confirm → Execute → Synthesize**；区别只在"数据进入方式"=AI 边问边要，而非开头全传。
+- **复用现有能力**：agent.py 已有"多轮收集缺失参数/文件"机制（缺啥问啥），把它从单工具扩展到多步计划即可，非从零重写。
+
+### 待定的小细节（要文件的时机）
+- A. 计划阶段一次性开完整清单（少打扰、有全貌）；B. 边跑边要（向导感、但用户没法提前备齐）。
+- 我的建议：**A 为主 + B 兜底**——计划里先列完整 manifest（可批量传也可一步步喂），跑到某步发现缺再补问。
+- 待用户在 A/B 上拍板后 → 写正式设计草案（ROADMAP 或 workflow 目录）再动手。
+
+### 测试状态
+- 无代码改动。
+
+---
+
+## 2026-06-19 — Workflow 正式设计草案落地（用户定 A 为主 B 兜底）
+
+### 完成
+- 用户拍板"数据清单 A 为主、边跑边要 B 兜底"。
+- 新增 **`usecaseLevel_workflow/WORKFLOW_DESIGN.md`（v0.1）** 总设计草案：目标/范围、交互模型、四阶段架构（Plan→Confirm→Execute→Synthesize，LLM 只管规划+解读、执行交确定性编排器）、数据模型（WorkflowPlan / RunContext，input source = input/literal/step 三类做输出→输入接线）、后端组件（新增能力目录 + `propose_workflow_plan` 工具 + 计划校验器 + 编排器 + Redis 运行上下文；复用 43 工具/tool_file_specs/session 工作区/output_router/多轮收集）、API 事件（建在 Tier 3 上）、前端（计划卡+清单 checklist+进度+解读）、MVP vs 后续、风险、落地步骤。
+- ROADMAP 新增 "Next up — Use-Case Level Workflow" 段，指向设计草案 + tourism 案例映射，标注依赖 Tier 3。
+
+### 下一步（设计草案 §10）
+- 先零开发 spike：GCP 上手动把 tourism 5 步串通；再写能力目录 + propose_workflow_plan，再做线性编排器。
+
+### 测试状态
+- 无代码改动（文档）。
+
+---
+
+## 2026-06-19 — 设计草案补两节（过程展示可折叠 + 触发/路由）+ 启动实现
+
+### 文档
+- `WORKFLOW_DESIGN.md` 新增 §7.1 过程展示（两层、可折叠）：①行动叙述（主，结构化事件，执行中展开/完成后收成一行摘要）；②Gemini thought summaries（次，默认折叠，须与真实结果分开，防 BUG6 式"想了≠做了"）。
+- 新增 §11 触发/路由：单工具调用**不进** workflow（保持 43/43 现状）；workflow 只在 ≥2 工具的目标时触发；三层防线（提示词规则 / 1 步坍缩 / 确认闸）；模糊请求偏向单工具；可选显式入口。
+
+### 启动实现（用户："根据讨论做一版看下"）
+- 决定先做**确定性 workflow 引擎**（schema + 校验器 + 线性编排器），用 tourism 计划端到端验证（我可完整自测、产出可见）；LLM 规划层 + 前端 UX 作下一轮（LLM 驱动部分按约定由用户在浏览器验，我不自动跑 Gemini）。
+
+### 完成：workflow 引擎 v0.1（确定性，已本地实跑验证）
+- 新增后端模块 `backend/workflow/`：
+  - `schema.py`（纯数据，可单测）：WorkflowPlan / WorkflowStep / RequiredInput / InputSource（input/literal/step 三类源）。
+  - `engine.py`：`validate_plan`（工具存在 + 必需文件参数齐 + input/step 引用有效 + 拓扑无环）+ `run_plan`（Kahn 拓扑序逐步跑，复用 `workers.task_queue.execute_tool` 调真工具，输出登记进 run context 支持 step→step 接线，emit 行动叙述事件，v0.1 遇错即停）。
+- 案例工件（`usecaseLevel_workflow/TourismTelecoupling_Workflow/`）：`tourism_plan.json`（5 步计划 + 7 项数据清单 + 字段参数映射）、`run_workflow.py`（把清单映射到真文件、跑引擎、打印过程）。
+- **本地实跑结果（TeleCouplingAI 环境）**：validate=OK；执行 **4/5 步成功产真输出**——s1 systems(shp)、s2 network(R igraph：分组 shp + stats csv + plot pdf)、s3 flows(shp)、s4 CO2(总 5,875,593 kg / 49 路线，与预处理自检一致)；**s5 FAMD 失败**＝本地 R 的 FactoMineR 版本不匹配报错（"invalid subscript type 'list'"），非引擎问题，且 FAMD 工具在 GCP Run2 已 43/43 过 → 判为环境性，待 GCP 复跑确认。
+- 引擎为**纯叠加**（没改任何现有文件），未部署 GCP（还没接 agent/API，避免上死代码）。
+
+### 下一步
+- 在 GCP 容器复跑确认 FAMD（环境一致）；然后做 LLM 规划层（能力目录 + `propose_workflow_plan`）让 Gemini 产出/校验计划；再做前端计划卡 + 过程展示。
+
+### 测试状态
+- ✅ 引擎 validate + 4/5 步本地实跑产真输出；FAMD 待 GCP 环境复跑。
+
+---
+
+## 2026-06-19 — 修复 FAMD 真 bug（纯定量/纯定性崩）+ 部署 GCP，tourism 5/5 步打通
+
+### 纠正前一条判断：FAMD 不是本地 R 环境问题，是真 bug
+- 在 GCP 容器复跑 FAMD 同样报 `invalid subscript type 'list'` → 推翻"本地环境"猜测。
+- 根因（`r_scripts/famd.R`）：空 JSON 数组 `[]` 经 `fromJSON` 变成 R `list()`；`all_vars <- c(quant_vars, qual_vars)` 里 `c(字符向量, list())` 把整体强转成 **list** → `df[, list(...)]` 崩。**只给一种变量类型（纯 PCA 或纯 MCA）时必崩**。Run2 没暴露是因为那次测试同时给了定量+定性两类。
+- **修复**：`quant_vars <- as.character(unlist(cfg$quant_vars))`、`qual_vars` 同（空→`character(0)`，非空→字符向量）。
+
+### 部署 + 验证（GCP dev）
+- tar backend（含 famd.R 修复 + 新 `backend/workflow/` 模块）→ rebuild api-server → up -d。
+- 验证：39/39 healthy；**famd worker** 也带上修复、纯定量 FAMD 实跑出 eigenvalues/coordinates/plots。
+- 至此 tourism 工作流 **5/5 步**都能产真输出（s1 systems / s2 network(R) / s3 flows / s4 CO2 5.88M kg / s5 FAMD）。
+
+### 注意
+- **MSU 仍有 FAMD 这个 bug**（纯定量/纯定性会崩）——按"MSU 不动"原则暂不同步，待统一回灌。
+- 分工：本地/引擎自测我做；网站(LLM/对话)体验由用户测。
+
+### 下一步
+- 做 LLM 规划层（能力目录 + `propose_workflow_plan`，让 Gemini 产计划）+ 前端计划卡/过程展示 → 部署 GCP，让用户在网站上测对话触发。
+
+### 测试状态
+- ✅ FAMD 修复 GCP 实跑通过；tourism 5/5 步在 GCP 环境验证可产出；引擎模块已上 GCP（暂未接 agent/API）。
+
+---
+
+## 2026-06-19 — 固化"GCP 领先 MSU、成熟后回灌"的决定（记忆）
+
+### 决定
+- 用户："记住 bug，等 GCP 成熟了我们再到 MSU 上去改。" → **MSU 保持不动**，GCP 上的修复/新功能先跑熟，统一回灌。
+- 写入长期记忆 `project_msu_sync_pending`（待回灌清单：FAMD 修复 + BUG6 + BUG7 + workflow 模块；触发=GCP 成熟；方式=部署到 `ssh csis-msu`、不覆盖其 `.env.docker`）+ `project_workflow_feature`（功能设计/案例/引擎 v0.1 状态/分工/下一步）。
+- 同步订正记忆索引里过时描述（BUG6/7 已修、GCP 已是 dev 环境）。
+
+### 测试状态
+- 无代码改动（仅记忆/文档）。
+
+---
+
+## 2026-06-19 — LLM 规划层落地（propose_workflow_plan）+ 部署 GCP，可在网站测"规划"
+
+### 新增
+- `backend/workflow/catalog.py`：
+  - `CAPABILITY_CATALOG` — 按五组件列出 workflow 相关工具 + 各自字段参数 + tourism few-shot（注入系统提示词）。
+  - `WORKFLOW_PROMPT` — 触发/路由规则：单工具直接调、≥2 工具目标才 `propose_workflow_plan` 一次、列全数据清单、提案后等用户确认（不声称已跑）。
+  - `PROPOSE_WORKFLOW_PLAN_DECLARATION` — Gemini function（inputs 用数组建模，绕开 schema 不支持 map）。
+  - `plan_from_llm_args()` — 把数组形 inputs 转成 schema 的规范 dict。
+- `agent.py` 接线：把声明 append 进 TOOLS；系统提示词拼上 WORKFLOW_PROMPT + CATALOG；函数调用循环里**特判** `propose_workflow_plan`——转换→`validate_plan`→发 `workflow_plan` 事件→给 Gemini 回 function_response（让它用文字总结计划+列文件+请用户确认）。**不执行**（确认闸）。
+
+### 自测（无 LLM，确定性部分）
+- py_compile 全过；模拟 Gemini 输出（inputs 数组）→ 转换 → 校验：tourism 5 步计划 **validate=NONE(可跑)**；坏计划正确报"未知工具/引用不存在上传"。
+- `import agent` OK，运行中 GCP backend 里 `propose_workflow_plan` 已注册（46 个声明），/health ok，39 容器。
+
+### 部署 + 可测范围
+- tar backend → rebuild api-server → up -d（GCP dev）。
+- **用户现在可在 http://34.42.83.50/ 测"规划"**：发"分析卧龙旅游 telecoupling"这类多步目标 → 预期 AI 调 propose_workflow_plan、回一份 5 步计划 + 需上传文件清单 + 请确认。
+- **还没做**：确认后真执行（confirm→run_plan 接线 + 文件映射 + 前端计划卡/过程展示）——这是下一层。
+- ⚠️ 风险：CATALOG 进了所有请求的系统提示词，可能轻微影响单工具行为；请顺带验一个普通单工具请求仍正常。
+
+### 下一步
+- confirm→execute 接线（存提案计划、把用户上传映射到 required_inputs、触发 run_plan、流式 step 事件）+ 前端计划卡/过程展示。
+
+### 测试状态
+- ✅ 规划层确定性部分本地自测通过；已部署 GCP；LLM 实际规划行为由用户在网站验。
+
+---
+
+## 2026-06-19 — 用户网站实测：规划层 PASS；确认"思考动画"未实现
+
+### 结果
+- 用户在 http://34.42.83.50/ 发"分析卧龙生态旅游这个 telecoupling" → **Gemini 正确产出 5 步计划**（系统→网络分组→径向流→CO2→FAMD）+ 6 项文件清单 + 请确认。与设计的 tourism 工作流一致 → **LLM 规划层网站实测通过**。
+- 用户问"中间没有 llm thinking 动画"。grep 核实：后端无 `thinking_config`/`includeThoughts`、前端无 thinking/思考块渲染 → **"过程/思考展示"那层根本还没做**（设计文档 §7.1 有，代码没实现），非 bug。
+  - 两层都缺：①行动叙述（随执行层来，目前没执行可叙述）；②Gemini thought-summary 折叠块（需后端开 thinking + 前端折叠块）。
+
+### 待用户拍板下一步
+- 选项：1) 先做思考块；2) 先接执行层(confirm→run + 行动叙述)；3) 都做。我建议 2（主干优先）。
+
+### 测试状态
+- 无代码改动（网站实测 + 排查）。
+
+---
+
+## 2026-06-19 — 网站实测2：证实是"真 LLM 推理非模板" + 暴露盲猜列名风险
+
+### 关键发现
+- 用户换个说法再问（"please analyse eco travel telecoupling"，非"卧龙生态旅游"）→ Gemini 给了**不同计划**：4 步（少了网络分组）、CO2 改 0.1 kg/km・1 人/趟（自编）、流列名 FROM_LON/FROM_LAT（而非 few-shot 的 FROM_X/FROM_Y）、FAMD 变量也换成 income/环境意识 等。→ **决定性证明：是 LLM 临场推理、能泛化，不是套模板**（模板会一字不差重复）。
+- 同时暴露真问题：**规划是在"没看见数据"下盲猜列名/参数**。猜的 FROM_LON 对不上真实 FROM_X → 若直接执行会因找不到列而失败；CO2 系数也是瞎编。
+
+### 对执行层的设计要求（本次实测启发）
+- 执行层**不能盲信 LLM 猜的字段映射**：用户上传后**读真实表头 → 对照计划字段 → 不符就让 AI/用户修正（或让 AI 先"看一眼"列名再定映射）→ 校验通过才跑**。确认闸 + 校验器正是为此。
+
+### 下一步
+- 接执行层，且把"用真实文件列名校准计划"作为执行前的第一步。
+
+### 测试状态
+- 无代码改动（网站实测）。
+
+---
+
+## 2026-06-19 — 改进：执行前用真实文件列名校准计划（reconcile）
+
+### 完成
+- 新增 `backend/workflow/reconcile.py`：执行前读**真实上传文件的列名**（CSV header / shapefile 字段），把计划里"列名类" literal 参数（`*_field`/`*_attri`/`*_col` + `quantitative_variables`/`qualitative_variables`）拿去对照：
+  - 仅大小写不同 → **安全自动修**（`from_x`→`FROM_X`）；
+  - 真不存在 → **拦截**（给出该文件可用列清单 + 最接近建议），绝不让工具撞上不存在的列而崩。
+- 接进 `engine.run_plan`：执行前先 reconcile，自动修发 `plan_reconciled` 事件，有硬冲突发 `plan_reconcile_failed` + `workflow_done(reconcile_error)` 并**不跑**。
+
+### 自测（真实 tourism 文件，无 LLM）
+- 正确计划：检查 13 个列参数，0 修 0 冲突 → 可跑。
+- 坏猜 `FROM_LON`：被拦截，列出真实列 `[FID,FROM_X,FROM_Y,...]` + 建议。
+- 大小写 `from_x`：自动修成 `FROM_X`。
+- py_compile 全过。
+
+### 注意 / 下一步
+- reconcile 已进引擎，但引擎还没接到网站（confirm→execute 未做）→ **暂不单独部署**，与执行层一起上 GCP。
+- 下一步（让网站可端到端测）：confirm→execute 接线——存提案计划、用户上传映射到 required_inputs、触发 run_plan（已含 reconcile）、流式 step 事件、跑完喂 LLM 出解读。
+
+### 测试状态
+- ✅ reconcile 本地对真实数据自测通过（正确/坏猜/大小写三例）。
+
+---
+
+## 2026-06-19 — 执行层落地（confirm→execute，对话式/Claude Desktop 风格）+ 部署 GCP
+
+### 用户选 A（对话式）；用巧办法复用现有工具卡，无需重做前端
+- 把 workflow 每步映射成前端**已支持的工具卡事件**（tool_start/tool_progress/tool_result/done），所以系统→网络→流→CO2→FAMD 像一张张工具卡在对话里依次跑出来。
+
+### 新增/改动
+- `session_manager.py`：`set/get_workflow_plan`（提案的计划存 Redis，跨轮确认后取用）。
+- `workflow/catalog.py`：`EXECUTE_WORKFLOW_PLAN_DECLARATION`（args=inputs:[{input_id,file_path}]）+ `input_map_from_llm_args` + WORKFLOW_PROMPT 加"确认后才调 execute、把上传文件对到清单 id"。
+- `workflow/engine.py`：`run_plan_async` —— run_plan 在线程跑（execute_tool 内部 asyncio.run 不能在活动事件循环里），事件经线程安全队列桥接给 async emit。
+- `agent.py`：注册 execute 声明；propose 成功后存计划；新增 `execute_workflow_plan` 处理器——取存的计划、校验上传覆盖+存在、`run_plan_async` 跑（含 reconcile）、把 engine 事件桥成工具卡事件流给前端、跑完回 function_response 让 LLM 写解读。
+- 下载链接：main.py 对所有 `tool_result` 事件做 `_enrich_file_urls`，故每步产出自动带下载 URL，无需额外处理。
+
+### 自测（无 LLM）
+- `run_plan_async` 真实 tourism 数据端到端：事件流 workflow_start→各步 start/progress/done→workflow_done，**5/5 步 done（含 FAMD，本地 famd.R 已修）**，26 文件。
+- agent import OK，propose+execute 均注册（47 声明）。py_compile 全过。
+
+### 部署 + 现可在网站端到端测
+- tar backend → rebuild → up -d；GCP 39 healthy，两函数都 live。
+- **完整链路已通**：说目标→AI 提案+存计划→用户传文件+确认→AI 调 execute→reconcile 校准列名→逐步跑（工具卡）→出下载+解读。LLM 驱动部分由用户在 http://34.42.83.50/ 验。
+
+### 测试状态
+- ✅ 执行层确定性部分（引擎+桥接+映射+校验）本地自测通过；已部署 GCP；端到端对话由用户网站验。
+
+---
+
+## 2026-06-19 — 准备测试包 + 澄清流程（卡片在执行阶段才出现）
+
+### 完成
+- 打包 `TourismTelecoupling_Workflow/upload_bundle/`：6 个 CSV（tourism_Systems / nodes / links / tourism_Flows / flows_with_distance / famd_input）+ 一整套 World_countries_2002 shapefile，供用户在网站"文件夹上传"一次性传。
+- 用户网站再测：规划层正常（AI 正确拆 5 步 + 列文件清单）。用户反馈"没卡片、没 thinking"——澄清：**卡片是执行阶段（确认+上传后真跑各步）才出现**，用户当前只到"提案+等确认"，尚未上传/确认，故无卡片；thinking 块本就未实现。
+
+### 下一步（待用户操作）
+- 用户传 upload_bundle + 说"确认开始跑" → 验证执行层：工具卡是否逐张出现、能否跑出结果。execute 的 LLM 行为只能靠用户网站验。
+- 之后按需补"思考中…"折叠块。
+
+### 测试状态
+- 无代码改动（测试包 + 流程澄清）。
+
+---
+
+## 2026-06-19 — 思考显示（Claude Desktop 式折叠 thinking）+ 部署 GCP
+
+### 后端（agent.py）
+- Gemini 2.5 开 `ThinkingConfig(include_thoughts=True)`（仅 "2.5" 模型加，老模型不支持）；gen_cfg + retry_cfg 都带上。
+- 部件循环区分 `part.thought`：thought 片段 → 发 `thinking` 事件；普通文本 → `text_chunk`。
+
+### 前端（App.jsx）
+- 新增 `ThinkingBlock` 组件：折叠卡，未完成时 "Thinking…" + 脑图标 pulse，完成后 "Thought process"，点击展开看推理。
+- 新增 `thinking` block 类型（渲染 + 事件）：`appendThinkingBlock` 累积流式思考；`finalizeThinking` 在 text_chunk/tool_start/done 时收尾（停 pulse、改标签）。
+- 图标加 `Brain, ChevronDown`。
+
+### 验证 + 部署
+- 后端 py_compile OK；`types.ThinkingConfig(include_thoughts=True)` 在 SDK 可构造（本地 1.75.0，GCP 2.8.0）。
+- tar backend+frontend → build 两镜像（**前端 npm build 成功 = JSX 合法**）→ up -d；39 healthy；前端 bundle 内含 "Thinking" UI；外网 200。
+
+### 现状：完整体验已上 GCP（规划 + 执行 + 思考显示）
+- ⚠️ 思考块是否真出现取决于 Gemini 2.5 是否返回 thought 片段；不返回则块不出现（不报错）。模型须选 Gemini 2.5 Flash。
+- 用户须**硬刷新**网站拿新前端。
+
+### 测试状态
+- ✅ 后端编译 + SDK 校验；前端 build 通过（JSX 合法）；已部署。LLM 思考/执行行为由用户网站验。
+
+---
+
+## 2026-06-19 — 思考改为实时流式（核心：非流式→流式生成）
+
+### 问题
+- 用户反馈：thinking 卡和答案一起在最后出现，想要"加载时思考卡先出、内容不断增长"。根因：agent 用**非流式** `generate_content`，整个回答一次性返回，事件一股脑发。
+
+### 改动（agent.py 核心生成循环）
+- 新增 `_generate_streaming`（替代主生成 + 恢复路径的 `_generate_with_retry`）：用 `client.aio.models.generate_content_stream`（兼容 await/非 await 两种返回），边收增量边发 `thinking`/`text_chunk` 事件（**实时流式**），把所有 part（文本/思考/function_call）组装成 `_StreamedResponse`，使后续 function-call 提取、`contents.append`、空响应恢复逻辑**原样可用**；空流→content.parts=None 触发原恢复。
+- 删掉循环里原"非流式后再统一 emit 文本"那段（改为流式期间已 emit，避免重复）。
+- 保留 429/503 退避重试。
+- 前端 `appendThinkingBlock` 累积增量 → 思考卡实时增长（前端无需再改，上一轮已部署）。
+
+### 自测（mock stream，无真 Gemini）
+- 思考增量(2块)/答案增量(2块)实时分流+累积正确，function_call 组装进 parts，顺序对 → PASS。py_compile OK。
+
+### 部署 + 现状
+- tar backend → rebuild api-server → up -d；39 healthy，/health ok，外网 200。
+- ⚠️ 核心循环改动；组装逻辑已自测，但真实 Gemini 流式+工具+思考行为由用户网站验。dev 环境可回退。
+
+### 测试状态
+- ✅ 流式组装 mock 自测通过 + 编译 + 部署；端到端流式思考由用户网站验。
+
+---
+
+## 2026-06-19 — 思考显示三处修复（滚动条 / 重复 / 滤代码）
+
+用户网站实测流式思考生效，提三个问题，全部修复并部署：
+1. **思考框滚动条**（前端 ThinkingBlock）：内容区加 `max-h-64 overflow-y-auto`。
+2. **思考/回答各出现两次**（agent.py 核心）：根因＝`propose_workflow_plan` 后循环没停、又喂回再生成一轮（二次思考+二次计划，且两份计划还不同）。修：**propose 为本轮终止动作**——`workflow_proposed` 标记后 `break`，不再二次生成；模型该轮若无文字则用 `_format_plan_summary` 确定性摘要兜底。execute 不受影响（仍正常 summary）。
+3. **思考里出现 python 代码块**（前端）：渲染思考时正则滤掉 ```fenced``` 与行内 `code`，只留自然语言。
+
+### 部署 + 验证
+- tar backend+frontend → build 两镜像（前端 npm build 通过）→ up -d；39 healthy，/health ok，外网 200。
+
+### 测试状态
+- ✅ 编译 + 前端 build 通过 + 部署；三处效果由用户硬刷新后网站验。
+
+---
+
+## 2026-06-19 — 思考框排版 + 滚动条加固（前端）
+
+- 用户反馈滚动条没出现。核查部署 bundle：`.max-h-64{max-height:16rem}` + `.overflow-y-auto` **CSS 规则确实已在**（新 hash），判定多半是**浏览器缓存旧 bundle**（软刷新不换 JS）。
+- 加固：滚动条改用**内联 style `maxHeight:'16rem'`**（不依赖 Tailwind purge）；思考内容改用 **ReactMarkdown 渲染**（标题降为加粗、列表/段落规整）、去代码、合并多余空行 → 排版更干净。
+- 部署 frontend-ui（新 bundle `index-DoRcXpS5.js`）；需用户硬刷新。
+- 同时答复用户"何时显示 Thought process"：模型须 2.5 + 该轮 Gemini 产出思考摘要（动脑型请求）才显示；工具执行阶段/简单请求/非 2.5/偶发不返回 → 不显示（正常）。
+
+### 测试状态
+- 无后端改动；前端 build 通过 + 部署；效果待用户硬刷新验。
+
+---
+
+## 2026-06-19 — 修复"下载对话"只导出提问（漏 AI 回答 + 思考）
+
+- 根因：`exportChat` 用 `m.content`，但助手消息内容在 `m.blocks`（text/thinking/tool_status/file_download…），`content` 为空 → 导出只剩用户提问。
+- 修：新增 `blockToMarkdown` + `messageToMarkdown`，导出时把助手 blocks 展平为 markdown——AI 回答(text)、🧠 Thought process(thinking 块加标注)、工具运行/产出文件记录都纳入。
+- 部署 frontend-ui（新 bundle `index-B2zDvw4z.js`）；旧对话也能正确导出（blocks 本就持久化在 localStorage）。需硬刷新。
+
+### 测试状态
+- 无后端改动；前端 build 通过 + 部署；导出效果待用户硬刷新验。
+
+---
+
+## 2026-06-19 — 拟开 gcp-head 分支推 GitHub（发现 .env 真 key 泄露，暂停待用户决定）
+
+### 背景
+- 用户要把 GCP dev 的全部改动单开一条 `gcp-head` 分支推 origin + backup。代码侧已备好提交清单（backend/workflow 模块 + agent/famd.R/nutrition/session_manager + 前端 App.jsx + DEV_LOG/ROADMAP + usecaseLevel_workflow 的设计文档/脚本；排除 PDF 9.7M / OneDrive 49M / SampleData 1.6M / 输出数据）。
+
+### 🔴 安全发现（推之前必须处理）
+- `telecouplingAI-project/.env` 含**真实 Google API key（AIza…）**，且**已被 git 跟踪、已在 `origin/feature/invest-expansion`**（历史早已泄露）。`.env.docker` 也被跟踪。
+- 影响：推 gcp-head 到 origin 不新增暴露（同仓库已含）；但推到 backup（dru1889 个人仓库）会把 live key 扩散到另一仓库。
+- 已向用户提选项：A 先 `git rm --cached .env/.env.docker` + gitignore 再推（推荐）；B 照常推；C 先只推 origin。**并强烈建议轮换该 key（已公开在 GitHub）**。
+
+### 下一步
+- 等用户选 A/B/C；A 则先去跟踪化 env + gitignore 再建分支提交推送。
+
+### 测试状态
+- 无代码改动（git 排查 + 安全告警）。

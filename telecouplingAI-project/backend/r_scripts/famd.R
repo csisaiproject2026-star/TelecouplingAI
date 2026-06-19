@@ -14,8 +14,11 @@ if (length(args) < 1) stop("Usage: Rscript famd.R <config.json>")
 
 cfg <- fromJSON(args[1])
 input_csv  <- cfg$input_csv
-quant_vars <- cfg$quant_vars
-qual_vars  <- cfg$qual_vars
+# Coerce to character vectors. An empty JSON array deserializes to an R list();
+# c(charvec, list()) would coerce the whole thing to a list -> "invalid subscript
+# type 'list'" when only one of quant/qual is supplied (pure PCA / pure MCA).
+quant_vars <- as.character(unlist(cfg$quant_vars))
+qual_vars  <- as.character(unlist(cfg$qual_vars))
 n_comp     <- as.integer(cfg$n_comp)
 handle_na  <- as.logical(cfg$handle_na)
 out_dir    <- cfg$output_dir
