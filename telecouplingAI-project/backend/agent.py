@@ -80,6 +80,12 @@ async def _generate_streaming(client, model_name: str, contents, config, emit,
     live as deltas arrive (so the UI's thinking block grows in real time), then
     returns the fully assembled response. Falls back through the same 429/503 retry."""
     import random, inspect
+    # Per-chunk inactivity watchdog: Gemini 2.5 Flash intermittently opens the stream
+    # (HTTP 200) and then stops emitting — or returns only "thinking" with no answer /
+    # function call. Both leave the user stuck. We abort a silent stream after
+    # _STALL_TIMEOUT and treat an answer-less stream as empty, then retry on a FRESH
+    # connection (stalls are transient → a retry usually succeeds).
+    _STALL_TIMEOUT = 60  # seconds with no new chunk
     for attempt in range(max_retries):
         async with _GEMINI_SEMAPHORE:
             try:
@@ -88,7 +94,12 @@ async def _generate_streaming(client, model_name: str, contents, config, emit,
                     model=model_name, contents=contents, config=config,
                 )
                 stream = await maybe if inspect.isawaitable(maybe) else maybe
-                async for chunk in stream:
+                ait = stream.__aiter__()
+                while True:
+                    try:
+                        chunk = await asyncio.wait_for(ait.__anext__(), timeout=_STALL_TIMEOUT)
+                    except StopAsyncIteration:
+                        break
                     cand = chunk.candidates[0] if getattr(chunk, "candidates", None) else None
                     if not cand or cand.content is None or not cand.content.parts:
                         continue
@@ -101,16 +112,37 @@ async def _generate_streaming(client, model_name: str, contents, config, emit,
                             else:
                                 await _maybe_await(emit({"type": "text_chunk", "content": part.text}))
                             collected.append(part)
+                # An answer-less stream (no function call and no non-thought text — e.g.
+                # "only thinking then stops") is effectively empty; retry fresh.
+                has_real = any(
+                    getattr(p, "function_call", None) is not None
+                    or (getattr(p, "text", None) and not getattr(p, "thought", False))
+                    for p in collected
+                )
+                if not has_real and attempt < max_retries - 1:
+                    logger.warning(f"[agent] Gemini empty/answer-less stream "
+                                   f"(attempt {attempt+1}/{max_retries}), retrying on fresh connection")
+                    await asyncio.sleep((2 ** attempt) * 0.5 + random.uniform(0, 0.5))
+                    continue
                 content = (types.Content(role="model", parts=collected)
                            if collected else types.Content(role="model"))
                 return _StreamedResponse(content)
+            except asyncio.TimeoutError:
+                if attempt < max_retries - 1:
+                    logger.warning(f"[agent] Gemini stream STALLED >{_STALL_TIMEOUT}s with no output "
+                                   f"(attempt {attempt+1}/{max_retries}), retrying on fresh connection")
+                    await asyncio.sleep(0.5 + random.uniform(0, 0.5))
+                    continue
+                raise
             except Exception as e:
                 err_str = str(e).lower()
                 is_rate_limit = "429" in err_str or "quota" in err_str or "resource_exhausted" in err_str
                 is_server_err = "503" in err_str or "unavailable" in err_str
-                if (is_rate_limit or is_server_err) and attempt < max_retries - 1:
+                is_timeout = "timeout" in err_str or "timed out" in err_str or "deadline" in err_str
+                if (is_rate_limit or is_server_err or is_timeout) and attempt < max_retries - 1:
                     wait = (2 ** attempt) + random.uniform(0, 1)
-                    logger.warning(f"[agent] Gemini stream {'rate limit' if is_rate_limit else 'server error'} "
+                    _kind = ("rate limit" if is_rate_limit else "timeout" if is_timeout else "server error")
+                    logger.warning(f"[agent] Gemini stream {_kind} "
                                    f"(attempt {attempt+1}/{max_retries}), retrying in {wait:.1f}s")
                     await asyncio.sleep(wait)
                 else:
@@ -1217,12 +1249,15 @@ TOOLS = [
 # ── Use-case workflow planning + execution layer (confirm-gated) ─────────────
 from workflow.catalog import (
     PROPOSE_WORKFLOW_PLAN_DECLARATION, EXECUTE_WORKFLOW_PLAN_DECLARATION,
+    ADD_WORKFLOW_STEPS_DECLARATION,
     CAPABILITY_CATALOG, WORKFLOW_PROMPT, plan_from_llm_args, input_map_from_llm_args,
+    field_overrides_from_llm_args, file_overrides_from_llm_args,
 )
 from workflow import plan_from_dict, validate_plan
 from workflow.engine import run_plan_async
 TOOLS[0].function_declarations.append(PROPOSE_WORKFLOW_PLAN_DECLARATION)
 TOOLS[0].function_declarations.append(EXECUTE_WORKFLOW_PLAN_DECLARATION)
+TOOLS[0].function_declarations.append(ADD_WORKFLOW_STEPS_DECLARATION)
 
 
 def _format_plan_summary(plan_dict: dict) -> str:
@@ -1239,6 +1274,259 @@ def _format_plan_summary(plan_dict: dict) -> str:
             lines.append(f"- {r.get('label', r.get('id'))}")
     lines.append("\nConfirm and upload these files, and I'll run it.")
     return "\n".join(lines)
+
+
+def _subset_plan_dict(plan_dict: dict, selected_ids: list[str]) -> dict:
+    """Filter a plan dict down to the user-chosen steps (plan card multi-select).
+
+    Keeps only `selected_ids` steps and the required_inputs those steps actually
+    reference (source=input). Returns the original plan unchanged if nothing matches
+    (defensive — better to run the whole plan than an empty one)."""
+    sel = {s for s in selected_ids if s}
+    steps = [s for s in plan_dict.get("steps", []) if s.get("id") in sel]
+    if not steps:
+        return plan_dict
+    used_inputs: set[str] = set()
+    for s in steps:
+        for src in (s.get("inputs") or {}).values():
+            if src.get("source") == "input" and src.get("ref"):
+                used_inputs.add(src["ref"])
+    reqs = [r for r in plan_dict.get("required_inputs", []) if r.get("id") in used_inputs]
+    return {**plan_dict, "steps": steps, "required_inputs": reqs}
+
+
+def _subset_dep_error(plan) -> str | None:
+    """If a kept step consumes a dropped step's output (source=step → missing id),
+    the subset is broken. Return a human message naming the gap, else None."""
+    kept = plan.step_ids
+    for st in plan.steps:
+        for src in st.inputs.values():
+            if src.source == "step" and src.ref not in kept:
+                return (f"step '{st.id}' needs the output of '{src.ref}', which you deselected. "
+                        f"Include '{src.ref}' (or deselect '{st.id}').")
+    return None
+
+
+# ── Deterministic re-plan (plan card "Add & re-plan") ───────────────────────
+# The card sends the kept step ids in a machine token + the new analysis text. The
+# backend keeps those steps EXACTLY and asks the LLM only for the NEW step(s), then
+# merges — so the model can never silently re-add steps the user deselected (the
+# "kept 3, added 1, got 6" bug). The LLM never touches the kept steps.
+_REPLAN_KEEP_RE = re.compile(r"\[\[REPLAN_KEEP=([^\]]*)\]\]", re.IGNORECASE)
+
+
+def _parse_replan_keep(message: str) -> list[str] | None:
+    """Parse the kept step ids from the card's re-plan token.
+    Returns None if the token is absent (caller should keep ALL stored steps — safe
+    default), or a list (possibly empty = user kept none) if the token is present."""
+    m = _REPLAN_KEEP_RE.search(message or "")
+    if not m:
+        return None
+    return [x.strip() for x in m.group(1).split(",") if x.strip()]
+
+
+def _replan_base_subset(plan_dict: dict, keep_ids: list[str]) -> dict:
+    """Exact subset of a plan to keep_ids (no defensive fallback — an empty keep list
+    yields an empty base, unlike _subset_plan_dict). Keeps only the required_inputs the
+    kept steps reference."""
+    keep = {s for s in keep_ids if s}
+    steps = [s for s in plan_dict.get("steps", []) if s.get("id") in keep]
+    used: set[str] = set()
+    for s in steps:
+        for src in (s.get("inputs") or {}).values():
+            if src.get("source") == "input" and src.get("ref"):
+                used.add(src["ref"])
+    reqs = [r for r in plan_dict.get("required_inputs", []) if r.get("id") in used]
+    return {**plan_dict, "steps": steps, "required_inputs": reqs}
+
+
+def _merge_added_steps(base: dict, added: dict) -> dict:
+    """Append the LLM's NEW steps to the deterministically-kept base plan. Kept steps
+    are never modified; colliding new step ids are renamed and their depends_on /
+    source=step refs rewritten. New required_inputs whose id already exists in base are
+    treated as a reuse (deduped)."""
+    base_step_ids = {s.get("id") for s in base.get("steps", [])}
+    base_input_ids = {r.get("id") for r in base.get("required_inputs", [])}
+
+    new_inputs = [r for r in added.get("required_inputs", []) if r.get("id") not in base_input_ids]
+
+    id_map: dict[str, str] = {}
+    used_ids = set(base_step_ids)
+    for s in added.get("steps", []):
+        old = s.get("id") or "step"
+        new = old
+        i = 2
+        while new in used_ids:
+            new = f"{old}_{i}"
+            i += 1
+        id_map[old] = new
+        used_ids.add(new)
+
+    new_steps = []
+    for s in added.get("steps", []):
+        s = {**s, "id": id_map.get(s.get("id"), s.get("id"))}
+        s["depends_on"] = [id_map.get(d, d) for d in (s.get("depends_on") or [])
+                           if id_map.get(d, d) in used_ids]
+        rewired = {}
+        for param, src in (s.get("inputs") or {}).items():
+            src = dict(src)
+            if src.get("source") == "step" and src.get("ref") in id_map:
+                src["ref"] = id_map[src["ref"]]
+            rewired[param] = src
+        s["inputs"] = rewired
+        new_steps.append(s)
+
+    merged_inputs = list(base.get("required_inputs", [])) + new_inputs
+
+    # Auto-declare any input id a NEW step references but nobody declared. The model
+    # generating "only the new step(s)" doesn't know the kept plan's input ids, so when
+    # its new step also needs an existing file it often invents an undeclared id (e.g.
+    # cost-benefit needs the flows table but refers to 'tourism_flows_csv', not the kept
+    # 'flows_table'). Without this the merged plan is invalid ("references unknown
+    # upload"). We add a proper upload slot using the tool's real file kind.
+    known = {r.get("id") for r in merged_inputs}
+    for s in new_steps:
+        kinds = {sp[0]: sp[2] for sp in TOOL_FILE_SPECS.get(s.get("tool"), []) if len(sp) >= 3}
+        for param, src in (s.get("inputs") or {}).items():
+            if src.get("source") == "input" and src.get("ref") and src["ref"] not in known:
+                ref = src["ref"]
+                merged_inputs.append({
+                    "id": ref,
+                    "label": ref.replace("_", " ").strip().title() or ref,
+                    "file_kind": kinds.get(param, "table"),
+                    "description": "Auto-added: a file the added step needs — upload it here.",
+                })
+                known.add(ref)
+
+    return {
+        "case_name": base.get("case_name", "workflow"),
+        "description": base.get("description", ""),
+        "required_inputs": merged_inputs,
+        "steps": list(base.get("steps", [])) + new_steps,
+    }
+
+
+def _apply_field_overrides(plan_dict: dict, overrides: list[dict]) -> dict:
+    """Apply user-stated column/param overrides onto the plan's step literals before
+    running. The planner fills column names from a few-shot (e.g. x_field='LON'); when
+    the user uploads data with different columns and tells us the real names (x_field=
+    'longitude'), we set them here so the run isn't blocked on a column mismatch.
+    Numeric values for non-column params (capacity_per_trip='50') are coerced to numbers."""
+    if not overrides:
+        return plan_dict
+    by_id = {s.get("id"): s for s in plan_dict.get("steps", [])}
+    applied = []
+    for ov in overrides:
+        st = by_id.get(ov.get("step_id"))
+        param, value = ov.get("param"), ov.get("value")
+        if not st or not param or value is None:
+            continue
+        v = value
+        if not param.endswith(("_field", "_attri", "_col")):
+            try:
+                v = int(value)
+            except (TypeError, ValueError):
+                try:
+                    v = float(value)
+                except (TypeError, ValueError):
+                    v = value
+        st.setdefault("inputs", {})[param] = {"source": "literal", "value": v}
+        applied.append(f"{ov['step_id']}.{param}={v}")
+    if applied:
+        logger.info(f"[agent] applied field_overrides: {', '.join(applied)}")
+    return plan_dict
+
+
+def _apply_file_overrides(plan_dict: dict, file_ovr: list[dict]) -> dict[str, str]:
+    """Wire specific step file params directly to specific uploaded files, so a tool can
+    read its OWN data file (e.g. CO2 reads a route/trip CSV, not the flows file the plan
+    wired it to). Mutates plan_dict (adds a synthetic required_input + repoints the step's
+    param) and returns {synthetic_input_id: file_path} to add to the execute inputs map."""
+    extra: dict[str, str] = {}
+    if not file_ovr:
+        return extra
+    by_id = {s.get("id"): s for s in plan_dict.get("steps", [])}
+    applied = []
+    for ov in file_ovr:
+        st = by_id.get(ov.get("step_id"))
+        param, fp = ov.get("param"), ov.get("file_path")
+        if not st or not param or not fp:
+            continue
+        synth = f"_ovr__{ov['step_id']}__{param}"
+        kinds = {sp[0]: sp[2] for sp in TOOL_FILE_SPECS.get(st.get("tool"), []) if len(sp) >= 3}
+        st.setdefault("inputs", {})[param] = {"source": "input", "ref": synth}
+        reqs = [r for r in plan_dict.get("required_inputs", []) if r.get("id") != synth]
+        reqs.append({"id": synth, "label": os.path.basename(fp),
+                     "file_kind": kinds.get(param, "table"),
+                     "description": "Per-step file override."})
+        plan_dict["required_inputs"] = reqs
+        extra[synth] = fp
+        applied.append(f"{ov['step_id']}.{param}={os.path.basename(fp)}")
+    if applied:
+        logger.info(f"[agent] applied file_overrides: {', '.join(applied)}")
+    return extra
+
+
+_KIND_EXTS = {
+    "table": {".csv"},
+    "vector": {".shp", ".geojson", ".gpkg"},
+    "raster": {".tif", ".tiff"},
+    "html": {".html", ".htm"},
+    "shapefile-set": {".shp"},
+}
+
+
+def _name_tokens(s: str) -> set[str]:
+    return {t for t in re.split(r"[^a-z0-9]+", (s or "").lower()) if len(t) >= 3}
+
+
+def _auto_map_inputs(plan, inputs_map: dict[str, str], uploaded: list[dict]) -> dict[str, str]:
+    """Deterministically fill any required input the LLM did NOT map (or mapped to a
+    nonexistent path) by matching the user's actually-uploaded files by file KIND +
+    name overlap. Takes the fragile filename-matching out of the LLM's hands — e.g.
+    required input 'systems_table' (table) auto-binds to the uploaded 'tourism_Systems.csv'.
+
+    Uses GLOBAL-GREEDY assignment (best (input,file) pairs first), so a strong match like
+    flows_csv↔tourism_Flows is claimed before a weak one (causes_csv↔tourism_Flows) can
+    steal that file — otherwise low-overlap inputs grab files out from under better matches."""
+    import difflib
+    by_id = {ri.id: ri for ri in plan.required_inputs}
+    used = {p for p in inputs_map.values() if p}
+    need = [iid for iid in plan.input_ids
+            if not (inputs_map.get(iid) and os.path.exists(inputs_map[iid]))]
+
+    pairs = []  # (score, iid, path)
+    for iid in need:
+        ri = by_id.get(iid)
+        kind = (ri.file_kind if ri else "table").lower()
+        if "shp" in kind or "shape" in kind or "vector" in kind:
+            kind = "vector"
+        elif "rast" in kind or "tif" in kind:
+            kind = "raster"
+        exts = _KIND_EXTS.get(kind) or set().union(*_KIND_EXTS.values())  # unknown -> any data ext
+        key_toks = _name_tokens(f"{iid} {ri.label if ri else ''} {ri.description if ri else ''}")
+        for f in uploaded:
+            path = f.get("path", "")
+            if (os.path.splitext(f.get("filename", ""))[1].lower() not in exts
+                    or path in used or not os.path.exists(path)):
+                continue
+            stem = os.path.splitext(os.path.basename(f["filename"]))[0]
+            ft = _name_tokens(stem)
+            inter = len(key_toks & ft)
+            jacc = inter / (len(key_toks | ft) or 1)
+            ratio = difflib.SequenceMatcher(None, iid.lower(), stem.lower()).ratio()
+            pairs.append(((inter, jacc, ratio), iid, path))
+
+    pairs.sort(key=lambda x: x[0], reverse=True)   # best matches first
+    done_inputs: set[str] = set()
+    for _score, iid, path in pairs:
+        if iid in done_inputs or path in used:
+            continue
+        inputs_map[iid] = path
+        done_inputs.add(iid)
+        used.add(path)
+        logger.info(f"[agent] auto-mapped input '{iid}' -> {os.path.basename(path)}")
+    return inputs_map
 
 
 # ---------------------------------------------------------------------------
@@ -1280,6 +1568,58 @@ _TOOL_BY_NAME: dict[str, types.Tool] = {
     for fd in tool.function_declarations
 }
 
+# Map each function name -> its FunctionDeclaration, so we can surface the tool's
+# REAL parameter contract (names/types/required/descriptions) to the plan card UI
+# instead of relying on the LLM's free-text file descriptions.
+_FD_BY_NAME: dict[str, types.FunctionDeclaration] = {
+    fd.name: fd
+    for tool in TOOLS
+    for fd in tool.function_declarations
+}
+
+
+def _tool_param_contract(tool: str) -> list[dict]:
+    """The authoritative parameter contract for a tool, from its FunctionDeclaration
+    (+ TOOL_FILE_SPECS for which params are files and their kind). Used by the plan
+    card to show, per tool, exactly what files/params it takes."""
+    fd = _FD_BY_NAME.get(tool)
+    if fd is None or fd.parameters is None:
+        return []
+    props = fd.parameters.properties or {}
+    required = set(fd.parameters.required or [])
+    file_kinds = {spec[0]: spec[2] for spec in TOOL_FILE_SPECS.get(tool, []) if len(spec) >= 3}
+    out: list[dict] = []
+    for pname, pschema in props.items():
+        ptype = getattr(pschema.type, "name", str(pschema.type)) if pschema.type is not None else ""
+        out.append({
+            "name": pname,
+            "type": str(ptype),
+            "required": pname in required,
+            "is_file": pname in file_kinds,
+            "file_kind": file_kinds.get(pname),
+            "description": pschema.description or "",
+        })
+    return out
+
+
+def _enrich_plan_for_ui(plan_dict: dict) -> dict:
+    """Add UI-only metadata to the workflow_plan event:
+      * tool_specs: {tool -> param contract}  (authoritative file/param info)
+      * each step's depends_on REWRITTEN to the REAL data dependencies only — i.e.
+        steps it actually consumes via a source=step input. The model's free-form
+        depends_on is unreliable (it adds "logical order" edges with no data behind
+        them), which made independent steps look serial/mixed. Basing the diagram on
+        source=step means truly independent steps correctly show as parallel."""
+    steps = plan_dict.get("steps", [])
+    for s in steps:
+        deps = set()
+        for src in (s.get("inputs") or {}).values():
+            if src.get("source") == "step" and src.get("ref"):
+                deps.add(src["ref"])
+        s["depends_on"] = sorted(deps)
+    tools = {s.get("tool") for s in steps if s.get("tool")}
+    return {t: _tool_param_contract(t) for t in tools if t}
+
 
 def _detect_tool_from_message(message: str) -> str | None:
     """Return the function name that best matches the user message, or None."""
@@ -1288,6 +1628,88 @@ def _detect_tool_from_message(message: str) -> str | None:
         if any(kw.lower() in msg_lower for kw in keywords):
             return tool_name
     return None
+
+
+# High-level analysis goals (use-case level, usually multi-tool) — when one of
+# these is asked WITHOUT a specific single tool, Gemini Flash tends to narrate a
+# plan in prose instead of calling propose_workflow_plan. We detect that intent
+# and FORCE the function call (tool_config mode=ANY) so the plan card renders.
+# Kept BROAD on purpose (any "analyze / assess / impact / case / study ..." request),
+# because users phrase use-cases in open-ended ways (e.g. "分析航线对环境的影响").
+_WORKFLOW_GOAL_KEYWORDS = [
+    "telecoupling", "telecouple", "工作流", "workflow", "pipeline", "端到端", "end-to-end",
+    "整套", "完整", "多步", "multi-step",
+    "分析", "analyze", "analysis", "评估", "assess", "影响", "impact",
+    "案例", "case study", "use case", "use-case", "研究", "量化", "模拟", "simulate",
+    "情景", "scenario", "做一个", "做个", "帮我做",
+]
+
+# Exclusions — messages that look like an analysis word but must NOT spawn a NEW
+# plan card: workflow confirmations / executions, references to existing results,
+# and chit-chat / capability questions.
+_WORKFLOW_GOAL_EXCLUSIONS = [
+    "execute_workflow_plan", "selected_steps", "我确认", "确认运行", "确认并运行", "运行选中",
+    "刚才的结果", "上一步", "这个结果", "这个输出", "之前的结果", "上面的结果",
+    "你是谁", "你能做什么", "你好", "怎么用", "帮助",
+]
+
+
+def _looks_like_workflow_goal(message: str) -> bool:
+    """True if the message reads like a high-level, use-case analysis goal that
+    should propose a workflow (and not a confirmation / result-reference / chit-chat)."""
+    m = message.lower().replace(" ", "")
+    if any(x.replace(" ", "") in m for x in _WORKFLOW_GOAL_EXCLUSIONS):
+        return False
+    return any(kw.replace(" ", "") in m for kw in _WORKFLOW_GOAL_KEYWORDS)
+
+
+# Markers the plan card puts in its "confirm & run" message — used to FORCE
+# execute_workflow_plan so a confirmation deterministically runs (instead of the
+# model narrating "running it…" without calling the function).
+_WORKFLOW_CONFIRM_MARKERS = ["execute_workflow_plan", "selected_steps", "确认并运行"]
+
+
+def _looks_like_workflow_confirm(message: str) -> bool:
+    m = message.lower()
+    return any(x.lower() in m for x in _WORKFLOW_CONFIRM_MARKERS)
+
+
+# Markers the plan card's "Add & re-plan" button puts in its message — used to FORCE
+# add_workflow_steps so a re-plan deterministically generates ONLY the new step(s) and
+# the backend merges them into the kept steps. (User-initiated refinement, not a submit.)
+_WORKFLOW_REPLAN_MARKERS = ["add_workflow_steps", "[[replan_keep="]
+
+
+def _looks_like_workflow_replan(message: str) -> bool:
+    m = message.lower()
+    return any(x.lower() in m for x in _WORKFLOW_REPLAN_MARKERS)
+
+
+# Marker the frontend appends when the user's send carries freshly-attached files.
+# Used (only when a workflow plan is already stored) to deterministically RUN the
+# workflow on the "upload files + send" turn of the confirm→upload→run flow.
+_FILES_ATTACHED_MARKER = "[[files_attached]]"
+
+
+def _looks_like_files_attached(message: str) -> bool:
+    return _FILES_ATTACHED_MARKER in (message or "").lower()
+
+
+# A plain "run it" intent — used as a SECOND trigger so the run can be a TEXT-ONLY send
+# (no files attached) when the files are already in the session. This decouples RUNNING
+# from the fragile file-attached send (browser's "upload then open SSE" handoff sometimes
+# fails to fire the chat). User: upload folder (files land server-side) → then just type
+# "run the workflow" and send → this fires execute against the already-uploaded files.
+_RUN_INTENT_KEYWORDS = [
+    "run the workflow", "run the full workflow", "run the plan", "run all the steps",
+    "run it", "run my", "run all", "execute the workflow", "execute the plan",
+    "start the workflow", "go ahead and run", "运行", "执行", "开始跑", "跑起来", "跑工作流",
+]
+
+
+def _looks_like_run_intent(message: str) -> bool:
+    m = (message or "").lower()
+    return any(k in m for k in _RUN_INTENT_KEYWORDS)
 
 
 # ---------------------------------------------------------------------------
@@ -1421,7 +1843,11 @@ async def run_agent(
     # Phase 1: build system instruction with PRE_EXECUTION skill sections
     pre_execution_context = _build_pre_execution_context()
     system_instruction = (
-        _BASE_SYSTEM_INSTRUCTION
+        "## Language (IMPORTANT)\n"
+        "Always respond in ENGLISH — all explanations, summaries, and plan descriptions — "
+        "regardless of the language the user writes in. Switch to another language ONLY if "
+        "the user explicitly asks you to (e.g. \"请用中文回答\" / \"reply in Chinese\").\n\n"
+        + _BASE_SYSTEM_INSTRUCTION
         + "\n\n" + WORKFLOW_PROMPT
         + "\n\n" + CAPABILITY_CATALOG
         + pre_execution_context
@@ -1481,6 +1907,48 @@ async def run_agent(
         else None
     )
 
+    # Workflow forcing (Flash won't reliably call these functions in AUTO mode):
+    #  * a card "confirm & run" message  -> force execute_workflow_plan
+    #  * a high-level analysis goal       -> force propose_workflow_plan (renders the card)
+    # Confirm takes precedence; single-tool keyword hits opt out of both.
+    _force_confirm = _looks_like_workflow_confirm(user_text)
+    # Only FORCE a brand-new plan card for the FIRST analysis goal in a session.
+    # Once a plan has already been proposed this session, follow-up turns (uploading
+    # files, "run any analysis you can", "complete the workflow") must NOT spawn a
+    # fresh card. That was the "plan card keeps popping up every turn" bug: generic
+    # words like "analysis"/"workflow" in normal follow-ups re-triggered propose on
+    # every message. With a plan present we drop to AUTO so the model executes or
+    # answers; the supplement/"change the plan" box still re-proposes (its message
+    # names a tool / explicitly asks to re-propose), and WORKFLOW_PROMPT tells the
+    # model to call execute (not re-propose) on follow-ups.
+    _has_plan = _sm.get_workflow_plan(session_id) is not None
+    # The "Add & re-plan" button explicitly asks for a new plan card. Force propose
+    # regardless of _has_plan / single-tool detection (it's a deliberate refinement).
+    _force_replan = (not _force_confirm) and _looks_like_workflow_replan(user_text)
+    _force_workflow = (not _force_confirm and not _force_replan and detected_tool_name is None
+                       and not _has_plan
+                       and _looks_like_workflow_goal(user_text))
+    # Run flow: confirm the plan -> AI lists the files to upload -> the user uploads
+    # files (+ states any column/param values) and sends. The frontend tags a send that
+    # carries freshly-attached files with a marker; with a plan already stored (and not a
+    # confirm / re-plan) that turn deterministically RUNS the workflow — Flash otherwise
+    # narrates "running it…" without calling execute. field_overrides from the user's text
+    # still apply. (A marker, not "session has any upload", so later follow-up questions
+    # after a run don't re-trigger the whole workflow.)
+    # Trigger execute when EITHER: the send carried fresh files (marker), OR it's a
+    # plain "run it" with files already uploaded this session (text-only run — lets the
+    # run sidestep the file-attached send entirely if that handoff flaked).
+    _has_uploads = bool(_sm.get_uploaded_files(session_id))
+    _force_execute_on_upload = (_has_plan and not _force_confirm and not _force_replan
+                                and (_looks_like_files_attached(user_text)
+                                     or (_has_uploads and _looks_like_run_intent(user_text))))
+    _forced_fn = ("execute_workflow_plan" if (_force_confirm or _force_execute_on_upload)
+                  else "add_workflow_steps" if _force_replan
+                  else "propose_workflow_plan" if _force_workflow else None)
+    if _forced_fn:
+        logger.info(f"[agent] forcing function call → {_forced_fn} "
+                    f"(has_plan={_has_plan}, replan={_force_replan}, on_upload={_force_execute_on_upload})")
+
     # run_crop_pollination consistently returns empty content at temperature=0.
     # Start at 0.9 directly so it passes on the first call without retries.
     # (run_Sediment_Delivery_Ratio_SDR behaves inconsistently at 0.9 and recovers faster via retries at 0.)
@@ -1493,18 +1961,53 @@ async def run_agent(
     # a collapsible "Thinking…" block. Older models don't accept the config.
     thinking_cfg = types.ThinkingConfig(include_thoughts=True) if "2.5" in model_name else None
 
+    # After a plan card is proposed, run ONE more turn (functions disabled) to write
+    # a short plain-language intro shown ABOVE the card (方案A layout). See below.
+    explain_only_next = False
+
     for iteration in range(max_iterations):
         logger.info(f"[agent] iteration={iteration} session={session_id} model={model_name}")
 
         # Use the single-tool list on iteration 0 (when we know which tool to call),
-        # then switch to full TOOLS list for follow-up iterations.
-        active_tools = _single_tool if (iteration == 0 and _single_tool is not None) else TOOLS
+        # then switch to full TOOLS list for follow-up iterations. A FORCED workflow
+        # function must be in scope, so never narrow to a single tool when forcing
+        # (e.g. a re-plan message that also mentions "cost-benefit" must still be able
+        # to call propose_workflow_plan).
+        if iteration == 0 and _forced_fn:
+            active_tools = TOOLS
+        elif iteration == 0 and _single_tool is not None:
+            active_tools = _single_tool
+        else:
+            active_tools = TOOLS
 
+        # On iteration 0, force the relevant workflow function (propose or execute)
+        # via mode=ANY restricted to that one function. Later iterations stay AUTO so
+        # the model can summarize / answer normally. The post-plan "explain" turn
+        # disables functions (mode=NONE) so it only writes the intro text.
+        _tool_config = None
+        if explain_only_next:
+            _tool_config = types.ToolConfig(
+                function_calling_config=types.FunctionCallingConfig(mode="NONE")
+            )
+        elif iteration == 0 and _forced_fn:
+            _tool_config = types.ToolConfig(
+                function_calling_config=types.FunctionCallingConfig(
+                    mode="ANY", allowed_function_names=[_forced_fn],
+                )
+            )
+
+        # Disable thinking when we FORCE a function call (mode=ANY): with thinking on,
+        # 2.5 Flash often streams only "thinking" parts and never emits the forced
+        # function_call → an answer-less turn that retries fruitlessly (the workflow
+        # "卡住 / only Thinking" symptom). No thinking on those turns = the call lands.
+        _forcing_now = (iteration == 0 and _forced_fn is not None)
         gen_cfg = types.GenerateContentConfig(
             system_instruction=system_instruction,
             tools=active_tools,
             temperature=base_temperature,
-            thinking_config=thinking_cfg,
+            # The post-plan explain turn (and any forced-call turn) shouldn't think.
+            thinking_config=(None if (explain_only_next or _forcing_now) else thinking_cfg),
+            tool_config=_tool_config,
         )
 
         response = await _generate_streaming(
@@ -1593,11 +2096,20 @@ async def run_agent(
                 except Exception as pe:  # malformed plan args
                     plan_dict = tool_input
                     plan_errors = [f"could not parse plan: {pe}"]
+                # Enrich with the tools' real param contracts + complete the DAG
+                # (depends_on ∪ source=step edges) so the card can show structure +
+                # authoritative per-tool files/params.
+                try:
+                    tool_specs = _enrich_plan_for_ui(plan_dict)
+                except Exception:
+                    logger.exception("[agent] plan UI enrich failed")
+                    tool_specs = {}
                 await _maybe_await(event_callback({
                     "type": "workflow_plan",
                     "plan": plan_dict,
                     "valid": not plan_errors,
                     "errors": plan_errors,
+                    "tool_specs": tool_specs,
                 }))
                 if plan_errors:
                     fr = {"status": "invalid_plan", "errors": plan_errors,
@@ -1622,6 +2134,59 @@ async def run_agent(
                 )
                 continue
 
+            # ── Deterministic re-plan: keep the user's chosen steps EXACTLY, take only
+            # the LLM's NEW step(s), and merge. The model cannot re-add deselected steps.
+            if tool_name == "add_workflow_steps":
+                from shared.session_manager import SessionManager as _SMx
+                _smx = _SMx()
+                stored = _smx.get_workflow_plan(session_id)
+                keep_ids = _parse_replan_keep(user_text)   # None = token absent → keep all
+                try:
+                    added = plan_from_llm_args(tool_input)  # new steps + new required_inputs
+                    if stored:
+                        if keep_ids is None:
+                            base = dict(stored)                                  # safe default: keep all
+                        elif keep_ids:
+                            base = _replan_base_subset(stored, keep_ids)         # keep the ticked ones
+                        else:
+                            base = {**stored, "steps": [], "required_inputs": []}  # kept none
+                        plan_dict = _merge_added_steps(base, added)
+                    else:
+                        plan_dict = added                                        # no prior plan → fresh
+                    plan = plan_from_dict(plan_dict)
+                    plan_errors = validate_plan(plan, available_tools=set(TOOL_FILE_SPECS))
+                except Exception as pe:
+                    plan_dict = tool_input
+                    plan_errors = [f"could not build updated plan: {pe}"]
+                try:
+                    tool_specs = _enrich_plan_for_ui(plan_dict)
+                except Exception:
+                    logger.exception("[agent] plan UI enrich failed")
+                    tool_specs = {}
+                await _maybe_await(event_callback({
+                    "type": "workflow_plan", "plan": plan_dict,
+                    "valid": not plan_errors, "errors": plan_errors, "tool_specs": tool_specs,
+                }))
+                if plan_errors:
+                    fr = {"status": "invalid_plan", "errors": plan_errors,
+                          "instruction": "Fix these issues and call add_workflow_steps again with corrected new step(s)."}
+                else:
+                    try:
+                        _smx.set_workflow_plan(session_id, plan_dict)
+                    except Exception:
+                        logger.exception("[agent] failed to stash merged workflow plan")
+                    workflow_proposed = True
+                    plan_summary_fallback = _format_plan_summary(plan_dict)
+                    fr = {"status": "plan_updated", "n_steps": len(plan_dict.get("steps", [])),
+                          "instruction": ("Updated plan saved. Briefly tell the user you ADDED the new "
+                                          "step(s) to their kept steps (do not re-describe the kept steps "
+                                          "in detail), and ask them to review the new card and confirm. "
+                                          "Do NOT claim it has run.")}
+                function_response_parts.append(
+                    types.Part.from_function_response(name=tool_name, response={"result": fr})
+                )
+                continue
+
             # ── Workflow execution: run the confirmed plan (reconcile + stream each step).
             if tool_name == "execute_workflow_plan":
                 from shared.session_manager import SessionManager as _SMx
@@ -1633,8 +2198,49 @@ async def run_agent(
                             "status": "no_plan",
                             "instruction": "No saved plan; call propose_workflow_plan first."}}))
                     continue
+                # Plan-card multi-select: run only the steps the user ticked.
+                selected_steps = [s for s in (tool_input.get("selected_steps") or []) if s]
+                if selected_steps:
+                    stored = _subset_plan_dict(stored, selected_steps)
+                # Apply user-stated overrides so the run matches the user's ACTUAL data:
+                #   * field_overrides — real column names / numeric params per step
+                #   * file_overrides  — point a step at its own uploaded file (e.g. CO2's
+                #                       route/trip CSV instead of the flows file)
+                overrides = field_overrides_from_llm_args(tool_input)
+                file_ovr = file_overrides_from_llm_args(tool_input)
+                if overrides:
+                    stored = _apply_field_overrides(stored, overrides)
+                extra_inputs = _apply_file_overrides(stored, file_ovr)
+                if overrides or file_ovr:
+                    try:
+                        _sm.set_workflow_plan(session_id, stored)  # persist so a retry keeps them
+                    except Exception:
+                        logger.exception("[agent] failed to persist overrides")
                 wf_plan = plan_from_dict(stored)
-                inputs_map = input_map_from_llm_args(tool_input)
+                if selected_steps:
+                    dep_err = _subset_dep_error(wf_plan)
+                    if dep_err:
+                        function_response_parts.append(types.Part.from_function_response(
+                            name=tool_name, response={"result": {
+                                "status": "bad_subset", "error": dep_err,
+                                "instruction": "Tell the user this dependency and ask them to adjust the selection."}}))
+                        continue
+                # File binding is DETERMINISTIC, not LLM-driven: the model's `inputs`
+                # mapping has been unreliable (wrong/missing/hallucinated paths that also
+                # poison auto-map's "already used" set). So we seed only with the user's
+                # explicit file_overrides, then auto-map the rest from the session's real
+                # uploads by kind + name overlap (validated 7/7 on the tourism set). The
+                # LLM's `inputs` arg is used only as a last-resort fallback for any input
+                # auto-map still couldn't fill.
+                llm_inputs = input_map_from_llm_args(tool_input)
+                inputs_map = dict(extra_inputs)   # file_overrides (explicit) win
+                try:
+                    inputs_map = _auto_map_inputs(wf_plan, inputs_map, _sm.get_uploaded_files(session_id))
+                except Exception:
+                    logger.exception("[agent] auto-map inputs failed")
+                for k, v in llm_inputs.items():   # fallback only where still unmapped
+                    if k not in inputs_map and v and os.path.exists(v):
+                        inputs_map[k] = v
                 unmapped = sorted(wf_plan.input_ids - set(inputs_map))
                 missing = sorted([p for p in inputs_map.values() if not os.path.exists(p)])
                 if unmapped or missing:
@@ -1817,9 +2423,29 @@ async def run_agent(
                 getattr(p, "text", None) and not getattr(p, "thought", False)
                 for p in candidate.content.parts
             )
-            if not has_answer_text and plan_summary_fallback:
-                await _maybe_await(event_callback({"type": "text_chunk", "content": plan_summary_fallback}))
-            break
+            if has_answer_text:
+                # Model already wrote an intro alongside the call — done.
+                break
+            # 方案A: the forced propose call emitted no text. Run ONE more turn with
+            # functions DISABLED to write a short plain-language intro, which streams
+            # in ABOVE the card (the frontend pins the plan card to the bottom of the
+            # message). mode=NONE makes it impossible to re-propose / duplicate.
+            # (candidate.content — the model's function_call turn — was already
+            # appended above at line ~1671, so only the function response + nudge here.)
+            contents.append(types.Content(role="user", parts=function_response_parts))
+            contents.append(types.Content(role="user", parts=[types.Part.from_text(
+                text=("Write a clear, fairly detailed explanation (4–6 sentences) in ENGLISH "
+                      "(unless the user explicitly asked for another language): first the overall idea and goal of this "
+                      "analysis plan, then walk through each step in order — what it does and why "
+                      "it's needed (organized around the telecoupling components: systems / flows / "
+                      "effects / causes) — and note whether the steps run in parallel or have a "
+                      "sequential dependency. Write for a non-technical user: clear and logical. "
+                      "End by asking the user to tick the steps to run in the plan card below, "
+                      "upload the needed files, and click Confirm. Do NOT list tool function names "
+                      "or file parameter names (the card already has them). Do NOT call any function."))]))
+            explain_only_next = True
+            continue
+        explain_only_next = False
 
         # Feed all function responses back to Gemini for final reply
         contents.append(

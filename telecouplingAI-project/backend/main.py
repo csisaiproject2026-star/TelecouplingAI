@@ -108,6 +108,7 @@ async def chat_endpoint(
     message: str = Form(""),
     model: str = Form(None),
     files: list[UploadFile] = File(default=[]),
+    paths: list[str] = Form(default=[]),   # folder-upload relative paths (parallel to files)
     x_session_id: str | None = Header(default=None),
 ):
     sm = get_session_manager()
@@ -146,7 +147,8 @@ async def chat_endpoint(
     if files:
         upload_dir = os.path.join(settings.UPLOADS_DIR, session_id)
         os.makedirs(upload_dir, exist_ok=True)
-        for uf in files:
+        upload_root = Path(upload_dir).resolve()
+        for i, uf in enumerate(files):
             if not uf.filename:
                 continue
 
@@ -157,11 +159,18 @@ async def chat_endpoint(
                 logger.info(f"[upload] Skipped unsupported file: {uf.filename}")
                 continue
 
-            dest = os.path.join(upload_dir, uf.filename)
+            # Preserve folder structure when a whole folder is sent with the chat
+            # (parallel `paths` field carries each file's relative path).
+            rel = _safe_relpath(paths[i] if i < len(paths) else "", uf.filename)
+            dest = os.path.join(upload_dir, *rel.split("/"))
+            if not str(Path(dest).resolve()).startswith(str(upload_root)):
+                rel = os.path.basename(uf.filename)
+                dest = os.path.join(upload_dir, rel)
+            os.makedirs(os.path.dirname(dest), exist_ok=True)
             async with aiofiles.open(dest, "wb") as f:
                 await f.write(await uf.read())
             sm.add_uploaded_file(session_id, dest)
-            uploaded.append({"filename": uf.filename, "path": dest})
+            uploaded.append({"filename": rel, "path": dest})
             logger.info(f"[upload] {uf.filename} → {dest}")
 
     # Include files previously uploaded via /api/upload in this session

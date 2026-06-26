@@ -4321,3 +4321,745 @@ Git commit: `6373c5f`
 
 ### 测试状态
 - 无代码改动（git 排查 + 安全告警）。
+
+---
+
+## 2026-06-19 — 开 gcp-head 分支推 GitHub（origin 成功 / backup token 失效）
+
+- 用户选 B（不处理 .env key，照常推）。
+- 建 `gcp-head` 分支，选择性提交 commit `02b5b0b`（17 文件 +2152/−23）：backend/workflow 模块 + agent.py(流式/规划/执行) + famd.R/nutrition/session_manager 修复 + 前端 App.jsx(思考块/导出) + WORKFLOW_DESIGN.md + tourism 案例文档/脚本。**排除** 大数据（PDF/OneDrive/SampleData/输出）；`.env`(含真 key)未触碰（早已在历史里）。
+- ✅ 推 `origin`（csisaiproject2026-star/TelecouplingAI）成功，新分支 gcp-head。
+- ❌→⏭️ 推 `backup`（dru1889 个人仓库）失败：嵌在 remote URL 的 GitHub PAT 已失效（git 转求密码、非交互失败）；`gh` 未安装、凭据管理器无有效令牌。**用户决定跳过 backup**（origin 已有 gcp-head，代码不会丢）。
+
+### 测试状态
+- ✅ 代码已提交并推 origin（gcp-head = 02b5b0b）；backup 按用户决定跳过。
+
+---
+
+## 2026-06-19 — 本日收尾小结（GCP dev 当前状态）
+
+### 今天在 GCP dev 上完成并部署的
+- **修复**：BUG6 假渲染、BUG7 营养静默空图、FAMD 纯定量/纯定性崩（famd.R）。
+- **Use-case workflow 功能（全新）**：
+  - 引擎 `backend/workflow/`（schema/validator/orchestrator + reconcile 列名校准）。
+  - LLM 规划层 `propose_workflow_plan` + 执行层 `execute_workflow_plan`（对话式：目标→计划→确认→逐步跑成工具卡→解读；propose 终止本轮防重复）。
+  - 流式生成：Gemini 2.5 思考摘要实时流出 → 前端可折叠 Thinking 块（流式增长/滚动条/去代码/markdown 排版）。
+  - 修复"下载对话"漏 AI 回答+思考。
+- 全部已部署 GCP（39 容器 healthy），并以 `gcp-head` 分支推到 origin（commit 02b5b0b）。
+
+### 状态 / 待办（下次接着做）
+- ⏳ **完整端到端 workflow 测试待用户在网站做**：propose→文件夹上传 `upload_bundle`→确认→看 5 步跑出结果。LLM 的文件映射/执行行为只能网站验。
+- 🔴 **MSU 全程未动**；GCP 成熟后回灌（清单见 memory `project_msu_sync_pending`：famd 修复 + BUG6/7 + workflow）。
+- 🔴 **`telecouplingAI-project/.env` 含真 Google key 且已在 GitHub**——建议轮换（用户暂不处理）。
+- ⏭️ backup 远程 token 失效，未推（origin 已备份）。
+- 🟡 未做：前端独立"计划卡 + 上传槽"UI（执行暂复用工具卡）。
+
+### 测试状态
+- 当日改动均编译/自测/部署通过；端到端 LLM 行为待用户网站验。
+## 2026-06-20 — 整理 tourism use-case 文件夹上传测试数据包
+### 完成内容
+- 将散落的 tourism 数据整理为单一上传文件夹，供"文件夹上传 → workflow 端到端运行"实验。
+- 核对完整性：`tourism_Systems.csv` / `tourism_Flows.csv` / `nodes.csv` / `links.csv` 与源 `SampleData_TourismTelecoupling/` 逐字节一致；2 个预处理产物（`flows_with_distance.csv` 49 条流带 length_km、`famd_input.csv` 56 行 affin/gdplog/dist）齐全；`World_countries_2002` 整套 shapefile（8 sidecar）在。
+- 对照 `tourism_plan.json`：6 个物理文件正好覆盖 plan 的 7 个逻辑输入（flows 表 / flows+distance 表是两个不同 CSV，world_countries 为 shapefile）。
+### 关键变更文件
+- `usecaseLevel_workflow/TourismTelecoupling_Workflow/upload_bundle/` → 重命名为 `Tourism_AllData_Upload/`（命名更直白；纯输入包，无脚本/输出杂物）。
+- 新增 `Tourism_AllData_Upload/README_DATA.md`：每个文件对应的工具/步骤、字段参数映射、可直接复制的运行 prompt。
+### 关键决策
+- 用重命名而非复制，避免 1.9M 测试数据重复与两个同内容文件夹的混淆。
+- README 放进文件夹内：folder upload 会一并上传，read_file 支持 .md，能帮 workflow 规划器读懂数据用途。
+- 本目录属测试数据，按"只推代码"惯例不入 git。
+### 测试状态
+- 数据完整性核对通过（diff 一致 + 行数/表头确认）。folder-upload 端到端 workflow 运行待用户在网站实验。
+### 下一步
+- 用户实跑：浏览器选 `Tourism_AllData_Upload` 文件夹整传，贴 README 里的 prompt，验证 workflow 引擎能否规划+跑通 5 步。
+
+### 追加：网站实跑文件夹上传 workflow（同日）
+- 在 GCP dev（http://34.42.83.50/，模型 GEMINI-2.5-FLASH）实测"先问'能做旅游生态分析吗' → 文件夹上传 → 跑 workflow"。
+- 第一次规划（我输入的较短 prompt）：LLM 只规划 3 步 = Systems→Flows→CO2，要 systems_csv + flows_csv(含 length_km)。与我们的 tourism_Systems.csv / flows_with_distance.csv 对得上。
+- 用户接管手动重试，LLM 这次规划 5 步，额外加了 scenic_quality + habitat_quality，索要 dem/structures/aoi/lulc/threats/sensitivity —— **这套卧龙 SampleData 没有这些数据**（WORKFLOW.md 早已确认不带 LULC 栅格）。即 LLM 规划"超纲"，把案例没有的步骤也排了进去。
+- 工具限制发现：浏览器自动化的 `mcp file_upload` 已**不再接受本机文件路径**（需内联文件内容，但 schema 未暴露该参数）→ 自动化无法直接喂本地文件；可用页面 JS 构造 File 注入文件夹输入（前端 `f.webkitRelativePath || f.name` 对扁平上传安全）。本次用户改为手动操作，未走 JS 注入。
+### 关键决策/结论
+- 规划不稳定：同一案例两次规划步数不同（3 vs 5），且会排入无数据的步骤。后续 workflow 引擎需要"按可用数据约束规划"或在缺输入时优雅跳过/提示，而非排进去再缺文件。
+- 给用户的指引：上传 `Tourism_AllData_Upload`；建议先回复 LLM 把范围收窄到有数据的 3 步，或直接上传以观察缺数据时的反应。
+### 下一步
+- 用户手动实跑，回贴结果；据此判断是否需要给 workflow 规划阶段加"可用输入清单"约束，避免规划出无数据步骤。
+- 暂停点：用户反馈"那个有一个问题"但未展开；已请其说明卡点/报错，待回复后继续定位（无新代码改动）。
+- 修订(按用户反馈)：撤回"禁止 habitat/scenic"硬约束——这两步也可能有用、且用户后续会自行选择。改为软措辞"这 5 步是 tourism telecoupling 的良好起点，可按用户目标/数据再加 habitat/scenic/cost-benefit 等"。仅保留 Wolong→通用 tourism telecoupling 的解绑。
+- 状态：catalog.py 改动(解绑+软措辞)本地完成、语法通过，**未部署 GCP**；等用户确认是否部署。
+
+### 部署：catalog.py few-shot 解绑改动 → GCP 上线
+- scp 单文件 catalog.py → ~/csis-platform/telecouplingAI-project/backend/workflow/，确认服务器为新版。
+- docker build -t csic_backend:latest（COPY 在 Step4，conda/pip 层全缓存，**1.3s**）；docker compose up -d --force-recreate api-server；docker compose restart nginx(IP cache gotcha)。
+- 验证：tele-backend 容器内 catalog.py = 新版；容器 Up(healthy)；经 nginx /health=200。仅动 api-server，33 worker 未碰(不读 catalog.py)。
+### 测试状态
+- 已上线 http://34.42.83.50/，待用户用"旅游生态分析"措辞复跑，确认是否命中通用 tourism 5 步(含 FAMD+网络分组)。
+
+### 修订+部署：恢复"工具名+文件详解"摘要格式（按用户反馈）
+- 解绑已验证生效：计划现含网络分组+FAMD(5步)。但用户指出新输出丢了工具名、文件说明太简，要求恢复旧格式。
+- 改 catalog.py 两处：①few-shot 收回精简版(只留通用化，删掉上次多加的列名caveat/起点说明，回应"改太多了")；②WORKFLOW_PROMPT 强制：每步报 run_xxx 工具名、每个 required_input 的 description 写明"是什么+需要哪些列"。
+- 部署：scp→docker build(缓存)→up --force-recreate api-server→restart nginx。容器内确认新代码、Up(healthy)、/health=200。
+### 测试状态
+- 已上线，待用户新开对话复跑，确认：5步(含网络分组+FAMD) + 每步带工具名 + 文件有列级说明。
+- 状态：格式恢复改动已部署 GCP 并验证(healthy/health=200)，等用户新开对话复跑确认工具名+文件列级说明是否回来。
+
+### 新功能：交互式工作流"计划卡"（多选步骤 + 补充重规划）
+- 需求：propose 出的计划改成像 Claude Desktop 那样的卡片，显示每步工具名，可多选要跑的步骤，"其他"框补充分析类型。
+- 用户拍板：①确认=只跑勾选步骤(后端加子集过滤) ②补充框=重新规划出新卡片。
+- 发现：后端早已发结构化 `workflow_plan` 事件(plan+valid+errors)，但**前端从未处理**，只渲染文字摘要。本功能=前端渲染该事件 + 后端子集执行。
+- 后端改动(agent.py + workflow/catalog.py)：
+  - execute_workflow_plan 声明加 `selected_steps`(可选 step id 数组)；WORKFLOW_PROMPT 说明子集用法。
+  - agent.py 加 `_subset_plan_dict`(按选中 step 过滤 steps + 仅保留被引用的 required_inputs) 和 `_subset_dep_error`(选中步依赖被去掉步的 source=step 时报错)；execute 分支应用。
+- 前端改动：
+  - 新组件 `components/WorkflowPlanCard.jsx`：组件徽标(Systems/Agents/Flows/Causes/Effects)+工具名代码块+多选复选框(默认全选)；按当前勾选动态列出需上传文件(含列说明，镜像后端过滤逻辑)；"其他/补充"输入框；"确认并运行选中的N步"按钮。确认→拼出含 selected_steps id 的消息走 handleSend；补充→拼出重规划消息走 handleSend；提交后禁用防重复。
+  - App.jsx：import 组件；handleSSEEvent 加 `workflow_plan` case→appendBlock；MessageContent 加 onPlanConfirm 透传；block 渲染加 case；调用点传 onPlanConfirm={handleSend}；blockToMarkdown 加导出 case。
+- 本地 `npm run build` 通过(1523 模块,3.6s)；后端 ast 语法通过。
+- 部署：scp 4 文件→GCP；docker build backend(缓存)+frontend；up --force-recreate api-server frontend-ui；restart nginx。验证 tele-backend healthy / tele-frontend Up / site+health=200 / 服务的 bundle 哈希=本地构建(index-C5_dsbPz.js)。
+### 测试状态
+- 已上线。自测浏览器时窗口反复自动 resize 导致"发送"误点欢迎页示例卡(发出了"Model crop yield"无关对话，侧栏多一条可删)，未完成可视化确认。改用 find/ref 操作时用户接手自测。
+### 下一步
+- 用户自测计划卡：卡片渲染 / 多选 / 确认只跑选中步 / 补充重规划。异常截图反馈再修。
+
+### 调试：计划卡不显示 → 定位为"模型不调用函数" → 强制调用修复
+- 现象：前端部署后卡片仍不出，只出文字。排查：①浏览器缓存旧 index.html(B2zDvw4z) 干扰→硬刷新得新包(C5_dsbPz)；②服务器端确认新包含卡片代码。③仍不出。
+- 用 `__cardtest__` 临时后端钩子(写死样例 workflow_plan)在 Chrome 验证：**卡片渲染完全正常**→证明前端没问题，问题在逻辑。
+- 服务器 curl 复测 SSE 事件类型：真实 prompt 只有 thinking/text_chunk/done，**无 workflow_plan**→模型(Gemini 2.5 Flash)在 AUTO 模式下把计划写成文字，没调用 propose_workflow_plan(系统提示里 CAPABILITY_CATALOG 详述了步骤，它照着 narrate)。
+- 修复(agent.py)：加 `_looks_like_workflow_goal()` 检测"分析目标"意图(telecoupling/工作流/旅游生态分析/做一个分析…等关键词，且未命中单工具)；iteration 0 时用 `types.ToolConfig(FunctionCallingConfig(mode="ANY", allowed_function_names=["propose_workflow_plan"]))` **强制调用**该函数；后续 iteration 仍 AUTO。容器已验证 types.ToolConfig 可用。
+- 清理：删除 main.py 的 __cardtest__ 钩子 + _CARD_TEST_PLAN；卡片下冗余英文摘要(_format_plan_summary)改为一句短引导语(workflow_proposed 且无模型文字时)。
+- 验证：服务器 curl 真实 prompt→含 workflow_plan;__cardtest__→无 workflow_plan(钩子已删)。Chrome 实测两种措辞("旅游生态的分析"/"分析卧龙旅游 telecoupling")均渲染完整卡片(5步+组件标签+工具名+文件列说明+多选+补充框+确认按钮)+短引导语。
+### 部署
+- agent.py/main.py 多轮 scp→docker build(缓存)→up --force-recreate api-server。前端 App.jsx + WorkflowPlanCard.jsx 已于前一步部署(frontend-ui 重建)。
+### 测试状态
+- 计划卡端到端打通并上线 GCP。待真实点"确认并运行"跑子集执行(selected_steps 过滤)的实测。
+### 下一步
+- 用户实测：勾选子集→确认→是否只跑选中步；补充框→是否重新规划出新卡片。
+
+### 修复：计划卡只对部分 use-case 触发 → 广义"分析意图"检测 + 确定化确认/执行
+- 问题(用户反馈)："帮我分析一个航线对环境影响的案例"不弹卡片——原 _looks_like_workflow_goal 是窄关键词白名单(只认 telecoupling/旅游生态/工作流…)，航线案例一个没命中。
+- 改 agent.py：
+  - _WORKFLOW_GOAL_KEYWORDS 扩成广义分析意图(分析/评估/影响/案例/研究/量化/模拟/情景/analyze/assess/impact/case/做一个/帮我做…)。
+  - 新增 _WORKFLOW_GOAL_EXCLUSIONS：排除确认/执行(execute_workflow_plan/selected_steps/我确认/确认并运行/运行选中)、结果引用(刚才的结果/这个结果/上一步…)、闲聊(你好/你是谁/你能做什么/帮助) → 防止误弹新卡。
+  - 新增 _looks_like_workflow_confirm + 确定化 force：确认消息→强制 execute_workflow_plan；分析目标→强制 propose_workflow_plan(单工具关键词命中则都不强制)。mode=ANY 限定单函数。
+- 验证：curl "帮我分析一个航线对环境影响的案例"→有 workflow_plan；"你好"→无。Chrome 实测航线案例渲染 2 步卡片(radial_flows+co2，模型自选工具正确)+航线CSV列说明+短引导。
+### 测试状态
+- 任意 use-case 分析意图均能触发计划卡(广义检测)。闲聊/确认/结果引用不误触发。
+### 下一步
+- 仍待实测：上传文件→点"确认并运行"→子集执行(force execute 已加，selected_steps 过滤)；补充框→re-plan。检测器为启发式，个别冷门措辞可能漏，按需补关键词。
+- 状态(2026-06-21)：广义检测器已部署 GCP 并验证(航线案例出卡/你好不出卡)；计划卡功能上线，等用户实测"上传→确认并运行"子集执行链路。
+
+### 设计讨论：计划卡触发的兜底方案（待用户拍板，无代码改动）
+- 确认 "工作流/workflow" 已在 _WORKFLOW_GOAL_KEYWORDS 中。
+- 反驳"2+ 工具 → 弹卡"作字面兜底：真实失败模式是 Flash AUTO 下零函数调用(narrate 文字)，工具数=0，从 0 数不到 2，永不触发→不成立。
+- 提出双层方案：①命中分析关键词→强制 propose(高精度)；②未命中但像"要干活"的请求(非闲聊/确认/旧结果引用)→强制 mode=ANY 允许"所有工具+propose"，由 LLM 自主路由(召回长尾)。
+- 诚实硬伤：启发式无法根治"新请求 vs 多轮任务内补充对话"的区分；强制路由会在边界误触发，只能缓解不能消除。
+- 待用户决定是否实现双层兜底。
+- 澄清(更正前条)：用户的"2+ tool"是指**规划时判断标准**(LLM 判断需 2+ 工具→用卡片)，非执行后计数。该标准已是 WORKFLOW_PROMPT 意图、无需改；真正问题仅是可靠性(Flash 判断了却 narrate 不调函数)。共识方向：用 iteration0 强制路由(mode=ANY 允许"所有单工具+propose")让模型的 1-vs-2+ 判断必须落地，堵死 narrate。待用户给"开做"即实现+部署+测(旅游/航线/单工具/闲聊)。
+- 讨论"如何判定新的要干活的请求"(强制路由的 gate)：结论=不必让 LLM 判新话题，用**会话状态**免费确定判断——①是否已存 plan(get_workflow_plan,有=任务中途)②上一条 assistant 是否在反问(是=follow-up)③是否本 chat 首条实质消息④是否带新上传文件。规则：仅在"无活跃任务状态"时强制路由(开局"帮我分析X"几乎必中；中途补充因有 plan 状态走确认/执行)。LLM 判新话题有鸡生蛋问题(要单独分类调用,加延迟)。可选软化:强制集合里加 respond_in_text 空函数当逃生口。待用户拍板按"状态 gate"实现。
+- 目标版式(用户参考图 usecaseLevel_workflow/Screenshot 2026-06-21 132028.jpg = Claude Desktop AskUserQuestion)：**文字解释在上 + 多选卡在下(钉输入框上方)**。我们现状反了(卡在上+短引导在下)。
+- Claude Desktop"新 chat"判定=**显式动作(New Chat/快捷键)+会话内共享上下文**，不做语义话题判断→印证我们 gate 该走"显式+状态"而非 LLM 判新话题。
+- 版式矛盾：强制 propose(mode=ANY)使模型本轮只吐函数调用、无文字。两方案：A 强制+补一轮短文字生成(推荐,多一次轻量调用)；B 不强制靠同轮(Flash 不可靠)。前端需把 workflow_plan 卡渲染在文字下方。
+- 待用户点头：按"方案A(文字在上+卡在下) + 状态gate + 强制路由"一并实现+部署+四类实测(旅游/航线/单工具/闲聊+中途补充)。
+
+### 实现+部署：方案A 版式(文字解释在上 + 复选卡在下)
+- 后端 agent.py：强制 propose 这轮模型只吐函数调用无文字 → 新增"解释轮"：propose 成功后追加 function_response + 中文 nudge，再生成一轮(tool_config mode=NONE 禁函数)写 2-3 句白话介绍，replace 原来那句模板短引导。explain_only_next 标志驱动；mode=NONE 杜绝重复 propose；注意 candidate.content 已在 ~1671 统一 append，解释轮只追加 function_response+nudge 避免双 append。
+- 前端 App.jsx：MessageContent 渲染时把 workflow_plan 块排到最后(非卡块在前、卡在后) → 卡片钉到消息底部，文字在上。
+- 构建：agent.py ast OK；前端 npm build OK(index-C2JcD7YQ.js)。部署 backend+frontend，recreate，nginx restart，served bundle=本地哈希一致。
+- Chrome 实测"帮我分析一个航线对环境影响的案例"：模型生成自然语言介绍在上 + 2步卡片(radial_flows+co2)在下 + 文件列说明 + 确认按钮，与参考图(Claude Desktop AskUserQuestion)版式一致。
+### 本次未做(按讨论保留)
+- 广义"强制路由 over 所有工具"的长尾召回兜底(多轮误触发风险)；复杂"状态 gate"。当前=广义分析关键词强制 propose + 确认强制 execute + 排除项。
+### 下一步
+- 待实测：上传文件→确认→子集执行(force execute+selected_steps)；补充框→re-plan。
+- 状态(2026-06-21)：方案A 版式(文字在上+卡在下)已部署 GCP 并经 Chrome 实测通过(航线案例)；等用户实测上传→确认→子集执行链路。
+- 答疑：航线案例"2 工具 1 文件"是正确的——两步(radial_flows 用坐标 / co2 用 Quantity+length_km)读同一份含 6 列的 flows CSV。卡片"需上传文件"=选中步骤所有 source=input 输入按 id 去重；共用 input→显示 1 个，不同 input→显示多个。注意:文件能否共用是模型判断的,上传前需核对该 CSV 列是否齐。
+
+### 改进+部署：计划卡"需上传文件"改为按工具分组
+- WorkflowPlanCard.jsx：原扁平去重列表 → 改为 filesByStep(每个勾选步骤→其 source=input 文件)，按工具分组渲染(组件徽标+工具名 code + 该工具所需文件)；共用文件在各工具下都出现；无需上传的步骤显示"使用上一步输出"；底部加"共 N 个文件；共用只需传一次"提示(uniqueFileCount 去重)。
+- 构建 index-6tmDa8MK.js；部署 frontend-ui+nginx。Chrome 实测航线案例：两个工具(radial_flows/co2)各列出同一份航运路线 CSV + "共1个文件"提示，分组清晰。
+### 测试状态
+- 版式(文字在上+卡在下)+按工具分文件 均已上线实测通过。仍待:上传→确认→子集执行实跑。
+- 状态(2026-06-21)：计划卡"需上传文件按工具分组"已部署 GCP 并实测通过；下一步待用户实跑上传→确认→子集执行。
+- 答疑"工具↔文件如何确定"：两层。①卡片显示的绑定=LLM 在 propose_workflow_plan 里写的(step.inputs 的 source=input→required_input id)，列说明也是 LLM 写、不被校验。②权威校验=shared/tool_file_specs.py TOOL_FILE_SPECS(tool→[(param,required,kind)]) + engine.validate_plan(查工具存在/必需文件参数齐/引用解析/无环)，invalid 退回 LLM 重提；执行前另有类型预检。强校验的是"必需参数+类型",非"列内容"。TOOL_FILE_SPECS 增量覆盖。可选改进:把列级要求也加进 spec 做硬预检。
+- 答疑+待办：用户指出卡片里 run_co2_emissions 下显示"需起终点坐标"是错的(co2 只用 animal_count_field+length_km_field,不用坐标)。根因=描述是文件级、两工具共用同一 required_input,按工具分组后把整份文件的合并描述挂到每个工具下→co2"继承"了坐标描述。非执行问题(co2 运行时只取那两列)。提议修复:每个工具下只显示它实际用到的列(从该 step 的 *_field/*_variables 字面参数提取),而非整份文件描述。待用户确认是否实现。
+
+### 讨论：把"需上传文件/参数"从 LLM 散文改为工具真实契约驱动
+- 用户提议:确定工具后去 .py 看它要哪些文件/参数,卡片如实说明"运行这些工具需传什么文件+参数怎么设"。
+- 取数处更正:不必运行时 parse .py,契约已结构化存在——FunctionDeclaration(agent.py TOOLS:参数名/类型/说明/默认/必填)+TOOL_FILE_SPECS(文件参数+类型+必填),即工具被调用的真实契约。证据:run_co2_emissions 声明只有 input_csv/capacity_per_trip/co2_per_km_per_trip/animal_count_field/length_km_field/id_field,**无任何坐标参数**→按契约渲染即可根治"co2 显示需坐标"。
+- 本质点:工具不写死列名,用 *_field 让用户指自己的列→准确表述是"传CSV+把 X_field 指向你的某列",而非"必须有某列"(也消除 LLM 现编固定列名)。
+- 分工:契约=要哪些文件/参数/类型/必填/默认(权威);LLM=选工具+串接+按用户数据给字段/数值参数填建议值(预填)。
+- 落地草案:后端 workflow_plan 事件给每 step 附 tool 参数契约;前端"需上传文件"块改为按契约渲染(文件+参数清单),LLM 值作预填。权衡:①FunctionDeclaration 须与 .py 对齐(手工维护,可加交叉测试)②卡片变密(必填+已设值默认展开,余折叠)③默认值现埋在 description 文本,需解析或结构化。
+- 结论:值得做,用现成声明不 parse .py。待用户确认分工/取数方式后细化具体改法。
+
+### 讨论：工具2用工具1输出作 input(链式)如何处理
+- 已有机制 source=step：计划里下游参数={source:step, ref:上游step_id, file:输出片段}。引擎(engine.run_plan)拓扑排序→跑完上游记录其输出文件→_resolve_param 自动把上游输出喂给下游。validate_plan 校验引用存在/先于下游/无环。用户对此类输入无需上传。
+- 卡片(契约驱动)应按来源区分:input=需上传文件;step=「← 自动使用 步骤N 输出，无需上传」;literal=参数值。
+- 坑:链式依赖使多选不能随便勾——取消上游却留下游=断链。后端已有 _subset_dep_error 拦截;卡片层应做依赖感知(取消上游联动取消/置灰下游)。
+- 顺带查到:engine 执行前 reconcile_plan 读真实上传文件的列,校验 LLM 的 *_field 字面值(差大小写自动修/对不上拦)——列层面有运行时校验(针对 input 文件)。
+- 现状:旅游/航线测例均为各步独立(各读自传文件),尚未出现链式;契约卡片实现时一并渲染三种来源+多选依赖约束。待用户认可处理方式。
+
+### 定稿：计划卡四段式设计 + 选项卡只放工具名
+- 用户要求:选项卡(④)只放工具名(复选框+工具名+可选组件标签),不放解释/文件说明(上面已解释)。
+- 四段各司其职不重复:①文字解释(总览+串/并) ②结构图(DAG,串/并/混合由 depends_on∪source=step 推出) ③工具+输入(契约驱动:文件/参数/来自上一步,所有细节在此) ④选项卡(仅工具名)+确认。
+- 顺带解决"co2 下冒坐标":选项卡不带描述,描述只在③按契约准确给。
+- 落地顺序注意:rationale 目前只在选项卡行内→做③时同步精简④,避免信息丢失。
+- 串/并加固:从 source=step 自动补 DAG 边(不只靠 LLM 写 depends_on);validate_plan 已查环。
+- 待用户拍两选择:(a)结构图 轻量自绘(荐)/Mermaid (b)四段分开(荐)/一步到位"可勾选DAG图"。确认后开干。
+
+### 实现+部署：计划卡四段式(结构图+契约驱动输入+纯工具名选项卡)
+- 后端 agent.py：新增 _FD_BY_NAME(函数名→FunctionDeclaration)、_tool_param_contract(tool→[{name,type,required,is_file,file_kind,description}] 从声明+TOOL_FILE_SPECS)、_enrich_plan_for_ui(补 tool_specs + 每步 depends_on=显式∪source=step边)。workflow_plan 事件新增 tool_specs 字段。curl 验证:tool_specs 正确含 run_co2_emissions 真实参数(无坐标)。
+- 前端 WorkflowPlanCard.jsx 重写四段：②结构图(按拓扑层级自绘,自动判 单步/并联/串联/混合;节点反映勾选态) ③工具与所需输入(按 source 渲染:input=需上传文件+填入哪个参数;step=自动用上一步输出;literal=参数=值;契约取 type/required/file_kind) ④选项卡仅工具名+复选框,依赖感知(取消上游联动取消下游/勾下游补上游)。App.jsx 透传 toolSpecs。
+- co2 坐标问题根治：③不再显示共享文件的整体描述,每个工具只列自己契约的参数→co2 只显示 animal_count_field/length_km_field/capacity/co2,坐标只在 radial_flows 下。
+- 构建 index-DrsRWSkH.js;部署 backend+frontend。Chrome 实测航线案例:①文字②并联结构图③契约输入(co2无坐标)④纯工具名选项卡,全部正确。
+### 观察(非bug)
+- 结构图忠实反映 LLM 声明的 depends_on;某次旅游案例 LLM 加了非必要依赖→显示"混合"(本应全并联)。如需结构更准,可在 prompt 约束"仅当用上一步输出才设 depends_on"。
+### 测试状态
+- 四段式卡片上线实测通过。仍待:上传文件→确认→子集执行实跑(force execute+selected_steps);依赖联动多选实点。
+- 状态(2026-06-21)：四段式计划卡(结构图+契约驱动输入+纯工具名选项卡+依赖联动)已部署 GCP 并 Chrome 实测通过(航线案例,co2无坐标);待用户实跑上传→确认→子集执行 & 实点依赖联动多选。可选:prompt 约束 depends_on 仅在真用上一步输出时设,使结构判定更准。
+
+### 计划卡四点打磨(按用户反馈)+部署
+- ①③标题:WorkflowPlanCard ③ "工具与所需输入"→"工具与所需示例输入"+提示(值为示例/列名自动校正)。
+- ②文字更详细:agent.py 解释轮 nudge 改为"4–6 句、总体思路+逐步说明+并行/依赖、面向非技术用户"。
+- ③满宽美化:卡片去掉 max-w-2xl→w-full,与对话/上方文字等宽。
+- ④两个 Thought process 修复:根因=方案A第二轮(解释)也开 thinking。解决:解释轮 thinking_config=None,只剩一个。
+- 构建 index-BVLPD3k8.js;部署 backend+frontend。Chrome 实测卧龙旅游:单个 thought process✅、详细文字✅、③示例标题+满宽✅、②并联判定正确(第2行系 flex-wrap 非依赖层级)。
+### 测试状态
+- 计划卡四段式+四点打磨全部上线实测通过。仍待:上传→确认→子集执行实跑;依赖联动多选实点。
+- 状态(2026-06-21)：计划卡四点打磨(示例标题/详细文字/满宽/单thought process)已部署 GCP 并 Chrome 实测通过;待用户实跑上传→确认→子集执行。
+
+### 结构图美化(开始+扇出) + 修"假混合"
+- ②结构图重做(WorkflowPlanCard)：加"▶ 开始"节点；纯并联=开始→竖向树状连接线扇出到各步(适配长工具名);串/混=开始↓逐层。前端 index-FqqfFFkr.js。
+- 用户质疑"为何混合/图文不符"。curl 实证:LLM 给 s2_network depends_on=[s1_systems]、s4_co2 depends_on=[s3_draw_flows],但所有 source=step 输入为空→无真实数据依赖,纯属 LLM 瞎填的"逻辑顺序"边→被误判混合,且图(按假依赖拓扑)与文字叙述来源不同故不一致。
+- 修复:agent._enrich_plan_for_ui 把每步 depends_on **重写为仅 source=step 的真实数据依赖**(丢弃无数据支撑的 depends_on)。curl 验证:旅游5步 depends_on 全空→并联→扇形。execution 仍正确(真实 step 边保留,独立步任意序无妨)。
+- 浏览器验证受阻:find 工具 5h 额度耗尽(429);screenshot 连续 CDP 超时(渲染端卡)。点击/输入/发送成功但抓不到图,未能视觉确认扇形渲染。后端数据层已确认正确。
+### 测试状态
+- 后端 depends_on=源step 实证通过;前端扇形布局已部署但本次未视觉确认(浏览器工具不可用)。待用户刷新查看。
+- 状态(2026-06-21)：结构图(开始+扇出)+假混合修复(depends_on 仅取 source=step)已部署 GCP,后端 curl 验证旅游=并联;前端扇形因浏览器工具(find限流/截图超时)未视觉确认,待用户刷新查看。
+- 答疑(串联实例,curl实证):海岸蓝碳=真串联。s1 run_coastal_blue_carbon_preprocessor→s2 run_coastal_blue_carbon,其中 s2 的 landcover_transitions_table 输入 source=step 取 s1 输出→真实数据依赖→结构判定(仅认source=step)正确画成 开始↓预处理↓主模型。对比旅游(全 source=step 空)=并联。其他真串联对:delineateit→SDR/NDR(watersheds)、routedem→水文、scenario_gen→habitat/carbon。验证了"source=step 驱动结构"对并联(旅游)和串联(CBC)都判定正确。
+- 浏览器验证(恢复后):海岸蓝碳串联图渲染正确——结构=串联(每步依赖上一步),▶开始↓run_coastal_blue_carbon_preprocessor↓run_coastal_blue_carbon;文字明确"第二步依赖第一步、顺序执行",图文一致(依赖真实 source=step)。与旅游并联扇形对照,确认"只认真实数据依赖"对并联/串联均判定正确、扇形/串联两种结构图均正常渲染。
+
+### 计划卡：英文化 + 计数bug + 默认英文输出 + 确认消息修正 + 会话串台诊断
+- 计数bug "已选7/5":根因=组件实例被复用、checked 残留上个计划的 step id。修:WorkflowPlanCard 加 useEffect 按 stepKey(step id 集合)重置 checked/submitted;nChecked 改为只数当前计划内的步骤(steps.filter(checked))。
+- 卡片英文化:所有静态标签译英(Analysis plan/Structure/Tools & example inputs/Upload…/Select steps to run/Confirm & run/Start 等);FILE_KIND 译英;结构标签 Parallel/Serial/Mixed。
+- 默认英文输出:agent.py system_instruction 顶部加"## Language"硬规则(始终英文,除非用户明确要求其他语言);解释轮 nudge 改"in English unless asked"。curl 验证:中文 prompt→英文介绍。
+- 确认消息修正:原"Use the files I already uploaded"在未传文件时误导→改为"只用为本计划上传的文件;缺则列出让我传,勿复用无关旧文件"。
+- 会话串台诊断(用户:没传文件却读到 co2_data.csv):实证 /data/uploads 按 session_id 分目录、agent 只注入 get_uploaded_files(session_id)→存储与注入均按 session 隔离;session_id 存 sessionStorage(同标签页刷新保留,仅 New Chat 用 resetSessionId 换新)。co2_data.csv 今日在某 session 下经文件夹上传(co2系统测试数据)。结论=同标签页 session 复用导致旧文件串入新分析,非跨 session 泄漏;reconcile 列校验拦下了(未拿错数据真跑)。tab 已关无法读当前 session_id 做最终比对。
+### 待定(会话卫生,需用户选)
+- 选项:①靠 New Chat 作清洁边界(现状) ②页面刷新也 mint 新 session ③加"清空已上传文件"控件 ④workflow execute 仅认本计划上传的文件。各有取舍(②④可能影响"先传文件再分析"流程)。
+- 状态(2026-06-21)：卡片英文化+计数修复+默认英文输出+确认消息修正 已部署 GCP(前端 index-BaAO2iZG.js;后端语言规则 curl 验证英文)。会话串台判定为同标签页 session 复用(非跨session泄漏);会话卫生增强待用户选 A/B/C(推荐B:清空已上传文件按钮)。
+- 修订:确认消息删除整段文件相关措辞(点Confirm时尚未传文件,该句多余/误导)→只保留"Confirmed…selected_steps=[…]+Selected steps列表"。缺文件由后端 need_files 流程让模型主动问。部署 index-uh9-_sEa.js,served bundle 验证该句已移除。
+- 状态(2026-06-21)：确认消息已精简(仅确认选中步骤,删除文件措辞),部署 index-uh9-_sEa.js 并验证移除;缺文件走后端 need_files。
+
+---
+
+## 2026-06-22 — 计划卡"子集执行"逻辑确定性自测（闭环唯一遗留 ⏳）
+
+### 完成内容
+- 之前"待真实点确认并运行跑子集执行(selected_steps 过滤)的实测"里，**确定性那一半**（后端过滤逻辑，不涉及 LLM）我这边可自测，本次补齐。
+- 新增 `usecaseLevel_workflow/TourismTelecoupling_Workflow/_test_subset.py`：用 `ast` 从 agent.py **源码精确抽取** `_subset_plan_dict` / `_subset_dep_error` 两个纯函数（agent.py 本地装不全 redis/celery 故不能整体 import），注入 `workflow.schema`（纯模块）后 exec，对真实 `tourism_plan.json` + 一个合成的 source=step 链式 plan 跑断言。测的是当前真实代码而非副本。
+- **11/11 PASS**：①全选→保留 5 步 + 7 输入；②子集{s1,s4}两独立步→只留这 2 步 + systems_table/flows_with_distance 两个输入、无依赖错；③单步{s5_famd}→1 步 1 输入(硬裁剪)；④乱填 id→防御性回退整计划；⑤合成 A→B 链：只留消费者 B 触发 `_subset_dep_error` 且报文点名被删的生产者 A，A+B 同留则无错。
+- 顺带核对前后端一致性：后端 `_enrich_plan_for_ui` 把 `depends_on` 重写为仅 source=step 边；前端 `WorkflowPlanCard.toggle()` 的依赖闭包正基于 `depends_on`——同一套边定义。故正常 UI 勾选不会产生坏子集，`_subset_dep_error` 是给"LLM 直接传 selected_steps"兜底。
+
+### 关键变更文件
+- 新增 `usecaseLevel_workflow/TourismTelecoupling_Workflow/_test_subset.py`（自测脚本，按既有 `_test_*.py` 约定，属测试资产不入 git 代码包）。
+- 无生产代码改动。
+
+### 测试状态
+- ✅ 子集执行逻辑确定性自测 11/11 PASS。
+- ⏳ 仍待用户在网站做端到端真人验证：勾选子集→Confirm→LLM 实际带 `selected_steps` 调 execute→只跑选中步（LLM 行为部分按分工归用户测）。
+- ⚠️ 计划卡整套（agent.py/catalog.py/App.jsx + 新 WorkflowPlanCard.jsx）已部署 GCP 但**未提交 git**（gcp-head 仍停在 02b5b0b）；待用户决定何时提交。
+
+---
+
+## 2026-06-22 — 修复"计划卡反复弹出 / 弹出时机不对"（根因+部署）
+
+### 根因（用真实对话+日志坐实，非猜测）
+- 用户报"plan 卡时机不对、后面对话一直弹"。查 GCP `tele-backend` 日志 + 从 `tele-redis` dump session `csis_4a3c2fed…` 的 `chat_history`：同一 session 里 propose/execute 交替"风暴"，多轮跟进消息被**强制 propose** 又弹新卡。
+- 决定性证据轮次：[6]"I have upload all data sets…complete the workflow's **analysis**"→又弹卡；[14]"please **run any analysis** you can"→又弹卡。用户明明在补文件/想运行，却被弹新计划卡。
+- 根因 = `agent.py` 强制判断 `_force_workflow` 用的 `_looks_like_workflow_goal` 关键词**过宽**（含 analysis/analyze/workflow/分析/评估/影响 等几乎每句跟进都会出现的词），**且完全不看 session 是否已有计划**——只要命中关键词，每轮都强制弹新卡。
+- 顺带发现（非本次修）：execute 反复失败死循环（模型挑不对上传文件填哪个输入 + `tourism_Flows.csv` 缺 `length_km`、cost-benefit 的 `economic_data_csv` 样例数据没有）；cost-benefit 步骤超纲（无经济数据）；每张卡开场白雷同。
+
+### 修复（用户选"只停弹卡"方案，最小改动）
+- `agent.py`：强制 propose 加 **session 门槛** `_has_plan = _sm.get_workflow_plan(session_id) is not None`；`_force_workflow` 增加 `and not _has_plan`——**只为本 session 第一个分析目标**强制弹卡，之后绝不再强制。日志加 `(has_plan=…)`。
+- `workflow/catalog.py`：WORKFLOW_PROMPT 新增"## Once a plan ALREADY exists (do NOT re-propose)"段——计划已存在时，用户传文件/说"run it"/确认→调 `execute_workflow_plan`；只有用户要求改计划才再 `propose`；纯提问就正常回答。压住 AUTO 模式的惯性重弹。
+- 补充框 re-plan 不受影响：其消息点名工具/显式要求 re-propose，AUTO 下照常重规划。
+
+### 关键变更文件
+- `telecouplingAI-project/backend/agent.py`（强制判断加 session 门槛）
+- `telecouplingAI-project/backend/workflow/catalog.py`（WORKFLOW_PROMPT 加"已有计划勿重弹"段）
+
+### 部署
+- scp 两文件→GCP；`docker build csic_backend:latest`（代码层后，全缓存 0.3s）；`docker compose up -d --force-recreate api-server`；`docker compose restart nginx`(IP cache gotcha)。
+- 验证：容器内 agent.py 含 `_has_plan`、catalog.py 含新段；tele-backend Up(healthy)；site=200 / health=200。仅动 api-server，33 worker 未碰。
+
+### 测试状态
+- ✅ 本地 py_compile + 子集自测 11/11 仍 PASS；已部署 GCP 并验证 healthy。
+- ⏳ 待用户在网站复跑确认：第一次目标弹一张卡；之后补文件/确认/"run it" 不再弹新卡，而是去执行或回答。
+- 🟡 遗留（未修，待定）：execute 的 file→input 映射不稳 + 缺列/缺数据时的死循环体验；cost-benefit 超纲；卡片开场白雷同。
+
+---
+
+## 2026-06-22 — 修复计划卡"Add & re-plan"两个 bug（带选择重规划 + 不误锁为已提交）
+
+### 用户反馈的两点（均确认为真 bug）
+1. 点"Add & re-plan"时，发给 LLM 的消息**只带了输入框文本，没带当前勾选的步骤** → 模型不知道用户要保留/去掉哪些步，会无视用户的取消勾选。
+2. 点它会 `setSubmitted(true)` 把整张卡锁成"Submitted" → 但用户根本没提交/没确认运行，语义错误。
+   - 叠加隐患：上一条修复加的 `_has_plan` 门槛让 re-plan 在已有计划时不再"强制"propose，只能靠 Flash 在 AUTO 下自觉调用 → 很可能点了不出新卡。
+
+### 修复
+- **前端 `WorkflowPlanCard.jsx`**：
+  - 新增 `replanning` 状态（与 `submitted` 区分）；`locked = submitted || replanning` 统一控制禁用；仅真正 Confirm 才显示"Submitted"。
+  - `sendSupplement` 重写：消息现在带上 **Keep these selected steps: …** + **Drop these unchecked steps: …** + **ALSO add this analysis: "…"**，并明确"我还没运行任何东西，别 run，给我一张新卡确认"。
+  - re-plan 按钮文案 `Re-planning…` + 一行提示"将带当前选择+新分析重规划，新卡出现在下方"。
+- **后端 `agent.py`**：
+  - 新增 `_looks_like_workflow_replan`（标记 `propose_workflow_plan again` / `show me a new plan card`）→ `_force_replan`：**显式强制 propose**，绕过 `_has_plan` 门槛与单工具检测（这是用户主动 refine，必须出新卡）。
+  - `active_tools`：iteration 0 一旦 `_forced_fn` 置位就用全量 TOOLS（避免 re-plan 含"cost-benefit"等关键词时被窄化成单工具、导致 propose 不可用）。
+  - 优先级：confirm > replan > 首个目标 propose。
+
+### 关键变更文件
+- `telecouplingAI-project/frontend/src/components/WorkflowPlanCard.jsx`
+- `telecouplingAI-project/backend/agent.py`
+
+### 部署
+- scp agent.py + WorkflowPlanCard.jsx→GCP；build backend(缓存 0.3s)+frontend(npm install 缓存,仅 npm build)；`up -d --force-recreate api-server frontend-ui`；`restart nginx`。
+- 验证：容器内 agent.py 含 `_force_replan`/`_looks_like_workflow_replan`(5 处)；服务的前端包 = 本地构建 `index-D3rSdCb4.js`、HTML 已引用；tele-backend Up(healthy)；site=200 / health=200。
+
+### 测试状态
+- ✅ 本地 py_compile + 前端 npm build(1523 模块) + 子集自测 11/11 仍 PASS；已部署 GCP 验证 healthy。
+- ⏳ 待用户网站复跑：勾掉几步 + 输入框写补充 → 点"Add & re-plan" → 应出一张**新复选卡**（保留勾选步 + 新分析，去掉取消的），旧卡显示"Re-planning…"而非"Submitted"，且不运行任何东西。
+- 🟡 遗留（未修）：execute 的 file→input 映射不稳 + 缺列/缺数据死循环；cost-benefit 超纲；卡片开场白雷同。本批改动连同前两次仍未提交 git（gcp-head=02b5b0b）。
+
+---
+
+## 2026-06-22 — 根因定位"re-plan 给 6 步而非 4 步"=前端旧缓存 + 修 nginx 缓存头
+
+### 现象 / 用户反馈
+- 用户：点 Add & re-plan，新卡没体现"我取消了 2 个分析"，只考虑了新增需求；原 5 个、勾 3 个 + 手动加 1 个，期望 4 个，结果给了 6 个。
+
+### 根因（证据导向，非猜测）
+- 从 GCP `tele-redis` dump 最近 session `csis_405014ec…` 的 `chat_history`，re-plan 那条消息原文 = **旧版** `sendSupplement`："Please update the current workflow plan to **also include** this analysis…"——没有 keep/drop。说明用户浏览器仍在跑**旧前端缓存**，发的是修复前的消息（"在原 5 步上再加 1 个"→6，且不带勾选）。服务器端确认服务的是新包 `index-D3rSdCb4.js`，即代码已上线、只是客户端没加载到。
+- 进一步查 nginx：`index.html` **没有 `Cache-Control` 头** → 浏览器按启发式缓存旧 index.html、继续引用旧 bundle。这正是反复"部署了但用户看不到新版"的系统性根因（之前多次"要硬刷新"的真正原因）。
+
+### 修复：nginx 缓存头（`nginx/nginx.conf`）
+- 新增 `location /assets/`：带哈希构建产物 `Cache-Control: public, max-age=31536000, immutable`（内容寻址，可永久缓存）。
+- `location /`（含 index.html / SPA 路由）加 `Cache-Control: no-cache`：每次 reload 靠 ETag 廉价 revalidate（变了拿 200、没变拿 304），保证新部署下次普通刷新即生效，不再需要每次硬刷新。
+- bind-mount(`./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro`)；scp→`nginx -t`通过→`nginx -s reload`（热加载，无中断）。
+- 验证：`/` 头含 `Cache-Control: no-cache`；`/assets/index-D3rSdCb4.js` 头含 `immutable`；site/health=200。
+
+### 关键变更文件
+- `telecouplingAI-project/nginx/nginx.conf`（缓存头规则；本地与服务器同步）。
+
+### 测试状态 / 下一步
+- ✅ 缓存头已上线验证。
+- ⏳ 用户需**硬刷新一次**清掉当前已缓存的旧 bundle，之后普通刷新即可拿新版。然后用**新前端**复跑 re-plan（新消息带 Keep/Drop）确认是否给 4 步。
+- ⚠️ 残留风险：即便新前端发了 keep/drop，Flash 仍可能受 CAPABILITY_CATALOG 里"卧龙 5 步 few-shot"偏置而回到全 5 步。若复跑仍不尊重取消勾选 → 改为**确定性方案**：后端按前端传的保留 step ids 先裁剪已存计划，只让 LLM 生成"新增分析"那一两步再合并（不让 LLM 重排整张计划）。
+
+---
+
+## 2026-06-22 — 确定性 re-plan：后端裁剪保留步 + LLM 只生成新增步再合并（根治"保留3加1却给6"）
+
+### 决策
+- 用户明确要求上面那个残留风险的"确定性方案"——彻底不让 LLM 重排整张计划。照做。
+
+### 设计：LLM 只产新增步，后端确定性保留 + 合并
+- **新 Gemini 函数 `add_workflow_steps`**（`catalog.py`）：只返回**新增的**step + 其新 required_inputs，描述明令"不要重列用户保留的步骤，后端会保留并合并"。
+- **前端 `WorkflowPlanCard.jsx`** `sendSupplement` 重写：发机器可解析令牌 `[[REPLAN_KEEP=<勾选的 step id 逗号分隔>]]` + 新分析文本 + "Call add_workflow_steps…只生成新增步"。
+- **后端 `agent.py`**：
+  - `_parse_replan_keep`：正则解析令牌（缺令牌→None=安全保留全部；空令牌→[]=一个不留）。
+  - `_replan_base_subset`：按 keep ids **精确**裁剪已存计划（无防御性回退，可空），只留被引用的 required_inputs。
+  - `_merge_added_steps`：把 LLM 新步**追加**到裁剪后的 base；保留步绝不改；新步 id 与 base 冲突则改名（`x`→`x_2`）并重写其 depends_on / source=step 引用；新 required_inputs 与 base 同 id 则视为复用（去重）。
+  - re-plan 标记改为 `add_workflow_steps` / `[[replan_keep=`，强制调用 `add_workflow_steps`（优先级 confirm > replan > 首个目标）。
+  - 新增 handler 分支：load 已存计划 → 按 keep 裁剪 base → 合并 LLM 新步 → validate → 发 `workflow_plan`(合并后) → 存 → 确认门（复用方案A解说轮）。
+- 关键：用户的保留步由**后端**确定性保留，LLM 完全碰不到，从根上杜绝"悄悄把取消的步加回来"。
+
+### 关键变更文件
+- `telecouplingAI-project/backend/workflow/catalog.py`（`ADD_WORKFLOW_STEPS_DECLARATION` + WORKFLOW_PROMPT 改"新增走 add_workflow_steps"）
+- `telecouplingAI-project/backend/agent.py`（注册 + 3 个 helper + 强制逻辑 + handler 分支）
+- `telecouplingAI-project/frontend/src/components/WorkflowPlanCard.jsx`（`sendSupplement` 发令牌 + 指向 add_workflow_steps）
+- 新增 `usecaseLevel_workflow/TourismTelecoupling_Workflow/_test_replan.py`（确定性自测）
+
+### 测试 / 部署
+- ✅ 自测 `_test_replan.py` **13/13 PASS**：核心场景"保留{s1,s3,s4}+加 cost-benefit → 恰好 4 步、丢掉 s2/s5、economic_data 入清单、保留步原样、合并 plan 可解析"；id 冲突改名+引用重写；空选→仅新步；令牌解析三态。py_compile + 前端 npm build 均过。
+- 部署：scp 3 文件→build backend/frontend(缓存)→`up -d --force-recreate api-server frontend-ui`→`restart nginx`。容器内 `add_workflow_steps`(5 处)、agent.py 可解析、声明可导入；前端服务包 = 本地 `index-CiOdA4If.js`；tele-backend Up(healthy)；site/health=200。
+
+### 下一步
+- 用户网站复跑：勾 3 个 + 输入框加 1 个 → 点 Add & re-plan → 应得**一张 4 步新卡**（保留的 3 + 新增 1），不再出现 6。
+- 仍未提交 git（gcp-head=02b5b0b）：累计未提交=停弹卡 + session门槛 + re-plan两轮 + nginx缓存头 + add_workflow_steps 确定性方案。
+
+---
+
+## 2026-06-22 — 自己端到端实测确定性 re-plan（curl GCP 真实 Gemini）+ 修悬空输入引用
+
+### 背景
+- 用户贴出复跑结果"仍然不弹卡片"，并要求"你自己测试好了再跟我说"。诊断：那条消息是 "Call **propose_workflow_plan** again"（**旧前端**文案），即用户仍在旧缓存，没硬刷新到带 `add_workflow_steps` 的新前端；旧消息不匹配新 replan 标记、又被 session 门槛挡住 → AUTO → 只出文字。
+- 据此用户明确授权我自测 LLM（覆盖 [[feedback_no_llm_testing]] 的默认分工，仅限本次）。直接 curl GCP `127.0.0.1/api/chat`（SSE）跑真实两轮，不走浏览器。
+
+### 实测发现并修复
+- 第一轮"analyze tourism telecoupling"→强制 propose，得有效 5 步、存 session。提取模型真实 step id。
+- 第二轮发**新前端格式**消息（`[[REPLAN_KEEP=<真实3个id>]]` + Call add_workflow_steps）：日志 `forcing → add_workflow_steps (has_plan=True, replan=True)`，合并 = **4 步**（保留3+新增cba，丢掉2）✓。**但** `valid:False`：cba 步 `input_csv` 引用了未声明的 `tourism_flows_csv`——LLM 只生成新步、不知已存计划里流数据叫 `flows_table`，自己编 id 又忘声明。
+- 修复（`agent.py` `_merge_added_steps`）：**自动补声明**——任何新步引用了但没人声明的 source=input id，按工具 `TOOL_FILE_SPECS` 的真实 file_kind 自动加一个上传槽（`run_cost_benefit_analysis` = input_csv/economic_data_csv 均 table）。无论 LLM 复用已有 id 还是另编新 id，合并计划都必然有效。
+- 复测（重新部署后）：两轮全绿，合并 **4 步、valid:True、errors:[]**（这次 LLM 直接复用了 `flows_table`，auto-declare 未触发也对）。
+
+### 关键变更文件
+- `telecouplingAI-project/backend/agent.py`（`_merge_added_steps` 末尾加悬空 source=input 自动补声明）
+- `usecaseLevel_workflow/TourismTelecoupling_Workflow/_test_replan.py`（加用例 3b：真实 cba 悬空引用→自动补声明+计划转有效）
+
+### 测试 / 部署
+- ✅ `_test_replan.py` **16/16 PASS**（含 3b auto-declare + validate）。py_compile 过。
+- ✅ **GCP 真实端到端 2 轮 curl 实测通过**：propose 5 步 → re-plan 保留3+加1 = 4 步 valid。
+- 部署：scp agent.py→build backend(缓存)→`up -d --force-recreate api-server`→`restart nginx`。
+
+### 给用户 / 下一步
+- 后端逻辑已实测确认。**用户必须硬刷新一次**加载新前端（`index-CiOdA4If.js`，发 add_workflow_steps 消息）——旧缓存发旧消息才是"还不弹卡"的原因。
+- 仍未提交 git（gcp-head=02b5b0b）。
+
+---
+
+## 2026-06-22 — workflow 执行：列名/文件按"工具契约+用户真实数据"而非 Wolong 写死（field_overrides + file_overrides）
+
+### 用户反馈/根因
+- 执行报 "Column mismatch": 计划里列名是 Wolong few-shot 写死的 `LON/FROM_X/Quantity/ID`，但用户上传的是另一套通用 demo 数据（列名 `longitude/from_lon/animals/distance_km/project_id`）。用户手打的列名没入口被忽略。
+- 用户架构性意见（采纳）：工具列名是**参数化**的（SKILL.md 证实，如 co2 `animal_count_field` 默认 'animal_count'），应按"需求→工作流→哪些工具→每个工具接受什么文件/列/参数→接收→输出"来定，**别拿 Wolong SampleData 当唯一标准**。
+
+### 修复（3 项）
+1. `field_overrides`（execute_workflow_plan 新参数 + `_apply_field_overrides`）：用户陈述的列名/数值参数写入对应 step 的 literal（数值参数自动转 int/float），运行前生效。
+2. `file_overrides`（新参数 + `_apply_file_overrides`）：把某 step 的文件输入**直接指向**指定上传文件（合成 required_input + 注入 inputs_map）。解决"co2 接到 flows 文件、读不到 animals/distance"的真正拦路虎——让每个工具读自己的数据文件。
+3. `catalog.py` CAPABILITY_CATALOG：加"按工具契约+用户真实数据决定文件/列/参数"总原则；few-shot 从写死列名改为占位符+结构示例，co2 标注需"自己的 route/trip 文件"。
+
+### 实测（GCP curl，真实 Gemini，复用 4-文件 session）
+- `forcing → execute_workflow_plan`；日志确认 13 个 field_overrides + 2 个 file_overrides 全部应用。
+- **无列名不匹配**；**4 步中 3 步成功跑出结果**：s1 systems→geojson、s3 radial_flows→shp、**s4 co2→co2_emissions_summary.csv（file_overrides 让它读 co2_data.csv，通了）**。
+- s6 cost_benefit 报 `'cost_usd'`：该工具需**两个不同文件**按 key_field join（input_csv 主数据 + economic_data_csv 成本收益），我把同一 economic_data.csv 喂给两参数→pandas join 同名列加后缀→KeyError。属工具两文件数据建模，非编排层。
+
+### 关键变更文件
+- `backend/workflow/catalog.py`（field/file_overrides 声明+解析器；few-shot/原则泛化；prompt 用法）
+- `backend/agent.py`（`_apply_field_overrides`/`_apply_file_overrides` + execute handler 接入 + inputs_map.update）
+
+### 测试 / 部署
+- ✅ py_compile + `_apply_field_overrides` 单测（列名串/数值转 int）+ 解析器自测。
+- ✅ GCP 端到端：3/4 工具用通用数据跑通（含原拦路虎 co2）。
+- 部署：scp agent.py+catalog.py→build→`up -d --force-recreate api-server`→`restart nginx`（多轮）。
+- 提示词层泛化**未**改变模型计划时仍猜 Wolong 列名/把 co2 接 flows——但运行时 overrides 纠正，故无碍。
+
+### 下一步
+- s6 cost_benefit：需用户给两个不同文件（主数据含 project_id + 经济数据含 cost/revenue），或确认其单文件用法；属工具数据建模，待与用户确认数据。
+- 前端尚无 field/file_overrides 的 UI（目前靠用户在消息里陈述列名/文件，LLM 填参数）；如需更顺滑可加卡片内"列名映射/文件指派"控件（未做）。
+- 累计改动仍未提交 git（gcp-head=02b5b0b）。
+
+---
+
+## 2026-06-22 — 讨论（无代码改动）：CO2 工具的来历/生成依据
+
+用户问"CO2 emission 工具的 py 是根据什么生成的"，要求仅讨论不改动。查证结论（证据导向）：
+- **非本会话生成**。`backend/tools/co2_emissions.py` 创建于 2026-05-15，commit `81d84c1`「feat: add 15 new Telecoupling tools」，Co-authored-by Claude Sonnet 4.6。
+- **来源**：移植自 **ArcGIS Telecoupling Toolbox v3.3** 的 `references/Telecoupling+Toolbox_ArcGISProV3.3/Scripts/CO2_Emissions.py`（arcpy → pandas 重写）。
+- **公式忠实照搬**：`trips=ceil(count/capacity)`、`CO2=length×trips×factor`，与原版逐行一致。
+- **移植三处改动**：①输入从"线要素几何"改为 CSV → 因无几何，**强制要 `length_km` 列**（正是 co2 需独立 route 文件、file_overrides 要解决之处）；②`wildlife_units`→`animal_count`（暴露其本是"野生动物/货物运输=熊猫借展"场景，故套到游客上别扭）；③删掉原版的 current-vs-future 情景对比。
+- **保真度隐患（仅记录）**：原版用 `SHAPE@LENGTH`（通常米），移植版用 `length_km`（公里），差 1000×；若系数照搬而长度单位变了，结果可能差三个数量级——用时需对齐系数与长度单位。
+- 与用户早前架构关切呼应：工具骨子里是 Wolong/熊猫"动物运输"基因，因其**源头工具箱**就是为该场景写的。
+- 无代码改动；未部署；git 状态不变（gcp-head=02b5b0b）。
+
+---
+
+## 2026-06-22 — 讨论（无代码改动）：ArcGIS CO2 样例数据的结构，解开"length_km 从哪来"
+
+用户给出本机 ArcGIS 样例路径 `…SampleData_ArcGISPro\Environmental Analysis\Calculate CO2 Emissions on Flows\`，问原工具能否吃这些数据、为何"格式都不一样"。查证（仅读，不改）：
+- 该目录全是 **CSV**（wildlife/tourism/agTrade/indTrade/info/conservation _Flows.csv）+ `results_layers/`（含 **Lines.shp/Nodes** 折线要素）。
+- **"格式不一样"是表象**：所有 CSV 共享同一空间骨架 `FID, Location_from, FROM_X, FROM_Y, Location_to, TO_X, TO_Y`，只是**末尾"值"列按 flow 类型不同**（wildlife=Quantity+Fees、tourism=Tourists、agTrade=cabbage_kg…、info=Frequency、conservation=无值列）。工具箱对所有 flow 类型通用，按类型选不同值字段。CO2 对应 **wildlife_Flows.csv 的 Quantity**（=原 wildlife_units）。
+- **关键澄清**：原 arcpy CO2 工具**不直接吃这些 CSV**，而是吃**画好的折线要素**（results_layers/Lines.shp），长度取自**几何 `SHAPE@LENGTH`**。真实链路 = CSV(坐标+Quantity) →「Draw/Radial Flows」→ Lines.shp(有几何) →「CO2」读 SHAPE@LENGTH。原始 CSV 因此从不带"长度"列。
+- **解释了一路的坑**：pandas 移植无几何 → 移植版 CO2 强行要 `length_km` 列；而这些原始 CSV（含 wildlife_Flows.csv）都无长度列 → 必须先补距离或从画线步链距离。即「距离：ArcGIS 靠几何，我们靠预算好的列」。
+- 待办（仅提议，未做）：排查 `run_draw_radial_flows` 输出是否带每条线长度——若有，workflow 里 co2 可 source=step 直接链距离，免去单独 co2 文件。
+- 无代码改动；git 状态不变（gcp-head=02b5b0b）。
+
+---
+
+## 2026-06-22 — 后台自验完整 tourism workflow（5/5）+ 对论文 + demo 演示说明
+
+### ① 后台自验（用户要求，纯确定性引擎，无 LLM）
+- 新增 `_gcp_wf_validate.py`：把 `Tourism_AllData_Upload` 数据 + `tourism_plan.json` 拷进 GCP **tele-backend 容器**，用 `workflow.run_plan`（引擎进程内执行真实工具，conda+R）跑完整 5 步。
+- 结果 **5/5 全 done，26 文件**：s1 systems(7)→s2 network/R(6)→s3 radial_flows(7)→s4 co2(2)→s5 famd/R(4)。
+- **链式依赖核查**：tourism_plan 五步 **无 source=step 边（全独立）**——用户担心的"后面用前面结果"在本案例不出现。引擎本身支持链式（engine.py 拓扑排序 + `_resolve_param` source=step 把上游输出文件喂下游 + 环检测），已读码确认。
+- 关键发现：`Tourism_AllData_Upload` 列名（LON/LAT、FROM_X../Quantity、length_km、affin/gdplog/dist）**正好等于计划默认 literal** → 该数据演示**零手调列名**全自动跑通（reconcile 无 fix/无 mismatch）。
+
+### ② 对照论文（Tonini & Liu 2017）
+- **CO2 total = 5,875,593 kg ≈ 5.88M**（49 流，29 kg/km）↔ 论文熊猫案例 5.2M kg，**同方法同量级** ✅（最硬数字吻合）。
+- FAMD 3 成分方差 40.1%/32.3%/27.6% ↔ Fig7/Table2-3 方法复现（注：论文 FAMD 原是熊猫数据，我们套到游客=工具演示）。
+- Systems/Flows↔Fig10；Network 分组↔全球客流网络。⚠️ 论文 tourism 定量核心 Habitat Quality(Fig11) 因缺 LULC 栅格未纳入。
+
+### ③ Demo 演示说明
+- 新增 `DEMO_GUIDE.md`：四幕脚本（NL 提需求→AI 规划卡→上传+确认→自动跑 5 步→解读+对论文）、要点话术、高级演示（裁剪步骤/增量重规划/适配他人列名）、救场预案表、后台自验证据、6 条卖点。强调用 `Tourism_AllData_Upload` + 标准 5 步语句 = 零手调最稳。
+
+### 关键变更文件
+- 新增 `usecaseLevel_workflow/TourismTelecoupling_Workflow/_gcp_wf_validate.py`（容器内引擎自验脚本）
+- 新增 `usecaseLevel_workflow/TourismTelecoupling_Workflow/DEMO_GUIDE.md`（演示说明）
+- 无生产代码改动；GCP 容器内临时跑验证（/tmp/wfval），不影响部署；git 不变（gcp-head=02b5b0b）。
+
+### 下一步
+- 用户按 DEMO_GUIDE 在网站做真人 demo（LLM 路径，归用户验）；若 LLM 文件映射偶发不稳，按救场表处理。
+- 可选：让 co2 改为 source=step 链 radial_flows 的距离输出（免预处理 flows_with_distance）——待确认 radial_flows 是否输出每线长度。
+
+---
+
+## 2026-06-22 — 排障（无代码改动）："GCP 卡住"= 单轮 Gemini 流式挂起，非服务器故障
+
+- 用户报"gcp 卡住了"。查 GCP：容器全 Up(healthy)、site/health=200、load 0.14、内存 27G 可用——**服务器健康**。
+- 根因：session `csis_f1f3bc56` 在 13:31:05 起一轮 → 13:31:07 Gemini `streamGenerateContent` 返回 200（流建立）→ 此后 3+ 分钟**零输出、无 iteration=1/done**。即 **Gemini 2.5 Flash 流式偶发挂起**（连接开了但不吐内容也不结束），非本平台 bug。SSE 异步，不拖累其他请求。
+- 处置建议：用户**刷新/开 New Chat 重发**即可（卡住那条不会自愈；nginx `/api/chat` 超时 30min 会一直挂）。如反复，可 `docker compose up -d --force-recreate api-server` 清挂起连接（约 10s，会断正在进行的请求）。本次未重启，交用户选。
+- 顺带发现（小、非本次原因）：前端在轮询 `/api/health` 但后端健康路径是 `/health` → 日志大量 `GET /api/health 404`。无害但配置不一致，可择日对齐（前端改 `/health` 或后端加 `/api/health` 别名）。
+- 无代码改动；git 不变（gcp-head=02b5b0b）。
+
+---
+
+## 2026-06-22 — workflow 运行流程改造（confirm→上传→跑）+ 定位 demo 不稳根因=Flash 空响应
+
+### 用户诉求
+- "确认后总停在这里"；要把逻辑改成：点 Confirm → 后台提示上传 → 用户上传文件+输入参数 → 发送 → 逐工具跑。要 demo prompt。
+
+### 根因定位（证据导向）
+- 从 nginx/后端日志查"停在这里"：propose 那轮 13:41 正常收尾，但 confirm 后**没有任何 /api/chat 到后端** → 确认被前端 `handleSend` 的 `|| isLoading` 吞掉（卡片却已 setSubmitted 显示 Submitted）。
+- 反复实测 confirm→上传→跑，每次结果不同（有时跑全 5 步、有时只出 thinking、有时反问 FAMD 列、有时空）。后端日志锁定：`Empty content (finish_reason=None), retrying up to 10x` —— **Gemini 2.5 Flash 间歇性空/挂起流式响应**是 demo 不稳与"卡住"的共同根因。**编排逻辑/引擎是好的**（纯引擎 5/5；force/overrides 均验证生效）。2.0-flash 实测 AGENT_FAILED（更糟），未深究。
+
+### 改动（已部署 GCP）
+- `agent.py`：新增 `_force_execute_on_upload`（已有计划 + 本轮带"附件标记" + 非 confirm/replan → 强制 execute_workflow_plan）；新增 `_looks_like_files_attached` + 标记常量 `[[files_attached]]`。解决"确认后没反应/上传后不跑"。
+- `App.jsx` `handleSend`：带附件发送时给发送文本追加 `[[FILES_ATTACHED]]`（不显示在气泡），让后端识别"本轮上传"。
+- `WorkflowPlanCard.jsx` `confirm()`：文案改为"确认这些步骤；先告诉我要传哪些文件+可设哪些参数；我上传并给参数后再发送运行"。
+- `workflow/catalog.py` few-shot：把列名占位符**改回具体 Wolong 列**（LON/CODE/FROM_X/Quantity/length_km/affin,gdplog,dist），并标注"示例，按用户实际数据调整"——让 LLM 生成的计划列名能匹配 Tourism demo 数据（之前泛化成占位符后模型乱猜 count/GDP_per_capita 导致必挂）。
+
+### 验证
+- `_force_execute_on_upload` ✅生效（日志 on_upload 路径强制 execute）；field/file_overrides ✅应用。
+- 但**端到端受 Flash 空响应拖累**：多次跑结果不一致。纯引擎仍 5/5。
+
+### 给用户的结论/建议
+- Demo prompt 已给（上传后粘贴：CO2 用 flows_with_distance.csv + 各步列名/参数写死，最大化确定性）。
+- 重要 demo 建议：规划部分直播（稳、出彩）；执行部分**预跑/重试兜底**（Flash 间歇问题多试一两次能干净通过），保留截图/录屏。
+- 待用户定：①是否把该流程+预案写进 DEMO_GUIDE.md；②是否做"流式空响应看门狗+自动重试"提高直播成功率（非银弹）。
+- 关键变更文件：`backend/agent.py`、`backend/workflow/catalog.py`、`frontend/src/App.jsx`、`frontend/src/components/WorkflowPlanCard.jsx`。累计改动仍未提交 git（gcp-head=02b5b0b）。
+
+---
+
+## 2026-06-22 — 流式空响应看门狗+自动重试 + DEMO_GUIDE 写入新流程&预案（用户要两个都做）
+
+### ① 流式看门狗 + 空响应重试（`agent.py` `_generate_streaming`）
+- 针对 Flash 间歇空/挂起：把 `async for chunk` 改为手动 `asyncio.wait_for(ait.__anext__(), timeout=60)` 逐块看门狗——开流后 60s 无新块即判挂起 → 自动**换连接重试**。
+- 新增"answer-less"判定：流结束但既无 function_call 也无"非 thought 文本"（即"只出 thinking 就停"）→ 视为空 → 重试（修正：thinking 文本不算 real）。
+- 把 `timeout/timed out/deadline` 纳入可重试错误（原只认 429/503）。
+- 部署 GCP，容器内确认（看门狗代码 6 处）、healthy/health=200。注意：看门狗期间持 `_GEMINI_SEMAPHORE`，单次挂起最多占 60s（低并发 demo 无碍）。
+
+### ② DEMO_GUIDE.md 写入新流程 + 预案
+- 第 2 幕改为三段式：**先 Confirm（不传文件）→ AI 提示要传哪些文件/参数 → 再上传文件夹 + 粘贴运行 prompt → 发送**。给出可直接粘贴的运行 prompt（点名 CO2 用 flows_with_distance.csv + 各步列名/参数写死，最大化确定性）。
+- 救场预案表新增"Flash 间歇空响应"行（最常见，刷新重发；后端已自动重试）+ "Confirm 没反应"行 + co2 缺 length_km 行。
+- 黄金法则：演示前先私下跑干净一遍并留截图/录屏兜底；规划部分稳可直播、执行部分靠预跑+重试；底层引擎 5/5 确定可靠（Flash 抽风是模型问题非平台能力）。
+
+### 关键变更文件
+- `backend/agent.py`（看门狗+重试）
+- `usecaseLevel_workflow/TourismTelecoupling_Workflow/DEMO_GUIDE.md`（新流程+预案+运行 prompt）
+
+### 状态/下一步
+- 两项均完成并部署；DEMO_GUIDE 为文档无需部署。用户将自行在网站实验。
+- 看门狗是"提高成功率"非"100% 根治"（Flash 模型层问题）。累计改动仍未提交 git（gcp-head=02b5b0b）。
+
+---
+
+## 2026-06-22 — 定位"上传后卡住"真凶=前端合并上传路径（非 Flash）+ 上传/发送解耦修复
+
+### 根因（nginx 日志坐实，可复现）
+- 用户发运行 prompt"又卡住"。查 nginx 访问日志 session csis_088cf04b：goal/confirm 两条 `/api/chat` 200 正常 → 文件夹 `/api/upload` 200（公网 23s，nginx 还 buffer 到临时文件）→ **此后再无 `/api/chat`**。即**运行 prompt 那条 chat 请求根本没从浏览器发出**。同 13:42 的 csis_2d9c6076 完全一致 → **可复现的前端 bug，不是 Flash 空响应**。
+- 机理：`streamChat` 两段式——先 `await uploadFilesWithProgress`（XHR）再 `fetchEventSource('/api/chat')`。慢上传走完后那个 SSE chat 请求有时未触发/静默失败。
+
+### 修复：上传与发送解耦（`App.jsx` + `lib/streaming.js`）
+- `streaming.js` 导出 `uploadFiles()`（复用 uploadFilesWithProgress）。
+- `App.jsx` 新增 `handlePickFiles`：**文件一选中即刻单独上传**（独立 XHR，带进度），文件留在 selectedFiles 仅作展示。三个入口（文件按钮/文件夹按钮/拖拽 onChange/drop）全改走它；input 选完 `value=''` 便于重选。
+- `handleSend`：streamChat 第二参数由 `currentFiles` 改为 `[]`——**运行消息走纯文本小请求**，不再触发 streamChat 内的上传段（即不再走会卡的合并路径）。`[[FILES_ATTACHED]]` 标记仍按 selectedFiles>0 追加 → `_force_execute_on_upload` 不受影响。
+- 这正是后台 curl 测试一直用的可靠模式（先 /api/upload，再纯文本 /api/chat），现浏览器同构。
+
+### 部署/验证
+- build frontend→`up -d --force-recreate frontend-ui`→restart nginx；服务包 = 本地 `index-B13xTzIV.js`；health=200。
+- 前端行为需浏览器实测（用户硬刷新后验）；后端"上传后纯文本 chat"路径此前 curl 已验证可强制 execute+应用 overrides。
+
+### 下一步
+- 用户**硬刷新**后按新流程实跑：goal→卡→Confirm→选文件夹(等进度条)→粘运行 prompt→发送。
+- 关键变更文件：`frontend/src/App.jsx`、`frontend/src/lib/streaming.js`。累计改动仍未提交 git（gcp-head=02b5b0b）。
+
+---
+
+## 2026-06-22 — workflow 执行端到端打通（5/5）：撤回 upload-on-select + thinking-off 强制调用 + 确定性 auto-map
+
+### 用户决定
+- 撤回"选中即传"（用户明确要 **点 Send 才上传**，和 MSU 一致）。换别的办法解决"上传后卡住/执行不跑"。
+
+### 根因链（逐个 curl 实测坐实）
+1. **强制 execute 那轮 Flash 只吐 thinking 不吐 function_call** → answer-less，看门狗重试也没用（每次都一样）。→ 修：**强制函数调用的那轮关掉 thinking_config**（`_forcing_now`）。thinking + 强制函数调用相冲突。
+2. **LLM 文件→输入映射不可靠**（漏 shapefile、乱编路径、把 nodes/causes/flows 互相错配），还污染 auto-map 的"已用"集合。→ 修：execute 时**忽略 LLM 的 inputs**，文件绑定全部由确定性 `_auto_map_inputs` 负责（file_overrides 显式优先；LLM inputs 仅兜底）。
+3. **auto-map 早期问题**：① file_kind="shapefile"(不在表里)→按 csv 找不到 .shp（修：kind 归一化 vector/raster + 未知回退全扩展名）；② 逐个贪心 + 顺序导致 causes_csv 抢走 tourism_Flows、flows_csv 只剩 famd_input（修：改**全局贪心**，所有(输入,文件)对按匹配分排序，高分先分配）。
+
+### 改动（已部署 GCP）
+- `agent.py`：`_forcing_now` 强制轮关 thinking；execute handler 文件绑定改"确定性 auto-map 为主、LLM inputs 兜底"；`_auto_map_inputs` 全局贪心 + kind 归一化/回退 + 名词重叠(Jaccard)打分。
+- `App.jsx`/`streaming.js`：**撤回 upload-on-select，恢复 upload-on-send**（保留 `[[FILES_ATTACHED]]` 标记）。
+
+### 实测（GCP curl，真实 Gemini，完整 demo prompt）
+- ✅ **全 5 步跑通、0 error**：s1 systems / s2 network / s3 flows / **s4 co2** / s5 famd 全部 tool_result。
+- ✅ auto-map 6/6 正确（含 causes↔famd、flows↔tourism_Flows 解纠缠）；co2 file_override→flows_with_distance。
+- ✅ **CO2 total = 5,875,593 kg (5.88M)** 对论文量级。
+- 单测：`_test_automap.py`（tourism ids）+ 内联 swap 场景（LLM ids）均 PASS。
+
+### 残留风险 / 下一步
+- 浏览器**两段式上传→聊天**的偶发"卡住"（13:42/15:07 nginx 显示上传后 chat 未发出）curl 复现不了（curl 走的就是"先传后纯文本"）；用户硬刷新后真站实测，若复发需看 F12 Network 确认 /api/chat 是否发出。MSU 用同款两段式且正常。
+- 关键变更文件：`backend/agent.py`、`frontend/src/App.jsx`、`frontend/src/lib/streaming.js`；新增 `_test_automap.py`。累计改动仍未提交 git（gcp-head=02b5b0b）。
+
+---
+
+## 2026-06-23 — 浏览器两段式"上传后卡"复发 → 加"运行意图"纯文字触发，绕开它
+
+### 现象（nginx 坐实，复现）
+- 用户真站又卡：session csis_7684e10a goal/confirm 正常，文件夹 `/api/upload` 01:45:54 返回 200，但**之后运行消息的 `/api/chat` 又没从浏览器发出**。即浏览器**两段式上传→聊天**的 handoff 偶发失败（curl 复现不了，因 curl 本就先传后纯文本）。文件其实已上传成功。
+
+### 修复：执行触发解耦（`agent.py`）
+- 新增 `_looks_like_run_intent`（run the workflow / run it / 运行 / 执行 …）。
+- `_force_execute_on_upload` 改为：has_plan 且非 confirm/replan，且 **(带文件标记 OR (session 已有上传文件 AND 运行意图))** → 强制 execute。
+- 效果：用户**带文件发送只负责把文件传上去**（卡不卡无所谓），再发一句**纯文字** "Run the full workflow…" → 后端就对已上传文件强制执行。彻底绕开会卡的带文件发送。
+
+### 实测（在用户真实 session csis_7684e10a 上）
+- ✅ 纯文字运行指令 → 强制 execute → auto-map 7/7 → **全 5 步跑通、0 error**（s1~s5 全 tool_result）。
+
+### 给用户的即时办法
+- 文件已上传：**别再选文件夹**，直接粘运行 prompt（纯文字）发送即可跑。
+- 可靠流程：Confirm → 选文件夹+发送(只为上传) → 纯文字运行 prompt 发送 → 跑。
+
+### 残留 / 下一步
+- 浏览器两段式 handoff 的根因仍未定位（需 F12 Network）；运行意图触发已让 demo 不依赖它。可选后续：streamChat 改单请求(文件随 chat 一起发)彻底消除两段式——但会丢上传进度条且影响 MSU，暂不动。
+- 关键变更文件：`backend/agent.py`。累计改动仍未提交 git（gcp-head=02b5b0b）。
+
+---
+
+## 2026-06-23 — 上传与聊天合并为单请求（用户："为什么要两次"）→ 彻底消除两段式卡点
+
+### 决策
+- 用户质疑为何文件和 prompt 要分两次发。采纳：改成**一个请求同时发文件+prompt**，根除"先传后聊"handoff 卡点（之前是为上传进度条才拆两段）。
+
+### 改动（已部署 GCP）
+- `main.py` `/api/chat`：签名加 `paths: list[str]`；文件保存循环改用 `paths[i]` + `_safe_relpath` 重建子目录（与 `/api/upload` 一致），单请求也不丢文件夹结构。
+- `streaming.js` `streamChat`：去掉独立 XHR 上传段；文件 + paths + message 一起塞进 **一个 fetchEventSource POST**。无 fetch 上传进度 → 上传时显示不确定"processing"态，首个 SSE 事件到达即转聊天。`uploadFilesWithProgress` 变为死代码（保留未删）。
+- 标记/force/auto-map 全沿用：单请求里文件先存盘→`[[FILES_ATTACHED]]`→强制 execute→auto-map→跑。
+
+### 实测（GCP curl，单 POST 带文件+paths+prompt+marker）
+- ✅ `forcing → execute (on_upload=True)`；file_override + auto-map 7/7；**全 5 步跑通、0 error**（s1~s5 全 tool_result）。
+
+### 用户新流程（更简）
+- 硬刷新 → goal → 卡 →(可选 Confirm)→ 选文件夹 + 粘运行 prompt → **一次发送** → 跑。
+- DEMO_GUIDE 第 2 幕已改为单请求版。
+
+### 残留 / 下一步
+- 单请求代价：大文件上传无字节进度（仅 GCP demo 小数据，无碍）；retry 会重传文件（仅首事件前的瞬时错误时）。MSU 大栅格如需进度条可日后另议。
+- 关键变更文件：`backend/main.py`、`frontend/src/lib/streaming.js`、`backend/agent.py`(run-intent)、`DEMO_GUIDE.md`。累计改动仍未提交 git（gcp-head=02b5b0b）。
+
+---
+
+## 2026-06-23 — 排障（无代码改动）："复选卡没弹出" = 浏览器旧缓存，非线上 bug
+
+- 用户报计划卡不弹。查证：① 后端 curl 复现 goal → 确实发 `workflow_plan` 事件、`valid:true`；② 服务的前端包 = 最新 `index-ByW1ravc.js`；③ App.jsx 的 workflow_plan 事件处理 + WorkflowPlanCard 渲染 + 无残留坏引用，代码完好。
+- 用 **Chrome 自动化在全新标签打开 http://34.42.83.50/ 发同样 goal → 计划卡完整正常渲染**（结构图 + 工具名 + Tools&inputs(run_draw_systems x_field=LON…) + 多选 + Confirm&run 5 steps）。截图存盘给用户。
+- 结论：线上前端 100% 正常，用户端是**旧缓存没加载到新卡片代码**。给用户三招清缓存：硬刷新 / **无痕窗口(最稳)** / F12 Disable cache。建议直接用无痕窗口做 demo。
+- 无代码改动；git 状态不变（gcp-head=02b5b0b）。
+
+---
+
+## 2026-06-23 — 讨论（无代码改动）：换模型能否减少抖动
+
+- 用户问"改成 3.5flash 会好些么"。澄清：**无 Gemini 3.5 flash 型号**；现用 2.5-flash；flash 系列只有 1.5/2.0/2.5。
+- 结论：本轮卡顿主要靠**把不可靠的活从 LLM 移到后端确定性逻辑**（auto-map / field+file_overrides / 强制 execute+关 thinking / 空响应看门狗）解决，**即便 2.5-flash 现也能 5/5**；模型只剩"听懂目标→规划→解读"。
+- 换更强模型大概率能减残留抖动，但要看哪个：**2.5-pro**（未接入下拉）最稳且保留 thinking，但慢/贵；1.5-pro 已在下拉、稳但无 thinking；**2.0-flash 实测 AGENT_FAILED 不可用**；1.5-flash 更弱。
+- 待用户定：是否把 **gemini-2.5-pro 加进前端模型下拉**供 A/B（动代码，待确认）。
+- 无代码改动；git 状态不变（gcp-head=02b5b0b）。
+
+---
+
+## 2026-06-23 — 联网核实 Gemini 新模型（无代码改动）
+
+- 用户指出已有 3.x flash；WebSearch/WebFetch 官方文档核实（我的知识截止 2026-01，已过时）：
+  - **gemini-3.2-flash = 泄露/未发布**（AI Studio 元数据/iOS 构建被扒，Google 未官方确认型号 id）→ **生产勿用**。
+  - **gemini-3.5-flash = 已发布稳定版**，官方定位"agentic + coding 最强"；另有 gemini-3-flash-preview(预览)、gemini-3.1-flash-lite(稳定便宜)。
+- 结论/建议：我们卡在多工具函数调用+指令遵循+空响应，3.5-flash 冲 agentic 调，**很可能明显改善**。建议升 **gemini-3.5-flash**（非 3.2）。
+- 代码注意：后端 thinking 块判断为 `"2.5" in model_name` → 换 3.5 会丢 thinking 块（也顺带没了 thinking+强制函数调用冲突）；若想保留 thinking 块需把判断扩到 `3.` 系并确认 3.5 接受 thinking 配置。
+- **用户决定（2026-06-23）：暂缓升级，仅留档**——后续若要做，把 `gemini-3.5-flash` 加进前端下拉 + thinking 判断扩到 `3.` 系，再 2.5 vs 3.5 A/B。
+- 无代码改动；git 状态不变（gcp-head=02b5b0b）。
+- Sources: ai.google.dev/gemini-api/docs/models ; .../whats-new-gemini-3.5 ; deepmind.google/models/gemini/flash/ ; blog.laozhang.ai/en/posts/gemini-3-2-flash-news
+
+---
+
+## 2026-06-26 — 核对 GCP dev 环境状态（无代码改动）
+
+### 完成内容
+- 用户："继续看一下那个 gcp 的 development"——对 GCP（34.42.83.50）dev 环境做了一次完整健康+一致性核对。
+- **运行状态全绿**：39 个容器全部 healthy；`tele-backend / tele-frontend / tele-nginx` 均 Up 3 days（= 上次部署 2026-06-23 单请求上传+run-intent 版）；`/` 与 `/health` 均返回 200。
+- **线上代码 = 本地未提交工作区，逐字节一致**（容器内 md5 对比本地）：
+  - `agent.py` `35528ab4…`、`main.py` `8b7d3ab4…`、`workflow/catalog.py` `e4de61c5…` 全部匹配。
+  - nginx：本地 `nginx/nginx.conf` 实际挂载为容器 `conf.d/default.conf`，md5 `e9d3821c…` 匹配（首轮误比了容器顶层 `/etc/nginx/nginx.conf`=file-server.conf，已纠正）。
+  - 前端服务 bundle `index-ByW1ravc.js`（Jun 23 01:59）。
+- workflow 引擎完整就位：容器内 `workflow/{schema,engine,reconcile,catalog}.py` 齐全。planning + execution(reconcile+单请求上传) + thinking 显示整套在线运行。
+
+### 关键变更文件
+- 无（纯核对，未改任何文件）。
+
+### 测试状态
+- GCP 站点 HTTP 200（root + health）；容器全 healthy；本地↔线上 md5 一致性已确认。
+- **未提交快照风险**：workflow 全部改动（7 文件 / +1563 行）仍未提交 git，HEAD 仍为 `02b5b0b`——线上=本地 一致但 git 落后，工作区一旦被动则无快照可回退。建议下一步先 commit 留快照（不 push、不动服务器）。
+- DEV_LOG 既有两个 next 仍挂起：①改动 ready 时提交（线上已稳定 3 天，可做）；②可选：co2 距离链到 radial_flows 输出（source=step）省掉 flows 预处理步。
+
+---
+
+## 2026-06-26 — 讨论 QGIS 渲染工具（梳理现状，无代码改动）
+
+### 完成内容
+- 用户："讨论一下关于渲染的问题，就是那个 qgis 的渲染工具"。通读了整条渲染链路并向用户对齐现状。
+- **调用链**：`render_spatial_file`(agent.py:1224) → celery `q_render`(concurrency=2) → `run_render_tif`(tools/render_tif.py) → `zoom_render`(qgis_renderer.py，子进程，信号量=3) → `_qgis_zoom_render_worker.py`(真正渲染)。容器 `tele-celery-render`。
+- **worker 逻辑**：底图 ①Google Satellite XYZ 在线 →②离线 MBTiles →③无底图；用户图层(栅格/矢量)；自动配色(栅格 Viridis 伪彩 band1 5级；矢量启发式选字段→类别/分级)；重投影 EPSG:3857 + 10% padding；PIL 叠图例；超时 120s。
+- **产品约束**：TIF/SHP 默认只给下载、不自动预览；只有用户明确请求才渲染；agent.py 402–406 用硬 prompt 规则防 LLM"假渲染"(BUG6 遗留)。
+
+### 我标注的潜在痛点（待用户确认方向）
+- A 出图质量：矢量自动选字段是启发式易配错；栅格固定 band1 + Viridis 5 级，分类栅格(LULC 整数)会被当连续值拉伸。
+- B 可靠性：在线底图强依赖 `mt1.google.com`，`isValid()` 未必真发请求(可能"看似有效但空白")；大栅格无降采样 + 120s 超时易失败；shapefile 缺 .prj 重投影出错。
+- C 交互/控制：用户无法指定渲染字段/色带/是否要底图。
+- D LLM 触发：防"假渲染"靠 prompt，脆，非结构性保证。
+
+### 关键变更文件
+- 无（纯讨论/代码梳理）。
+
+### 测试状态
+- 未实测渲染；待用户确认要深挖的方向(A/B/C/D 或具体失败现象)后再在 GCP 上复现。
+
+### 下一步
+- 等用户指明具体卡点 → 对应深挖代码 / 在 GCP `tele-celery-render` 实测复现。
+
+### 续(讨论,无代码改动):确定优先级框架
+- 用户:"我们先讨论,然后再进行代码的修改"——本轮仍只讨论,未动代码。
+- 我提出的优先级建议(待用户拍板):
+  1. **分类栅格被当连续值渲染**(最高收益):`_qgis_zoom_render_worker.py:122-136` 对所有栅格一律 Viridis 连续拉伸 min→max;LULC 等整数类别栅格被渲染成渐变,用户看不出地类。LULC 是 InVEST 最常见栅格 → 改动收益最高。
+  2. **在线底图可靠性**:`mt1.google.com` 直连 + `isValid()` 未必真发请求 → 潜在"偶发空白底图";需先确认真发生过才动。
+  3. **用户可控渲染**(字段/色带/底图开关):体验提升,不紧急。
+- 已向用户提两个问题待答:① 是遇到具体坏例子还是泛泛优化?② 最该先修哪个?
+- 测试状态:仍未实测;等用户回答后再钻具体方向。
+
+### 续(讨论,无代码改动):锁定具体问题 = telecoupling 点/流渲染
+- 用户给出参考图 `feedbacks/agentssystemsflows.jpg`(= Tonini & Liu 2017 Wolong 旅游 Fig 10)。诉求:agents 现在是圆点应改图标;flows 起讫点没画;flow 线太细;整体想还原 Fig 10。
+- **查清数据基础**(决定能做什么样式):
+  - `radial_flows.shp` = 直线 LineString,属性含输入 CSV 全部列(有数量列如 tourists)。
+  - `systems_from_table.shp` / `agents_from_table.shp` = Point,属性含全部列 + POINT_X/Y(systems 有类型列 Receiving/Sending/Spillover)。
+  - 结论:数据足够支撑 Fig 10 样式(流可颜色+线宽分级,系统可按类型分图标)。
+- **查清图标可用性**:render 容器 QGIS SVG 库在 `/opt/conda/envs/TeleCouplingAI/share/qgis/svg/`(tourist/ symbol/poi_peak gpsicons/tree 等齐全)+ 内置几何 marker(三角)。小人/三角/树图标技术上都可做。
+- **现状渲染差距**:通用 worker `_qgis_zoom_render_worker.py` 矢量用 `QgsSymbol.defaultSymbol()` → 点=默认圆、线=默认细线;线只按颜色分级、无线宽分级;无图标、无起讫点。
+
+### 抛给用户的 3 个决策(待答,答完即可动代码)
+1. **先做 A(每图层单独变好看)还是直接 B(三层合成一张 Fig 10)**——根本矛盾:`render_spatial_file` 一次只渲一个文件,Fig 10 是三层叠加。我建议先 A 后 B。
+2. **流要不要弯曲弧线**(现为直线;弯曲需生成弧线几何,工作量真实)——必须有 / 以后再说?
+3. **流的"数量列"自动猜 vs 用户/LLM 指定字段**(自动猜可能选错列)。
+- 我倾向的技术点:起讫点用 `MarkerLineSymbolLayer` 在首末顶点放 marker(不需单独点文件);Phase1 在 worker 加"telecoupling 图层识别"(按文件名 radial_flows/systems/agents 分流到专用样式)。
+
+### 测试状态 / 下一步
+- 仍无代码改动。等用户回 3 个决策 → 在 worker 实现 Phase1 telecoupling 样式 → GCP `tele-celery-render` 实测出图对比 Fig 10。
+
+### 续(讨论,无代码改动):用户拍板 4 决策 + 我给出方案待确认
+- 用户决定:① 先 A(单图层各自变好)再 B(新增"合成"工具出 Fig 10);② 弧线要有;③ 数量列人工指定,但渲染前列出候选列让用户选;④ 必须能回滚 + **绝不影响其他工具产出文件的渲染(最高优先)**。
+- 我提的**三重安全网(备案)**:(1) git 快照 commit 当前良好版本=本地回滚点;(2) 代码隔离——仅文件名匹配 `radial_flows*/systems_from_table*/agents_from_table*` 且几何对得上才走新样式,其余 100% 走原封不动旧路径;(3) try/except 兜底→新样式抛错自动回退默认渲染;(4) env `TELECOUPLING_STYLE=0` 运行时一键关、不重部署。验收方式:拿普通 InVEST tif/shp 渲染前后对比逐字节一致。
+- **Phase A 计划**:worker 加 `_detect_telecoupling_kind()` + 3 样式函数(flows 颜色+线宽双分级+首末 marker+渲染时弯弧/源文件不动;systems 按类型分图标;agents 小人图标);`render_spatial_file` 加可选参 `magnitude_field`/`category_field`。数量列交互=确定性 gate(列候选数值列→用户选→再渲染)。弧线在渲染时生成、源 .shp 保持直线。
+- **Phase B**(A 验收后):新增 telecoupling 合成图工具,叠三层,复用样式函数。
+- 待用户确认:① 方案 OK 即先打 git 快照再写 Phase A;② agents 小人用 QGIS 自带 SVG 还是用户提供标准小人图。
+
+### 测试状态 / 下一步
+- 仍无代码改动(讨论收敛完成,方案待用户最终 OK)。下一步:用户确认 → git 快照 → 实现 Phase A → GCP 实测对比 Fig 10。

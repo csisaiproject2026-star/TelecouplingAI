@@ -88,39 +88,45 @@ function uploadFilesWithProgress(files, sessionId, onProgress) {
 }
 
 /**
- * Stream a chat message and receive SSE events. If files are attached they
- * are uploaded first via /api/upload (with progress) and then the chat call
- * carries only the message text.
+ * Stream a chat message and receive SSE events. Files (if any) are sent in the
+ * SAME request as the message — one multipart POST to /api/chat. (Previously the
+ * upload was a separate XHR followed by a text-only chat POST, but that two-step
+ * "upload then open the SSE" handoff sometimes failed to fire the chat request,
+ * leaving the user stuck after the upload finished.) Trade-off: fetch() has no
+ * upload-progress event, so big uploads show an indeterminate bar instead of bytes.
  *
  * @param {string} message - User message text
- * @param {File[]} uploadedFiles - Optional files to upload
+ * @param {File[]} uploadedFiles - Optional files to upload alongside the message
  * @param {string} sessionId - Session ID header
  * @param {string|null} model - Gemini model name (e.g. 'gemini-2.5-flash')
  * @param {function(Object): void} onEvent - Callback for each SSE event
  * @param {{onUploadProgress?: (p:{loaded:number,total:number,percent:number}) => void}} [opts]
  */
 export async function streamChat(message, uploadedFiles, sessionId, model, onEvent, opts = {}) {
-  // Phase 1: upload files (if any). This is the slow part for big rasters; we
-  // run it as a separate XHR so xhr.upload.onprogress gives us byte-level
-  // progress for the UI.
-  if (uploadedFiles && uploadedFiles.length > 0) {
-    await uploadFilesWithProgress(uploadedFiles, sessionId, opts.onUploadProgress);
-  }
-
-  // Phase 2: kick off the chat. The body is now tiny (just the message text)
-  // so retries are cheap and safe, and the SSE stream can keep-alive freely.
   const formData = new FormData();
   formData.append('message', message);
   if (model) {
     formData.append('model', model);
   }
-  // NOTE: files are intentionally NOT appended — backend pulls them from the
-  // session_manager (where /api/upload above stashed them).
+  if (uploadedFiles && uploadedFiles.length > 0) {
+    uploadedFiles.forEach((f) => {
+      formData.append('files', f);
+      // webkitRelativePath preserves sub-folder layout for folder uploads; plain
+      // picks / drag-drop have an empty one → just the name.
+      formData.append('paths', f.webkitRelativePath || f.name);
+    });
+    // No byte-level progress with fetch(); show an indeterminate "uploading" state
+    // until the first SSE event arrives (then the chat spinner takes over).
+    if (opts.onUploadProgress) {
+      opts.onUploadProgress({ loaded: 0, total: 1, percent: 100, status: 'processing' });
+    }
+  }
 
   // Track whether we've ever received a real event. Retrying after the agent
   // has already started producing output would re-trigger the whole agent run
   // on the server (until Tier 3 buffer+resume lands), so we only retry while
-  // the stream is still in its "warm up" phase.
+  // the stream is still in its "warm up" phase. (A retry re-sends the files too,
+  // but that only happens on a transient error before any event has streamed.)
   let receivedAnyEvent = false;
 
   await fetchEventSource('/api/chat', {
@@ -145,6 +151,9 @@ export async function streamChat(message, uploadedFiles, sessionId, model, onEve
       // sse-starlette emits keep-alive comment frames (": ping") that the
       // library filters out, so anything that reaches us is a real event.
       if (!ev.data) return;
+      if (!receivedAnyEvent && opts.onUploadProgress) {
+        opts.onUploadProgress({ loaded: 1, total: 1, percent: 100, status: 'done' });
+      }
       receivedAnyEvent = true;
       try {
         onEvent(JSON.parse(ev.data));

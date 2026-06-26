@@ -13,6 +13,7 @@ import ChartRenderer from './components/ChartRenderer';
 import ImageRenderer from './components/ImageRenderer';
 import WarningCard from './components/WarningCard';
 import ResultFiles from './components/ResultFiles';
+import WorkflowPlanCard from './components/WorkflowPlanCard';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -83,7 +84,7 @@ function ThinkingBlock({ content, done }) {
   );
 }
 
-function MessageContent({ msg, sessionId }) {
+function MessageContent({ msg, sessionId, onPlanConfirm }) {
   if (msg.role === 'user') {
     return (
       <div className="bg-[#f0f4f9] px-6 py-4 rounded-3xl max-w-[85%] ml-auto">
@@ -101,7 +102,12 @@ function MessageContent({ msg, sessionId }) {
     <div className="flex gap-5 max-w-[90%]">
       <Sparkles size={24} className="text-blue-500 shrink-0 mt-1" />
       <div className="flex-1 space-y-3">
-        {msg.blocks && msg.blocks.map((block, i) => {
+        {/* Pin the workflow plan card to the BOTTOM of the message: render the text
+            explanation first, then the interactive card (方案A layout). */}
+        {msg.blocks && [
+          ...msg.blocks.filter(b => b.type !== 'workflow_plan'),
+          ...msg.blocks.filter(b => b.type === 'workflow_plan'),
+        ].map((block, i) => {
           switch (block.type) {
             case 'thinking':
               return <ThinkingBlock key={i} content={block.content} done={block.done} />;
@@ -153,6 +159,17 @@ function MessageContent({ msg, sessionId }) {
               return <ImageRenderer key={i} url={block.url} filename={block.filename} extent={block.extent} />;
             case 'file_download':
               return <ResultFiles key={i} files={block.files} sessionId={sessionId} />;
+            case 'workflow_plan':
+              return (
+                <WorkflowPlanCard
+                  key={i}
+                  plan={block.plan}
+                  valid={block.valid}
+                  errors={block.errors}
+                  toolSpecs={block.toolSpecs}
+                  onConfirm={onPlanConfirm}
+                />
+              );
             default:
               return null;
           }
@@ -179,6 +196,9 @@ function blockToMarkdown(b) {
     case 'image':         return `_[Image: ${b.filename || ''}]_`;
     case 'csv_table':     return `_[Table: ${b.filename || ''}]_`;
     case 'chart':         return `_[Chart]_`;
+    case 'workflow_plan':
+      return `**分析计划：${b.plan?.description || b.plan?.case_name || ''}**\n` +
+        (b.plan?.steps || []).map((s, i) => `${i + 1}. \`${s.tool}\`${s.rationale ? ` — ${s.rationale}` : ''}`).join('\n');
     default:              return '';
   }
 }
@@ -327,6 +347,10 @@ function App() {
     const currentInput = text;
     const currentFiles = [...selectedFiles];
     const chatId = activeId;
+    // Tag a send that carries freshly-attached files so the backend can deterministically
+    // RUN a confirmed workflow on the "upload files + send" turn (it strips the marker).
+    // The marker is NOT shown in the chat bubble (userMsg.content stays clean).
+    const sentText = currentFiles.length > 0 ? `${currentInput}\n\n[[FILES_ATTACHED]]` : currentInput;
 
     setInput('');
     setSelectedFiles([]);
@@ -353,7 +377,7 @@ function App() {
 
     try {
       await streamChat(
-        currentInput,
+        sentText,
         currentFiles,
         sessionId.current,
         appSettings.selectedModel,
@@ -439,6 +463,17 @@ function App() {
 
       case 'image_url':
         appendBlock(chatId, { type: 'image', url: event.url, filename: event.filename, extent: event.extent });
+        break;
+
+      case 'workflow_plan':
+        finalizeThinking(chatId);
+        appendBlock(chatId, {
+          type: 'workflow_plan',
+          plan: event.plan,
+          valid: event.valid,
+          errors: event.errors,
+          toolSpecs: event.tool_specs || {},
+        });
         break;
 
       case 'warning':
@@ -630,7 +665,7 @@ function App() {
             <div className="space-y-8 pb-20">
               {currentChat.messages.map((msg, idx) => (
                 <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : ''}`}>
-                  <MessageContent msg={msg} sessionId={sessionId.current} />
+                  <MessageContent msg={msg} sessionId={sessionId.current} onPlanConfirm={handleSend} />
                 </div>
               ))}
               {isLoading && (
