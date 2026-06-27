@@ -55,6 +55,7 @@ async def run_draw_radial_flows(
 
     gdf = gpd.GeoDataFrame(df, geometry=geoms, crs=crs)
     gdf = gdf[gdf.geometry.notna()]
+    gdf["tc_role"] = "flow_type"   # telecoupling render tag (Fig.10 flow styling)
 
     workspace_dir, _ = generate_output_dir("radial_flows", session_id)
     os.makedirs(workspace_dir, exist_ok=True)

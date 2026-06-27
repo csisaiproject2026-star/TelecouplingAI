@@ -1,0 +1,9 @@
+name,type,longitude,latitude
+Beijing,Sending,116.4,39.9
+London,Sending,-0.1,51.5
+New York,Sending,-74.0,40.7
+Tokyo,Sending,139.7,35.7
+Sydney,Sending,151.2,-33.9
+Wolong,Receiving,103.17,31.0
+Hong Kong,Spillover,114.1,22.3
+Singapore,Spillover,103.8,1.35

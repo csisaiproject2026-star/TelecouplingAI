@@ -108,6 +108,7 @@ async def run_add_media_flows(
         })
 
     gdf = gpd.GeoDataFrame(rows, geometry=geoms, crs=crs)
+    gdf["tc_role"] = "flow_type"   # telecoupling render tag (media = flow lines)
 
     workspace_dir, _ = generate_output_dir("add_media_flows", session_id)
     os.makedirs(workspace_dir, exist_ok=True)

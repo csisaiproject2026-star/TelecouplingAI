@@ -401,9 +401,9 @@ Users often provide parameters across multiple messages. Follow this pattern:
 - NEVER write inline image data in your text response. Specifically: do NOT emit `![...](data:image/png;base64,...)`, do NOT emit any `data:image/*;base64,...` URLs, and do NOT emit fake/fabricated base64 byte strings.
 - The ONLY way to show a rendered map or image is to call the `render_spatial_file` tool. The frontend will display the resulting PNG automatically — you do not need to embed it in your reply.
 - NEVER claim, state, or imply that you rendered/showed/displayed a map or image (e.g. "Here is the rendered map", "the image is shown above", "you can download this image") UNLESS you actually called `render_spatial_file` for that exact file. Describing or announcing a render you did not perform is a hard error — it produces NO image for the user.
-- When the user asks to show / render / display / visualize / 可视化 a specific .tif or .shp file, you MUST call `render_spatial_file` on that file. Never answer with text alone claiming it is done.
-- The ONLY exception to calling `render_spatial_file` again: if you yourself called it for the SAME file in the IMMEDIATELY preceding turn of THIS conversation, you may say it is already shown above. In every other case — including when an older render exists earlier in the history — you MUST call `render_spatial_file` again.
-- You cannot draw images yourself. If asked to "show a map" or "visualize" and you have not rendered that file this turn, call `render_spatial_file` on the relevant .tif / .shp file.
+- When the user asks to show / render / display / visualize / 可视化 ANY spatial file (.tif, .tiff, .shp, .geojson, .gpkg — including point layers like agents/systems and line layers like flows), you MUST call `render_spatial_file` on that file. Never answer with text alone claiming it is done.
+- There is NO exception and NO shortcut. EVERY time the user asks to show/render/display/visualize a file, call `render_spatial_file` for it AGAIN, even if you or an earlier turn already rendered it. Re-rendering is cheap, fast, and safe. You must NEVER say "already shown above", "rendered in the previous turn", "the map is displayed", or anything implying an image exists, UNLESS you are calling `render_spatial_file` in THIS same response. Claiming a prior render instead of calling the tool is a hard error that leaves the user with no image.
+- You cannot draw images yourself and you cannot remember/reuse a previous render. If asked to "show a map" or "visualize", call `render_spatial_file` on the relevant file in this very turn — no matter how many times it has been rendered before.
 """
 
 # ---------------------------------------------------------------------------
@@ -1229,7 +1229,12 @@ TOOLS = [
                 "Do NOT call this when the user is asking to run a model or upload input files — "
                 "only call it after a tool has already produced output .tif or .shp files and the user "
                 "specifically asks to see one of those outputs as an image. "
-                "The file_path must be an absolute path to an existing file on disk."
+                "The file_path must be an absolute path to an existing file on disk. "
+                "For radial-flow layers (radial_flows.shp), you MUST also pass magnitude_field — "
+                "the column whose value sets each flow's color and line width (e.g. tourists/volume/trips). "
+                "If you don't know which column to use, render once without it: the tool will reply with "
+                "the list of available numeric columns; show those to the user, ask which one is the flow "
+                "magnitude, then call again with magnitude_field set."
             ),
             parameters=types.Schema(
                 type=types.Type.OBJECT,
@@ -1237,6 +1242,30 @@ TOOLS = [
                     "file_path": types.Schema(
                         type=types.Type.STRING,
                         description="Absolute path to the spatial file (.tif, .tiff, .shp, .geojson, or .gpkg) to render.",
+                    ),
+                    "magnitude_field": types.Schema(
+                        type=types.Type.STRING,
+                        description=(
+                            "For radial-flow layers only: the numeric column that drives flow color "
+                            "and line width (e.g. 'tourists'). Omit for non-flow files."
+                        ),
+                    ),
+                    "category_field": types.Schema(
+                        type=types.Type.STRING,
+                        description=(
+                            "For systems-point layers only: the column to categorize markers by "
+                            "(e.g. 'type' = Sending/Receiving/Spillover). Optional; auto-detected if omitted."
+                        ),
+                    ),
+                    "render_as": types.Schema(
+                        type=types.Type.STRING,
+                        description=(
+                            "Telecoupling render style override: one of 'flow', 'system', 'agent', 'cause'. "
+                            "Files produced by the telecoupling tools are auto-detected (they carry a tc_role tag), "
+                            "so you normally OMIT this. ONLY set it when the user uploads their OWN .shp/.geojson and "
+                            "explicitly asks to render it as a flow/system/agent/cause map. If the user uploads a "
+                            "spatial file and wants telecoupling styling but does NOT say which type, ask them."
+                        ),
                     ),
                 },
                 required=["file_path"],
@@ -1258,6 +1287,70 @@ from workflow.engine import run_plan_async
 TOOLS[0].function_declarations.append(PROPOSE_WORKFLOW_PLAN_DECLARATION)
 TOOLS[0].function_declarations.append(EXECUTE_WORKFLOW_PLAN_DECLARATION)
 TOOLS[0].function_declarations.append(ADD_WORKFLOW_STEPS_DECLARATION)
+
+# Telecoupling composite map (Phase B): overlay flows + systems + agents into ONE
+# Fig.10-style image. Use when the user wants the combined telecoupling map, not a
+# single layer. Pass the absolute paths of whichever layers exist; flows REQUIRE a
+# magnitude_field (render once without it to get the candidate column list).
+TOOLS[0].function_declarations.append(
+    types.FunctionDeclaration(
+        name="render_telecoupling_scene",
+        description=(
+            "Composite a single Tonini & Liu Fig.10-style telecoupling map by overlaying any "
+            "subset of these previously-produced layers onto a satellite basemap: flows "
+            "(radial_flows.shp), systems (systems_from_table.shp), agents (agents_from_table.shp). "
+            "Use this when the user asks for the combined/overall telecoupling map (systems + agents "
+            "+ flows together), as opposed to rendering one file. Provide the absolute path of each "
+            "layer that exists (at least one is required). If flows are included you MUST pass "
+            "magnitude_field (the flow volume column, e.g. tourists); if you don't know it, call once "
+            "without it and the tool returns the candidate numeric columns to ask the user about. "
+            "If the user UPLOADED several telecoupling layer files (e.g. radial_flows.geojson, "
+            "systems.geojson, agents.geojson, causes.geojson) and asks to combine them, just pass ALL "
+            "their paths in `layers` — the tool auto-detects each file's role from its tc_role tag, so "
+            "you do NOT need to sort them into flows_file/systems_file/etc."
+        ),
+        parameters=types.Schema(
+            type=types.Type.OBJECT,
+            properties={
+                "layers": types.Schema(
+                    type=types.Type.ARRAY,
+                    items=types.Schema(type=types.Type.STRING),
+                    description=(
+                        "List of absolute paths to telecoupling layer files (.shp/.geojson) to "
+                        "auto-route by their tc_role tag. Best for combining freshly-uploaded files: "
+                        "pass them all here and the tool assigns each to flows/systems/agents/causes. "
+                        "Explicit *_file params (below) take priority over these."
+                    ),
+                ),
+                "flows_file": types.Schema(
+                    type=types.Type.STRING,
+                    description="Absolute path to the radial_flows .shp/.geojson (optional).",
+                ),
+                "systems_file": types.Schema(
+                    type=types.Type.STRING,
+                    description="Absolute path to the systems_from_table .shp/.geojson (optional).",
+                ),
+                "agents_file": types.Schema(
+                    type=types.Type.STRING,
+                    description="Absolute path to the agents .shp/.geojson (optional).",
+                ),
+                "causes_file": types.Schema(
+                    type=types.Type.STRING,
+                    description="Absolute path to the causes .shp/.geojson (optional; drawn as star markers).",
+                ),
+                "magnitude_field": types.Schema(
+                    type=types.Type.STRING,
+                    description="Flow volume column driving color/width (required when flows_file is given).",
+                ),
+                "category_field": types.Schema(
+                    type=types.Type.STRING,
+                    description="System type column (e.g. 'type'); optional, auto-detected if omitted.",
+                ),
+            },
+            required=[],
+        ),
+    )
+)
 
 
 def _format_plan_summary(plan_dict: dict) -> str:
@@ -1651,6 +1744,12 @@ _WORKFLOW_GOAL_EXCLUSIONS = [
     "execute_workflow_plan", "selected_steps", "我确认", "确认运行", "确认并运行", "运行选中",
     "刚才的结果", "上一步", "这个结果", "这个输出", "之前的结果", "上面的结果",
     "你是谁", "你能做什么", "你好", "怎么用", "帮助",
+    # Compositing telecoupling layers into ONE map is a single tool
+    # (render_telecoupling_scene), NOT a workflow — don't spawn a plan card.
+    "telecoupling map", "telecoupling scene", "combined telecoupling",
+    "combine the flows", "combine flows", "into one map", "into a single map",
+    "one combined map", "overlay the", "合成图", "合成一张", "叠成一张",
+    "叠加成一张", "组合成一张", "一张总图", "叠在一起",
 ]
 
 
@@ -1797,6 +1896,7 @@ async def run_agent(
         "run_crop_production_percentile":       "q_crop_pct",
         "run_crop_production_regression":       "q_crop_reg",
         "render_spatial_file":                  "q_render",
+        "render_telecoupling_scene":            "q_render",
         "read_file_content":                    "q_render",
         "run_carbon_storage":                   "q_carbon",
         "run_habitat_quality":                  "q_habitat_quality",

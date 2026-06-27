@@ -111,6 +111,7 @@ async def run_commodity_trade(
         )
 
     gdf = gpd.GeoDataFrame(valid_rows, geometry=geoms, crs=crs)
+    gdf["tc_role"] = "flow_type"   # telecoupling render tag (trade = flow lines)
 
     workspace_dir, _ = generate_output_dir("commodity_trade", session_id)
     os.makedirs(workspace_dir, exist_ok=True)

@@ -5063,3 +5063,231 @@ Git commit: `6373c5f`
 
 ### 测试状态 / 下一步
 - 仍无代码改动(讨论收敛完成,方案待用户最终 OK)。下一步:用户确认 → git 快照 → 实现 Phase A → GCP 实测对比 Fig 10。
+
+---
+
+## 2026-06-26 — Telecoupling 渲染 Phase A 实现 + 自测通过 + 热部署到 GCP dev
+
+### 完成内容(flows/systems/agents 出图向 Tonini&Liu 2017 Fig.10 看齐)
+- **回滚快照**:先提交 `d4c0528`(chore: snapshot baseline)作为本地回滚点。
+- **worker `_qgis_zoom_render_worker.py`(附加式、隔离)**:新增 `_tc_detect_kind` + 样式函数;**完全不改动现有通用样式代码**,只在其后加一个 `if _tc_kind:` 覆盖块,且 `_tc_kind` 仅当文件名匹配 `radial_flows*/systems_from_table*/agents_from_table*` 且几何对得上才非 None。
+  - flows:渲染时把直线弯成贝塞尔弧(源 .shp 不动)+ 按数量列**颜色(粉→品红)+线宽 4 级**分级 + 首末顶点 marker(起讫点);
+  - systems:按类型列分类(Sending/Receiving 绿三角深浅、Spillover 橙圆)+ 分类图例;
+  - agents:自带 person SVG(`backend/renderers/assets/agent_person.svg`)替圆点。
+- **参数链**:`render_spatial_file`(agent.py)新增可选 `magnitude_field`/`category_field` → `render_tif.py` → `qgis_renderer.zoom_render` → worker。
+- **数量列 gate(用户要的"列出来让用户选")**:`render_tif` 检测 flows 文件且无 magnitude_field → 抛 `NEEDS_MAGNITUDE_FIELD`,消息列出候选数值列(用 ogr 读 dbf,自动剔除 FROM_X/Y/TO_X/Y 等坐标列)。
+- **三重安全网**:① git 快照 d4c0528;② 隔离(非匹配文件走原路径);③ try/except 兜底→新样式抛错回退通用;④ env `TELECOUPLING_STYLE=0` 运行时一键关。
+
+### 自测(全部在 GCP `tele-celery-render` 容器,QGIS 3.44.7)
+- 合成"类 Wolong"数据(flows 带 tourists/trips、systems 带 type、agents)。
+- **出图视觉**:flows 弯弧+颜色线宽分级+起讫点+色带图例;systems 三角+橙圆+分类图例;agents 小人图标。截图存 `feedbacks/_tc_render_test/`(integ_flows/systems/agents.png)。
+- **回归(最高优先:不影响其他工具)**:非 telecoupling 矢量 `generic_points.shp` 旧→新 worker **md5 逐字节一致**(ca88f633);栅格代码路径未改(附加块仅 VECTOR_EXTS 触发),新 worker 连续 3 次渲染 tif 完全一致(cf1ac488),旧 baseline 的一次差异=在线卫星瓦片抓取的瞬时差异,非代码。
+- **kill-switch**:`TELECOUPLING_STYLE=0` 渲 flows → 回到通用细直线(generic 误挑 FROM_X 分级),证明一键回滚有效。
+- **gate**:`_numeric_field_candidates(radial_flows)` = ['tourists','trips'](正确剔除坐标列);`run_render_tif` 无 field → 抛错列出候选;带 `magnitude_field=tourists` → 成功出 `radial_flows_render.png`。
+
+### 部署状态(GCP dev,热补丁,未 baked)
+- docker cp 新 worker+SVG+render_tif+qgis_renderer 进 tele-celery-render;agent.py 进 tele-backend;重启两容器 → 均 healthy、站点 200、日志无报错。
+- ⚠️ **热补丁非镜像**:容器若被 `--force-recreate`/重建会回到 baseline(无 telecoupling)。回滚=重建容器即恢复 d4c0528 效果;持久化需 rebuild image(待用户审完再做)。
+
+### 关键变更文件(本地未提交,在 d4c0528 之上)
+- `backend/renderers/_qgis_zoom_render_worker.py`、`backend/renderers/qgis_renderer.py`、`backend/renderers/assets/agent_person.svg`(新)、`backend/tools/render_tif.py`、`backend/agent.py`
+
+### 下一步
+- 待用户审图:① agents 小人图标偏小,是否放大/换用户自备 SVG;② flows 配色/线宽是否再调。
+- Phase B(用户要做):新增"合成图"工具,把 flows+systems+agents 叠成一张 Fig.10,复用本期样式函数。
+- 用户审完 → commit Phase A → 视需要 rebuild image 持久化(GCP);MSU 暂不动。
+
+---
+
+## 2026-06-26 — Telecoupling 渲染:systems 空心/实心三角 + 图例放大 + 共享模块抽取 + Phase B 合成图
+
+### systems 样式 + 图例(用户反馈)
+- Sending → **空心**绿三角(fill 透明、绿描边);Receiving → **实心**绿三角;Spillover → 橙圆。
+- 图例**放大**:仅对 telecoupling 生效(`_lg_scale=1.7 if _tc_kind else 1.0`),每个尺寸字面量改 `int(round(X*scale))`,**scale=1 时与原图例逐字节一致**;PIL 分类图例支持 hollow swatch(向后兼容旧 4 元组)。
+- 回归复核:非 telecoupling 矢量 `generic_points` 仍 `ca88f633` 不变。
+
+### 共享模块抽取(让 Phase A/B 复用同一套样式)
+- 新增 `backend/renderers/telecoupling_style.py`:detect_kind / build_curved / flow_symbol / style_flows / style_systems / style_agents / apply_style + flow_ramp。
+- 单图 worker `_qgis_zoom_render_worker.py` 删掉内联函数(-198 行)改 `from telecoupling_style import ...`;调用点改新签名(显式传 magnitude_field/category_field)。重新部署+自测:回归 ca88f633 不变、flows/systems 仍正常。
+
+### Phase B 合成图(新工具)
+- 新增 worker `_qgis_scene_render_worker.py`:加载 flows+systems+agents(任意子集)→ 复用 telecoupling_style 样式 → 叠加(agents 顶/systems 中/flows 底/basemap)→ 并集 extent → 渲染 → **组合图例**(flow 色带 + systems 分类框 + Agent 小人条目)。
+- 新增工具 `tools/render_telecoupling_scene.py`(参数 flows_file/systems_file/agents_file/magnitude_field/category_field;至少一个文件;flows 在内但无 magnitude_field → 同款 NEEDS_MAGNITUDE_FIELD gate 列候选列)。
+- 接线:`qgis_renderer.scene_render`;`task_queue` tool_map + import;`agent.py` 新 FunctionDeclaration `render_telecoupling_scene` + `_TOOL_QUEUES` q_render。
+- **自测**:容器内 scene worker 直渲 → 一张 Fig.10 复刻图(弯弧分级流 + 空心/实心三角 + 橙圆 spillover + 小人 + 组合图例),存 `feedbacks/_tc_render_test/scene.png`;工具函数 `run_render_telecoupling_scene` gate(列 tourists,trips)+ 全量合成均通过。
+
+### 部署(GCP dev,热补丁,未 baked)
+- docker cp 全部新/改文件进 tele-celery-render + tele-backend,重启两容器 → healthy、站点 200、`render_telecoupling_scene` 已注册(decls=49)、render worker ready。
+- ⚠️ 仍为热补丁;容器重建会回 baseline。回滚:`TELECOUPLING_STYLE=0`(单图样式)/ 重建容器回 d4c0528。
+
+### 关键变更文件(本地未提交,在 d4c0528 之上)
+- 新增:`backend/renderers/telecoupling_style.py`、`backend/renderers/_qgis_scene_render_worker.py`、`backend/tools/render_telecoupling_scene.py`、`backend/renderers/assets/agent_person.svg`
+- 改:`backend/renderers/_qgis_zoom_render_worker.py`、`backend/renderers/qgis_renderer.py`、`backend/tools/render_tif.py`、`backend/workers/task_queue.py`、`backend/agent.py`
+
+### 下一步
+- 用户审 `feedbacks/_tc_render_test/`(尤其 scene.png + sys2.png)→ 微调(agents 小人大小/流配色)→ commit → 视需要 rebuild image 持久化。MSU 不动。
+
+---
+
+## 2026-06-26 — systems 改正/倒实心三角 + 图例画三角 + 网站测试说明
+
+### 改动(用户:receiving 倒实心三角、sending 正实心三角)
+- `telecoupling_style.style_systems`:Sending=正三角(angle 0)、Receiving=倒三角(angle 180,QGIS 3.44 无 InvertedTriangle 枚举→用旋转)、Spillover=橙圆。两个都改**实心**(取消之前的空心)。entries 第 5 元素从 hollow 布尔改为**形状字符串** triangle_up/triangle_down/circle。
+- 两处 PIL 图例(单图 worker + 合成 worker)按形状画 swatch:正三角/倒三角/圆/(generic 仍 rect)。**关键**:generic 4 元组→"rect"→画填充方块,与原逐字节一致。回归复核 `generic_points` 仍 `ca88f633`。
+- 部署:telecoupling_style + 两个 worker docker cp 进 tele-celery-render(worker 每渲染重载,无需重启)。自测出图:`feedbacks/_tc_render_test/sys3.png`(正/倒三角+图例区分)、`scene2.png`(合成,三角已更新)。
+
+### 排查:用户"scene2 不全"
+- 复核:完整文件 2.0MB、md5 本地==服务器,内容齐全。原因=**用户在 scp 传输中(才 783KB)打开了半截 PNG**,非渲染问题。
+
+### 网站测试说明(已给用户)
+- GCP dev http://34.42.83.50/(无痕窗口)。渲染对"已生成输出文件"操作,文件名须匹配 radial_flows.shp/systems_from_table.shp/agents_from_table.shp(即 run_draw_radial_flows / run_draw_systems_from_table / run_draw_agents_from_table 的产出)。
+- Phase A:画出文件→"渲染 flows"(AI 反问数量列→答 tourists)→ 弯弧分级图;systems/agents 同理。
+- Phase B:三层都跑出后→"合成一张 telecoupling 总图/Fig 10"→ render_telecoupling_scene。
+- 数量列=人工指定(AI 先问);agents 小人偏小可后调;热补丁未 baked,容器重建会回退。
+
+### 关键变更文件(本地未提交,在 d4c0528 之上)
+- 改:`backend/renderers/telecoupling_style.py`、`_qgis_zoom_render_worker.py`、`_qgis_scene_render_worker.py`(本轮);累计本特性共 4 新 5 改(见前条目)。
+
+### 下一步
+- 用户在网站实测 Phase A/B(LLM 流程,用户负责)→ 反馈微调(小人大小/配色)→ commit → 视需要 rebuild image 持久化。MSU 不动。
+
+### 收尾确认(同日,无代码改动)
+- scene2.png md5 复核:本地 == 服务器 = `e00778c2093d6c9701fbdb31f37f4d68`(2,016,066 字节)→ 坐实"不全"仅为传输中半截 PNG,渲染本身完整。
+- 当前状态:Phase A + systems 正/倒三角 + Phase B 合成图全部热部署在 GCP dev;本地改动未 commit(在 d4c0528 之上);等用户网站实测反馈后再 commit + rebuild image 持久化。
+
+---
+
+## 2026-06-26 — 修 "preview expired"(渲染图过大)+ flows 列过滤 + JPEG 预览
+
+### 用户实测两问题
+1. render radial_flows 时未被询问数量列;2. 图加载中途报 "preview expired"。
+
+### 根因(查 GCP 日志 + 实测坐实)
+- **"preview expired"** = 前端 `ImageRenderer.jsx` 的 `<img onError>` 占位(图加载失败)。**渲染本身成功**(render worker 6.37s 出图)、PNG 服务端 200。真因:**渲染 PNG 达 3.2MB**(1920×1080 卫星底图,PNG 压不动),慢链路(用户离 GCP 远)下传输中途连接断 → img onError → "preview expired"。**属既有问题**(底图渲染一直这么大),非 telecoupling 改动引入。
+- **未询问列** = LLM 自己传了 magnitude_field(它刚跑完 draw 知道列名,传了 flow_value),gate 正确跳过 → 实际按 flow_value 正常出图(图核对无误)。另外用户列名是 from_lon/from_lat/to_lon/to_lat,旧 `_COORD_COLS` 没排除 _lon/_lat 变体 → 候选里混进坐标列。
+
+### 修复(workers 完全不动,改在工具层 → 不破坏"逐字节"保证)
+- `render_tif._to_web_jpeg`:渲染产出 PNG 后**重编码为 JPEG(q85,透明铺白底)**,删原 PNG,返回 .jpg。flows 渲染 3.2MB→**518KB**(6×),scene 256KB,外网 URL 200 image/jpeg。前端 `<img>`/下载/`_enrich_file_urls` 均兼容 .jpg。
+- 列过滤改 `_is_coord_col`:排除精确 x/y/lon/lat/... + 后缀 _x/_y/_lon/_lat/_long/_latitude → 用户文件候选现为干净的 `['flow_value']`。
+- scene 工具复用 `_to_web_jpeg`。
+- 部署:render_tif + scene 工具 docker cp 进 tele-celery-render(+backend),重启 render worker;实测出图 .jpg、画质无损、URL 200。
+
+### 备注
+- "LLM 自己猜列、不问用户"是合理行为;若要强制每次问,属 LLM prompt 调优(用户负责)。
+- JPEG 优化对**所有** render_spatial_file/scene 预览生效(都受益于变小),视觉 q85 近无损;QGIS worker 未改,渲染本身仍逐字节一致。
+
+### 关键变更文件(本地未提交,在 d4c0528 之上)
+- 改:`backend/tools/render_tif.py`、`backend/tools/render_telecoupling_scene.py`
+
+### 下一步
+- 用户重测网站渲染(图应能正常加载);确认 OK 后 commit + rebuild image 持久化。MSU 不动。
+
+---
+
+## 2026-06-26 — BUG6"假渲染"复发修复 + agents/systems 检测放宽 + 讨论按列检测
+
+### 用户问题:"show the agents.shp" 没出图
+- 查 GCP 日志坐实:**LLM 根本没调 render_spatial_file**(无调用、无错误),只回了句"Here is the rendered map" + 自称"上一轮已渲染"。= BUG6 假渲染复发(用户猜"调用了但出错"其实不对)。
+- 诱因:我之前给 `render_spatial_file` 加的 flows/magnitude 长描述可能带偏模型;且 agent.py 提示词第 405 行留了"上一轮渲染过可不再调"的逃生口,被模型滥用(谎称上一轮渲染过——但唯一一次渲染在 agents.shp 生成之前)。
+
+### 修复
+- **agent.py 提示词**:删掉逃生口,改成绝对规则——每次要求显示就必须当轮再调 render_spatial_file,禁止任何"已显示/上一轮渲染过"措辞;明确点/线/栅格各类文件都要调。需重启 backend(已重启,health 200)。
+- **检测放宽**:`telecoupling_style.detect_kind` 由 `systems_from_table*/agents_from_table*` 放宽到 `systems*/agents*`,让交互版 `agents.shp`/`systems.shp`(run_add_*_interactively 产出)也吃到样式。实测 agents.shp → 小人图标 + 479KB jpg(`feedbacks/_tc_render_test/agents_interactive_render.jpg`)。
+
+### 讨论中(未定):用户提"按文件名判断不靠谱,能否按列名"
+- 我的分析:线=flows 稳;点(systems vs agents)光几何分不开,需类型列;**纯几何/列判断会误伤其他工具的线/点图层**(违反"绝不影响其他工具"硬约束)。
+- 我推荐:**生成时由工具写标记列 `tc_role=flow/system/agent`**,detect_kind 只读它 → 可靠+零误伤+本质就是"按列";兜底=几何+强列特征(收紧防误伤)。已请用户定:走标记列 vs 纯启发式;及其数据是否本就有角色列。
+
+### 关键变更文件(本地未提交,在 d4c0528 之上)
+- 改:`backend/agent.py`(提示词)、`backend/renderers/telecoupling_style.py`(检测放宽)
+- (本会话早些)`backend/tools/render_tif.py`、`render_telecoupling_scene.py`(JPEG 预览修 preview-expired)
+
+### 下一步
+- 等用户定检测方案(标记列/启发式)→ 实现;用户重测网站 show agents(应出图)。确认后 commit + rebuild。
+
+### 续(讨论,无代码改动):tc_role 标记列方案收敛
+- 用户明确选了"生成时打标记"路线,三层判定:① prompt 显式 `render_as`(用户单独传 shp 必须说明 agents/system/flow)> ② shp 自带 `tc_role` 列(我们工具写入)> ③ 都没有走通用渲染(零误伤)。detect_kind 不再看文件名。
+- 我已确认方案可行,抛 4 个待定细节给用户:① tc_role 取值=agent/system/flow;② 旧文件无此列→走通用(需重跑工具或 render_as 指定)是否接受;③ 打标记工具范围(先 flows+systems2版+agents2版=5 个,causes/media/commodity 是否纳入);④ 几何与 role 不匹配时做 sanity 回退通用。
+- 待用户拍这 4 点 → 实现:5 工具写 tc_role + detect_kind 读列 + render_spatial_file 加 render_as + 提示词规则;保留安全网(env 开关/try-except/不动通用路径)。
+
+### 续(讨论,无代码改动):tc_role 取值定 + 排查 causes/media/commodity
+- 用户拍 4 点:① tc_role 值用 `agent_type/system_type/flow_type`;② 旧文件重跑 OK;③ 先做 5 个;④ 几何不匹配回退通用 OK。并让我先看另 3 个工具产出。
+- 读三个工具产出结论:
+  - **add_media_flows → media_flows.shp = 线**,列含 `mentions`(数量)+ from/to 坐标 → **本质就是流**,可零成本复用 flow 样式,打 `tc_role=flow_type`。
+  - **commodity_trade → commodity_trade_flows.shp = 线**,含 value 数量列 → **也是流**,同样复用,`flow_type`。
+  - **add_causes → causes.shp = 点**,DESCRIPTION+POINT_X/Y → 第 4 类组件(Causes),需新点标记(建议星/菱形)+ `cause_type`。
+- 建议:media+commodity 一起纳入 flows(免费);causes 可选(小工作量,新 marker+图例)。范围 5→7(不含 causes)或 8(含)。待用户定。
+
+### 下一步
+- 用户定范围(7 或 8)→ 实现:各工具写 tc_role(值 *_type)+ detect_kind 读列(替掉文件名)+ render_spatial_file 加 render_as + 提示词规则 + 几何 sanity 回退;causes 若纳入则加 style_causes + 图例。保留安全网。
+
+---
+
+## 2026-06-26 — tc_role 标记列方案落地(8 工具)+ causes 星形 + render_as + 全量自测+上线
+
+### 实现(用户授权:自己做+自己截图验证+可用 LLM 验证,勿重蹈 BUG6)
+- **8 工具写 `tc_role` 列**(值 *_type):flows×3(radial_flows/add_media_flows/commodity_trade=`flow_type`)、systems×2(draw_systems_table/add_systems=`system_type`)、agents×2(draw_agents_table/add_agents=`agent_type`)、causes×1(add_causes=`cause_type`)。
+- **detect_kind 改读 `tc_role` 列**(`telecoupling_style.py`),彻底不看文件名。优先级:`render_as`(显式)> `tc_role` 列 > None(通用)。几何 sanity(flow=线/其余=点,不符回退通用)。
+- **causes 新样式 `style_causes`**:红色★星形 + 一条 `Cause` 星形图例;两处 PIL 图例(单图+合成 worker)加 star glyph(5 角星多边形)。
+- **render_as 参数**:`render_spatial_file` 加(flow/system/agent/cause),给单独上传文件用;链路 agent.py→render_tif→qgis_renderer.zoom_render→worker(p.get("render_as")→detect_kind force_role)。
+- **flow gate 改判**:`render_tif._is_flow_render` 读 `tc_role==flow_type` 或 render_as=flow(替掉文件名),媒体/贸易流也会触发"选数量列"。
+- **Phase B scene 加 causes**:scene 工具/worker/qgis_renderer 加 `causes_file`/`causes_path`,合成图含星形 + 图例。
+
+### 自测(全绿,截图存 feedbacks/_tc_render_test/)
+- 造带标记测试数据(4 角色)+ 1 个无标记文件。run_render_tif 逐个验证:
+  - flows 无 magnitude → **gate 抛错列候选**(读 tc_role 生效);带 magnitude → 流样式。
+  - systems→正/倒三角(v2_systems)、agents→小人、**causes→红星(v2_causes)**。
+  - **无标记文件→通用渲染**(v2_notag_generic:默认小点+Viridis,零 telecoupling 样式=零误伤)。
+  - **render_as=agent 强制**:同一无标记文件→小人(v2_notag_as_agent)。
+  - **Phase B 4 层合成**(v2_scene_causes):弯弧分级流+正/倒三角+橙圆+小人+红星+组合图例 = Fig10+causes。
+- JPEG 预览全程生效(248–490KB)。
+
+### 上线(GCP dev,热补丁+重启)
+- 队列→容器:spatial-flows(radial/commodity/media)、tc-pts(agents/systems/causes 5 个)、render(渲染链)、backend(agent.py)。docker cp 8 工具到对应 worker + agent 到 backend,重启 4 容器,均 healthy/ready。
+- **live 实跑确认**:radial_flows→tc_role=flow_type、add_agents→tc_role=agent_type 真写入。
+
+### 关键变更文件(本地未提交,在 d4c0528 之上)
+- 8 工具 + `telecoupling_style.py` + `_qgis_zoom_render_worker.py` + `_qgis_scene_render_worker.py` + `qgis_renderer.py` + `render_tif.py` + `render_telecoupling_scene.py` + `agent.py`
+
+### 下一步
+- 用户网站实测(LLM 流程):跑工具→渲染应自动按角色出样式;单独上传文件需说"按 agents/system/flow/cause 渲染"。**旧文件需重跑**才带标记。确认后 commit + rebuild image 持久化。MSU 不动。
+
+### 续(同日):产出手动测试文档 + 健壮性小修
+- 用户要一份逐项手动测试文档。查清 8 工具测试数据在 `Systematic_tests/Test_data/<NN>_<tool>/`,列名已确认(flows: from_lon/from_lat/to_lon/to_lat + flow_value;commodity: exporter_iso3/importer_iso3/trade_usd;media: article.html+country_centroids.csv,source Beijing,数量列 mentions;点类统一 longitude/latitude)。
+- 新增 **`Systematic_tests/TELECOUPLING_RENDER_TEST_GUIDE.md`**:8 工具逐项(上传→跑工具 prompt→渲染 prompt→预期)+ 合成图 + render_as + 通用兜底 + 勾选清单 + 注意事项(旧文件重跑/数量列人工选/热补丁未 baked)。
+- 新增 demo 数据 `Systematic_tests/render_demo_data/systems_SRS.csv`(type=Sending/Receiving/Spillover,用于看清正/倒三角+橙圆;Test_data 的 systems.csv type 是 Watershed 等会全正三角)。
+- 健壮性修:`style_systems` 自动选分类列时**排除 `tc_role`**(避免标记列被当分类),已编译+部署 tele-celery-render。
+
+### 下一步
+- 用户照文档在网站逐项手动测;反馈现象/截图 → 修 → commit + rebuild 持久化。
+
+### 续(同日):数量列门控不再当成 error(用户反馈"别用 ❌ Error")
+- 用户实测流类渲染时看到红色 "❌ Error: This is a flow layer…"——功能对(让选 flow_value),但不该是 error。
+- 根因:门控用 `raise CSISError` → worker 发 `type:error` 事件 → 前端红 ❌。worker 的 tool_result 只透传 `files`+`content`。
+- 修复:`render_tif` 与 `render_telecoupling_scene` 的数量列门控**改为 return 正常结果**(`files:[]` + `content:温和提示`),不再 raise。→ 前端走 tool_result 无红 ❌;content 进 LLM function_response,AI 友好地问用哪列。
+- 实测:flows 无 magnitude → 返回 content="Almost ready to render this flow map…",未抛异常。部署 tele-celery-render(+backend)重启,ready/health 200。
+- 关键变更文件:`backend/tools/render_tif.py`、`backend/tools/render_telecoupling_scene.py`。
+
+### 续(同日):合成图请求误触发 workflow 计划卡 → 修
+- 用户截图:"Combine ... into one telecoupling map" → render_telecoupling_scene **成功出合成图**(对的),但**同一句又触发 workflow 规划**,弹出一张自相矛盾(说"无法合成,去 GIS 叠")且无效(报 `unknown tool 'render_spatial_file'`,4 步全红)的计划卡。
+- 根因:消息含 "telecoupling" → 命中 `_WORKFLOW_GOAL_KEYWORDS`;render 工具不在单工具关键词检测里 → detected_tool_name=None → `_force_workflow` 强制 propose_workflow_plan。
+- 修复:把"合成一张图"措辞加入 `_WORKFLOW_GOAL_EXCLUSIONS`(telecoupling map/scene、combine the flows、合成图、叠成一张 等)→ `_looks_like_workflow_goal` 对这类返回 False → 不再弹计划卡;scene 渲染 LLM 仍会 AUTO 调用(截图里它本就在调)。真正的工作流目标不受影响。
+- 实测(backend 容器)`_looks_like_workflow_goal`:合成图措辞=False、真分析目标=True,符合预期。部署 tele-backend 重启,health 200。
+- 关键变更文件:`backend/agent.py`(workflow 排除项)。
+
+### 续(同日,答疑,无代码改动)
+- 用户问 render_telecoupling_scene 合并的是 jpg 还是 shp、怎么定用哪些文件。
+- 答:合并的是 **SHP 矢量**(每个 `QgsVectorLayer(...,"ogr")` 加载→套样式→统一投影+并集范围→渲染成一张→压 jpg 输出),不是叠 jpg 图片。用哪些文件靠 **LLM 显式传四个路径参数**(flows_file/systems_file/agents_file/causes_file,至少一个),工具不自动扫 session;漏层=LLM 没传对路径。
+- 已提示用户:可在 prompt 点名各层;如需"按 session 自动找最新层"兜底需另加逻辑——待用户定。
+
+### 续(同日,答疑,无代码改动)
+- 用户问:下载 shp→上传→再用合成工具,是否更稳?传哪些文件?
+- 答:在"同条消息上传+合成"确实更确定(LLM 手边即明确路径)。但 shp=一组文件(.shp/.shx/.dbf/.prj/.cpg),建议改传**单文件 .geojson**(每层一个,工具本就同时输出),都带 tc_role 样式不丢。仍有弱点:scene 当前**按参数槽位**决定样式 → LLM 仍需把每个上传文件放对槽位。
+- 我向用户提了一个**可选增强**:scene 工具**按 tc_role 自动归位**(传一堆 geojson 只说"combine these",工具自己读 tc_role 分 flow/system/agent/cause,不依赖 LLM 分槽/文件名)。待用户确认是否实现。
+
+### 续(同日):scene 工具加 tc_role 自动归位(additive)+ 自测
+- 用户拍板做"上传即稳"版。实现:`render_telecoupling_scene` 加可选 `layers`(文件路径列表),逐个读 `tc_role` 自动归到 flows/systems/agents/causes 槽。**显式 *_file 参数优先**(只填空槽);无/未知 tc_role 的文件**跳过**(记日志)。老的显式槽路径**完全不动** → 对话扫历史直接合并不受影响。
+- agent.py scene 声明加 `layers`(ARRAY[STRING])+ 描述:用户上传多层文件说"合并"时,把所有路径塞 layers,工具按 tc_role 自动归位,不用 LLM 分槽。
+- **自测(GCP)**:① 自动归位 layers=[4 tagged 文件]无显式参数 → 四层正确合成(视觉确认 v3_autoroute.jpg);② layers=[无标记] → 跳过 → MISSING;③ 仅显式槽(老路)→ 正常。部署 tele-celery-render+backend 重启,health 200。
+- 关键变更文件:`backend/tools/render_telecoupling_scene.py`、`backend/agent.py`。
+- 可选后续:把"跳过的文件"回传给用户提示(目前只记日志)。

@@ -52,12 +52,33 @@ from qgis.core import (
     QgsGraduatedSymbolRenderer,
     QgsRendererRange,
     QgsWkbTypes,
+    # --- telecoupling (flows/systems/agents) styling ---
+    QgsLineSymbol,
+    QgsMarkerSymbol,
+    QgsMarkerLineSymbolLayer,
+    QgsSvgMarkerSymbolLayer,
+    QgsSingleSymbolRenderer,
+    QgsFeature,
+    QgsGeometry,
+    QgsPointXY,
+    QgsGradientColorRamp,
+    Qgis,
 )
 from qgis.PyQt.QtCore import QSize
 from qgis.PyQt.QtGui import QColor
 
 app = QgsApplication([], False)
 app.initQgis()
+
+# ==================================================================
+# Telecoupling cartography (flows / systems / agents) — shared module.
+# Styling lives in telecoupling_style.py so the single-file render and the
+# composite scene render share ONE source of truth. OPT-IN + ISOLATED: only
+# OUR tool outputs match (detect_kind); env TELECOUPLING_STYLE=0 disables it
+# (instant rollback to the generic renderer, no redeploy).
+# ==================================================================
+from telecoupling_style import detect_kind as _tc_detect_kind, apply_style as _tc_apply_style
+
 
 # ------------------------------------------------------------------
 # 1. Load basemap — online first, fallback to local MBTiles
@@ -216,6 +237,22 @@ elif ext in VECTOR_EXTS:
         sys.stderr.write(f"[vector styling] skipped: {e}\n")
 
 # ------------------------------------------------------------------
+# 2c. Telecoupling override (ADDITIVE) — only our flow/system/agent outputs.
+#     Runs after the generic styling above and overrides the result for
+#     matched layers. For every other file _tc_kind is None and nothing here
+#     executes, so generic rendering is byte-for-byte unchanged. Guarded so a
+#     failure silently falls back to whatever the generic block produced.
+# ------------------------------------------------------------------
+_tc_kind = _tc_detect_kind(p["file_path"], user_layer, p.get("render_as")) if ext in VECTOR_EXTS else None
+if _tc_kind:
+    try:
+        user_layer, vector_legend = _tc_apply_style(
+            _tc_kind, user_layer,
+            p.get("magnitude_field"), p.get("category_field"))
+    except Exception as e:
+        sys.stderr.write("[telecoupling style] fell back to generic: %s\n" % e)
+
+# ------------------------------------------------------------------
 # 3. Layer order: user layer on top, basemap at bottom
 # ------------------------------------------------------------------
 layers = [user_layer, basemap_layer] if basemap_layer else [user_layer]
@@ -274,9 +311,18 @@ if _legend is not None:
         iw, ih = img.size
         draw = ImageDraw.Draw(img)
 
+        # Telecoupling layers get a larger legend; every other file keeps the
+        # original size (scale == 1.0 -> all literals below reproduce the old
+        # values exactly, so non-telecoupling output is byte-for-byte unchanged).
+        _lg_scale = 1.7 if _tc_kind else 1.0
+
+        def _s(x):
+            return int(round(x * _lg_scale))
+
+        _fs, _fs_s = _s(14), _s(12)
         try:
-            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 14)
-            font_small = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 12)
+            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", _fs)
+            font_small = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", _fs_s)
         except Exception:
             font = ImageFont.load_default()
             font_small = font
@@ -299,9 +345,9 @@ if _legend is not None:
 
         if raster_legend is not None or kind == "graduated":
             # Continuous color bar
-            bar_w = 24
+            bar_w = _s(24)
             bar_h = int(ih * 0.55)
-            margin_r = 70
+            margin_r = _s(70)
             bar_x = iw - margin_r
             bar_y = (ih - bar_h) // 2
 
@@ -319,25 +365,26 @@ if _legend is not None:
                                outline=(0, 0, 0, 220), width=1)
             img.paste(bar, (bar_x, bar_y), bar)
 
-            text_x = bar_x + bar_w + 6
+            text_x = bar_x + bar_w + _s(6)
             for ly, text in [
-                (bar_y,                   _fmt(vmax)),
-                (bar_y + bar_h // 2 - 7,  _fmt((vmin + vmax) / 2)),
-                (bar_y + bar_h - 14,      _fmt(vmin)),
+                (bar_y,                       _fmt(vmax)),
+                (bar_y + bar_h // 2 - _s(7),  _fmt((vmin + vmax) / 2)),
+                (bar_y + bar_h - _s(14),      _fmt(vmin)),
             ]:
                 _halo_text((text_x, ly), text, font)
             if "field" in _legend:
-                _halo_text((bar_x - 4, bar_y - 22), _legend["field"], font_small)
+                _halo_text((bar_x - 4, bar_y - _s(22)), _legend["field"], font_small)
 
         elif kind == "categorical":
             # Stacked swatches + labels in the upper-right
             entries = _legend["entries"]
             max_show = 16
             shown = entries[:max_show]
-            sw = 18           # swatch size
-            row_h = sw + 4    # gap
-            panel_w = 200
-            panel_h = row_h * len(shown) + (24 if len(entries) > max_show else 0) + 24
+            sw = _s(18)            # swatch size
+            row_h = sw + _s(4)     # gap
+            panel_w = _s(200)
+            pad = _s(8)
+            panel_h = row_h * len(shown) + (_s(24) if len(entries) > max_show else 0) + _s(24)
             margin_r, margin_t = 16, 16
             px = iw - margin_r - panel_w
             py = margin_t
@@ -350,20 +397,42 @@ if _legend is not None:
                 outline=(0, 0, 0, 220), width=1,
             )
 
-            _halo_text((px + 8, py + 4), f"{_legend['field']}", font_small)
-            cy = py + 22
-            for label, r, g, b in shown:
-                # swatch
-                ImageDraw.Draw(img).rectangle(
-                    [(px + 8, cy), (px + 8 + sw, cy + sw)],
-                    fill=(r, g, b, 230), outline=(0, 0, 0, 200), width=1,
-                )
-                _halo_text((px + 8 + sw + 6, cy + 1),
+            _halo_text((px + pad, py + _s(4)), f"{_legend['field']}", font_small)
+            cy = py + _s(22)
+            for entry in shown:
+                label, r, g, b = entry[0], entry[1], entry[2], entry[3]
+                # entry[4] (if present) is a glyph hint: triangle_up/triangle_down/
+                # circle. Generic categorical entries are 4-tuples -> "rect", which
+                # reproduces the original filled square exactly (byte-identical).
+                gshape = entry[4] if len(entry) > 4 else "rect"
+                x0, y0, x1, y1 = px + pad, cy, px + pad + sw, cy + sw
+                xm = (x0 + x1) // 2
+                _d = ImageDraw.Draw(img)
+                if gshape == "triangle_up":
+                    _d.polygon([(xm, y0), (x1, y1), (x0, y1)],
+                               fill=(r, g, b, 255), outline=(0, 0, 0, 220))
+                elif gshape == "triangle_down":
+                    _d.polygon([(x0, y0), (x1, y0), (xm, y1)],
+                               fill=(r, g, b, 255), outline=(0, 0, 0, 220))
+                elif gshape == "circle":
+                    _d.ellipse([(x0, y0), (x1, y1)],
+                               fill=(r, g, b, 255), outline=(0, 0, 0, 220))
+                elif gshape == "star":
+                    import math as _m
+                    _cx, _cy, _R = (x0 + x1) / 2, (y0 + y1) / 2, sw / 2
+                    _pts = [((_cx + (_R if k % 2 == 0 else _R * 0.42) * _m.cos(-_m.pi / 2 + k * _m.pi / 5)),
+                             (_cy + (_R if k % 2 == 0 else _R * 0.42) * _m.sin(-_m.pi / 2 + k * _m.pi / 5)))
+                            for k in range(10)]
+                    _d.polygon(_pts, fill=(r, g, b, 255), outline=(0, 0, 0, 220))
+                else:  # rect — generic categorical, unchanged
+                    _d.rectangle([(x0, y0), (x1, y1)],
+                                 fill=(r, g, b, 230), outline=(0, 0, 0, 200), width=1)
+                _halo_text((px + pad + sw + _s(6), cy + 1),
                            (label if len(label) < 22 else label[:22] + "…"),
                            font_small)
                 cy += row_h
             if len(entries) > max_show:
-                _halo_text((px + 8, cy + 2),
+                _halo_text((px + pad, cy + 2),
                            f"… +{len(entries) - max_show} more",
                            font_small)
 

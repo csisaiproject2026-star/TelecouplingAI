@@ -64,6 +64,7 @@ async def run_add_agents_interactively(
 
     gdf["POINT_X"] = gdf.geometry.x
     gdf["POINT_Y"] = gdf.geometry.y
+    gdf["tc_role"] = "agent_type"   # telecoupling render tag (agent person icons)
 
     workspace_dir, _ = generate_output_dir("add_agents", session_id)
     os.makedirs(workspace_dir, exist_ok=True)

@@ -50,6 +50,7 @@ async def run_draw_systems_from_table(
     gdf = gdf[gdf.geometry.notna()].copy()
     gdf["POINT_X"] = gdf.geometry.x
     gdf["POINT_Y"] = gdf.geometry.y
+    gdf["tc_role"] = "system_type"   # telecoupling render tag (system markers)
 
     workspace_dir, _ = generate_output_dir("draw_systems_table", session_id)
     os.makedirs(workspace_dir, exist_ok=True)

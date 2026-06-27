@@ -42,6 +42,7 @@ def execute_tool(tool_name: str, params: dict, session_id: str, task_id: str, pr
     from tools.crop_percentile import run_crop_percentile
     from tools.crop_regression import run_crop_regression
     from tools.render_tif import run_render_tif
+    from tools.render_telecoupling_scene import run_render_telecoupling_scene
     from tools.read_file import run_read_file
     from tools.carbon import run_carbon
     from tools.habitat_quality import run_habitat_quality
@@ -97,6 +98,7 @@ def execute_tool(tool_name: str, params: dict, session_id: str, task_id: str, pr
         "run_crop_production_percentile":       run_crop_percentile,
         "run_crop_production_regression":       run_crop_regression,
         "render_spatial_file":                  run_render_tif,
+        "render_telecoupling_scene":            run_render_telecoupling_scene,
         "read_file_content":                    run_read_file,
         "run_carbon_storage":                   run_carbon,
         "run_habitat_quality":                  run_habitat_quality,

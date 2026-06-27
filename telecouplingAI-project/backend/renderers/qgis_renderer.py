@@ -17,8 +17,9 @@ logger = logging.getLogger(__name__)
 QGIS_PYTHON = settings.QGIS_PYTHON_PATH
 QGIS_PYTHON_BINDINGS = settings.QGIS_PYTHON_BINDINGS
 _semaphore = asyncio.Semaphore(int(os.environ.get("QGIS_MAX_CONCURRENT", "3")))
-WORKER_SCRIPT      = str(Path(__file__).parent / "_qgis_render_worker.py")
-ZOOM_WORKER_SCRIPT = str(Path(__file__).parent / "_qgis_zoom_render_worker.py")
+WORKER_SCRIPT       = str(Path(__file__).parent / "_qgis_render_worker.py")
+ZOOM_WORKER_SCRIPT  = str(Path(__file__).parent / "_qgis_zoom_render_worker.py")
+SCENE_WORKER_SCRIPT = str(Path(__file__).parent / "_qgis_scene_render_worker.py")
 
 
 async def render_file(file_path: str, output_path: str, width: int = 1920, height: int = 1080) -> str:
@@ -53,6 +54,9 @@ async def zoom_render(
     width: int = 1920,
     height: int = 1080,
     padding: float = 0.1,
+    magnitude_field: str | None = None,
+    category_field: str | None = None,
+    render_as: str | None = None,
 ) -> str:
     """Render a spatial file (SHP/TIF) overlaid on a world basemap, zoomed to
     the file's extent.
@@ -72,13 +76,54 @@ async def zoom_render(
         output_path
     """
     async with _semaphore:
-        return await _run({
+        params = {
             "file_path": file_path,
             "output_path": output_path,
             "width": width,
             "height": height,
             "padding": padding,
-        }, ZOOM_WORKER_SCRIPT)
+        }
+        if magnitude_field:
+            params["magnitude_field"] = magnitude_field
+        if category_field:
+            params["category_field"] = category_field
+        if render_as:
+            params["render_as"] = render_as
+        return await _run(params, ZOOM_WORKER_SCRIPT)
+
+
+async def scene_render(
+    output_path: str,
+    flows_path: str | None = None,
+    systems_path: str | None = None,
+    agents_path: str | None = None,
+    causes_path: str | None = None,
+    magnitude_field: str | None = None,
+    category_field: str | None = None,
+    width: int = 1600,
+    height: int = 1000,
+    padding: float = 0.12,
+) -> str:
+    """Composite telecoupling scene: overlay flows + systems + agents (any
+    subset) into one Fig.10-style map. Returns output_path."""
+    async with _semaphore:
+        params: dict = {
+            "output_path": output_path,
+            "width": width,
+            "height": height,
+            "padding": padding,
+        }
+        for key, val in (
+            ("flows_path", flows_path),
+            ("systems_path", systems_path),
+            ("agents_path", agents_path),
+            ("causes_path", causes_path),
+            ("magnitude_field", magnitude_field),
+            ("category_field", category_field),
+        ):
+            if val:
+                params[key] = val
+        return await _run(params, SCENE_WORKER_SCRIPT)
 
 
 async def _run(params: dict, worker_script: str) -> str:

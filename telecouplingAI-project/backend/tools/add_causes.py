@@ -55,6 +55,7 @@ async def run_add_causes_interactively(
 
     gdf["POINT_X"] = gdf.geometry.x
     gdf["POINT_Y"] = gdf.geometry.y
+    gdf["tc_role"] = "cause_type"   # telecoupling render tag (cause star markers)
 
     workspace_dir, _ = generate_output_dir("add_causes", session_id)
     os.makedirs(workspace_dir, exist_ok=True)
