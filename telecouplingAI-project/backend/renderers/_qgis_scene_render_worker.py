@@ -170,25 +170,8 @@ job.renderedImage().save(p["output_path"], "PNG")
 try:
     from PIL import Image, ImageDraw, ImageFont
 
-    img = Image.open(p["output_path"]).convert("RGBA")
-    iw, ih = img.size
-    scale = 1.7
-
-    def _s(x):
-        return int(round(x * scale))
-
-    try:
-        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", _s(14))
-        font_s = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", _s(12))
-    except Exception:
-        font = ImageFont.load_default()
-        font_s = font
-
-    def _halo(xy, text, fnt):
-        x, y = xy
-        for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
-            ImageDraw.Draw(img).text((x + dx, y + dy), text, fill=(255, 255, 255, 230), font=fnt)
-        ImageDraw.Draw(img).text((x, y), text, fill=(0, 0, 0, 255), font=fnt)
+    map_img = Image.open(p["output_path"]).convert("RGB")
+    iw, ih = map_img.size
 
     def _fmt(v):
         if not isinstance(v, (int, float)):
@@ -196,84 +179,92 @@ try:
         av = abs(v)
         return f"{v:.0f}" if (av == 0 or av >= 1) else f"{v:.2f}"
 
-    # --- flow color bar (right-center) ---
-    if flow_legend and flow_legend.get("kind") == "graduated":
-        ramp = flow_legend["ramp"]
-        vmin, vmax = flow_legend["min"], flow_legend["max"]
-        bar_w, bar_h = _s(24), int(ih * 0.45)
-        bar_x = iw - _s(72)
-        bar_y = (ih - bar_h) // 2
-        bar = Image.new("RGBA", (bar_w, bar_h))
-        bd = ImageDraw.Draw(bar)
-        for y in range(bar_h):
-            c = ramp.color(1.0 - y / max(bar_h - 1, 1))
-            bd.line([(0, y), (bar_w - 1, y)], fill=(c.red(), c.green(), c.blue(), 255))
-        bd.rectangle([(0, 0), (bar_w - 1, bar_h - 1)], outline=(0, 0, 0, 220), width=1)
-        img.paste(bar, (bar_x, bar_y), bar)
-        tx = bar_x + bar_w + _s(6)
-        _halo((tx, bar_y), _fmt(vmax), font)
-        _halo((tx, bar_y + bar_h // 2 - _s(7)), _fmt((vmin + vmax) / 2), font)
-        _halo((tx, bar_y + bar_h - _s(14)), _fmt(vmin), font)
-        _halo((bar_x - _s(2), bar_y - _s(22)), str(flow_legend.get("field", "flow")), font_s)
-
-    # --- systems categories + agent entry (upper-right panel) ---
+    # Gather category rows (systems + causes + agent).
     rows = []
     if system_legend and system_legend.get("kind") == "categorical":
         for e in system_legend["entries"]:
-            gshape = e[4] if len(e) > 4 else "rect"
-            rows.append((e[0], (e[1], e[2], e[3]), gshape))
+            rows.append((e[0], (e[1], e[2], e[3]), e[4] if len(e) > 4 else "rect"))
     if cause_legend and cause_legend.get("kind") == "categorical":
         for e in cause_legend["entries"]:
-            gshape = e[4] if len(e) > 4 else "rect"
-            rows.append((e[0], (e[1], e[2], e[3]), gshape))
+            rows.append((e[0], (e[1], e[2], e[3]), e[4] if len(e) > 4 else "rect"))
     if has_agents:
         rows.append(("Agent", (34, 34, 34), "person"))
+    has_bar = bool(flow_legend and flow_legend.get("kind") == "graduated")
 
-    if rows:
-        sw = _s(18)
-        row_h = sw + _s(6)
-        panel_w = _s(165)
-        pad = _s(8)
-        title_h = _s(22)
-        panel_h = title_h + row_h * len(rows) + pad
-        px = iw - _s(16) - panel_w
-        py = _s(16)
-        backdrop = Image.new("RGBA", (panel_w, panel_h), (255, 255, 255, 205))
-        img.paste(backdrop, (px, py), backdrop)
-        ImageDraw.Draw(img).rectangle([(px, py), (px + panel_w - 1, py + panel_h - 1)],
-                                      outline=(0, 0, 0, 220), width=1)
-        field = system_legend["field"] if system_legend else "Legend"
-        _halo((px + pad, py + _s(4)), str(field), font_s)
-        cy = py + title_h
-        for label, rgb, shape in rows:
-            x0, y0, x1, y1 = px + pad, cy, px + pad + sw, cy + sw
-            xm = (x0 + x1) // 2
-            _d = ImageDraw.Draw(img)
-            if shape == "person":
-                # small person glyph: head + body
-                cx = px + pad + sw // 2
-                _d.ellipse([(cx - _s(3), cy + _s(1)), (cx + _s(3), cy + _s(7))], fill=(34, 34, 34, 255))
-                _d.rectangle([(cx - _s(4), cy + _s(8)), (cx + _s(4), cy + sw)], fill=(34, 34, 34, 255))
-            elif shape == "triangle_up":
-                _d.polygon([(xm, y0), (x1, y1), (x0, y1)], fill=rgb + (255,), outline=(0, 0, 0, 220))
-            elif shape == "triangle_down":
-                _d.polygon([(x0, y0), (x1, y0), (xm, y1)], fill=rgb + (255,), outline=(0, 0, 0, 220))
-            elif shape == "circle":
-                _d.ellipse([(x0, y0), (x1, y1)], fill=rgb + (255,), outline=(0, 0, 0, 220))
-            elif shape == "star":
-                import math as _m
-                _cx, _cy, _R = (x0 + x1) / 2, (y0 + y1) / 2, sw / 2
-                _pts = [((_cx + (_R if k % 2 == 0 else _R * 0.42) * _m.cos(-_m.pi / 2 + k * _m.pi / 5)),
-                         (_cy + (_R if k % 2 == 0 else _R * 0.42) * _m.sin(-_m.pi / 2 + k * _m.pi / 5)))
-                        for k in range(10)]
-                _d.polygon(_pts, fill=rgb + (255,), outline=(0, 0, 0, 220))
-            else:
-                _d.rectangle([(x0, y0), (x1, y1)], fill=rgb + (230,), outline=(0, 0, 0, 200), width=1)
-            _halo((px + pad + sw + _s(6), cy + 1),
-                  (label if len(label) < 20 else label[:20] + "…"), font_s)
-            cy += row_h
+    # Draw the legend in a WHITE PANEL to the RIGHT of the map (never overlaps the
+    # map, so it can't cover any point), with ~2x larger text for readability.
+    if has_bar or rows:
+        PANEL_W = 340
+        canvas = Image.new("RGB", (iw + PANEL_W, ih), (255, 255, 255))
+        canvas.paste(map_img, (0, 0))
+        canvas.paste((220, 220, 220), (iw, 0, iw + 2, ih))  # thin divider line
+        draw = ImageDraw.Draw(canvas)
 
-    img.save(p["output_path"], "PNG")
+        def _font(sz):
+            try:
+                return ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", sz)
+            except Exception:
+                return ImageFont.load_default()
+        F_TITLE, F_ENTRY = _font(44), _font(38)
+
+        x0 = iw + 40
+        cy = 50
+
+        # --- flow color bar ---
+        if has_bar:
+            ramp = flow_legend["ramp"]
+            vmin, vmax = flow_legend["min"], flow_legend["max"]
+            draw.text((x0, cy), str(flow_legend.get("field", "flow")), fill=(0, 0, 0), font=F_TITLE)
+            cy += 66
+            bar_w, bar_h = 56, int(ih * 0.34)
+            bar = Image.new("RGB", (bar_w, bar_h))
+            bd = ImageDraw.Draw(bar)
+            for y in range(bar_h):
+                c = ramp.color(1.0 - y / max(bar_h - 1, 1))
+                bd.line([(0, y), (bar_w - 1, y)], fill=(c.red(), c.green(), c.blue()))
+            bd.rectangle([(0, 0), (bar_w - 1, bar_h - 1)], outline=(0, 0, 0), width=2)
+            canvas.paste(bar, (x0, cy))
+            tx = x0 + bar_w + 18
+            draw.text((tx, cy - 16), _fmt(vmax), fill=(0, 0, 0), font=F_ENTRY)
+            draw.text((tx, cy + bar_h // 2 - 20), _fmt((vmin + vmax) / 2), fill=(0, 0, 0), font=F_ENTRY)
+            draw.text((tx, cy + bar_h - 26), _fmt(vmin), fill=(0, 0, 0), font=F_ENTRY)
+            cy += bar_h + 60
+
+        # --- categories (systems / causes / agent) ---
+        if rows:
+            field = system_legend["field"] if system_legend else "Legend"
+            draw.text((x0, cy), str(field), fill=(0, 0, 0), font=F_TITLE)
+            cy += 70
+            gw = 46                       # glyph box size
+            row_h = gw + 24
+            for label, rgb, shape in rows:
+                x1, y1 = x0 + gw, cy + gw
+                xm = (x0 + x1) // 2
+                if shape == "person":
+                    cx = x0 + gw // 2
+                    draw.ellipse([(cx - 9, cy + 2), (cx + 9, cy + 22)], fill=(34, 34, 34))
+                    draw.rectangle([(cx - 13, cy + 24), (cx + 13, cy + gw)], fill=(34, 34, 34))
+                elif shape == "triangle_up":
+                    draw.polygon([(xm, cy), (x1, y1), (x0, y1)], fill=rgb, outline=(0, 0, 0))
+                elif shape == "triangle_down":
+                    draw.polygon([(x0, cy), (x1, cy), (xm, y1)], fill=rgb, outline=(0, 0, 0))
+                elif shape == "circle":
+                    draw.ellipse([(x0, cy), (x1, y1)], fill=rgb, outline=(0, 0, 0))
+                elif shape == "star":
+                    import math as _m
+                    _cx, _cy, _R = (x0 + x1) / 2, (cy + y1) / 2, gw / 2
+                    _pts = [((_cx + (_R if k % 2 == 0 else _R * 0.42) * _m.cos(-_m.pi / 2 + k * _m.pi / 5)),
+                             (_cy + (_R if k % 2 == 0 else _R * 0.42) * _m.sin(-_m.pi / 2 + k * _m.pi / 5)))
+                            for k in range(10)]
+                    draw.polygon(_pts, fill=rgb, outline=(0, 0, 0))
+                else:
+                    draw.rectangle([(x0, cy), (x1, y1)], fill=rgb, outline=(0, 0, 0))
+                draw.text((x1 + 20, cy + 4), str(label), fill=(0, 0, 0), font=F_ENTRY)
+                cy += row_h
+
+        canvas.save(p["output_path"], "PNG")
+    else:
+        map_img.save(p["output_path"], "PNG")
 except Exception as e:
     sys.stderr.write(f"[scene legend] skipped: {e}\n")
 

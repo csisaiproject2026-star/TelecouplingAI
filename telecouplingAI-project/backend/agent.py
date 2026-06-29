@@ -1563,7 +1563,7 @@ def _apply_file_overrides(plan_dict: dict, file_ovr: list[dict]) -> dict[str, st
 _KIND_EXTS = {
     "table": {".csv"},
     "vector": {".shp", ".geojson", ".gpkg"},
-    "raster": {".tif", ".tiff"},
+    "raster": {".tif", ".tiff", ".img", ".vrt", ".bil", ".asc", ".jp2"},
     "html": {".html", ".htm"},
     "shapefile-set": {".shp"},
 }

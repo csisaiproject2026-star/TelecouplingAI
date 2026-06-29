@@ -5291,3 +5291,146 @@ Git commit: `6373c5f`
 - **自测(GCP)**:① 自动归位 layers=[4 tagged 文件]无显式参数 → 四层正确合成(视觉确认 v3_autoroute.jpg);② layers=[无标记] → 跳过 → MISSING;③ 仅显式槽(老路)→ 正常。部署 tele-celery-render+backend 重启,health 200。
 - 关键变更文件:`backend/tools/render_telecoupling_scene.py`、`backend/agent.py`。
 - 可选后续:把"跳过的文件"回传给用户提示(目前只记日志)。
+
+### 续(同日):git 固化(commit 5eb1157)
+- 用户确认渲染功能 OK,要求固化。**已 commit**:`5eb1157 feat(render): telecoupling Fig.10 cartography for flows/systems/agents/causes`(分支 gcp-head,父 d4c0528)。精确暂存 18 个源/文档文件(8 工具 + 渲染链 + agent + 共享模块/合成 worker/合成工具/小人 SVG/测试文档/demo),49 个测试产物未纳入。
+- 待用户定的两个后续:A) 推 GitHub 备份(快);B) **rebuild GCP 镜像**(把热补丁烤进 csic_backend:latest,否则容器重建会回退到 baseline)——较重、会 force-recreate 重启全部约 38 容器,建议用户测完 8 工具后做;做前先核对真实镜像名(compose=csic_backend vs CLAUDE.md=csis-backend)与 build 上下文。
+- 注:当前 GCP 仍是热补丁未 baked。
+
+### 续(同日):push 到 GitHub(A 完成)
+- backup 远端(dru1889/CSIS_fulldev-backup)**已失效**(Repository not found)→ 用户指定推 csis 账号。
+- `git push origin gcp-head` 成功(`02b5b0b..5eb1157`);origin=csisaiproject2026-star/TelecouplingAI(SSH)。远端 gcp-head = 本地 = 5eb1157,核对一致。
+- 固化进度:① commit 5eb1157 ✅;② push origin ✅;③ rebuild GCP 镜像挂起(用户测完 8 工具后做,因会 force-recreate 重启全部容器)。GCP 仍热补丁。
+- 记忆已更新:reference_github_backup(backup 失效,用 origin)。
+
+### 续(同日,讨论,无代码改动):是否把合成图渲染并入 use-case workflow
+- 核实事实:workflow `catalog.py` 的 CAPABILITY_CATALOG **只含分析/产数据工具**(draw_systems/network/draw_radial_flows/co2/famd…),**渲染工具被有意排除**(故之前坏计划卡报 unknown tool)。旅游 5 步计划末尾不出图;Fig10 合成图目前是另外手动出。
+- 讨论三方案:A) planner 多排一个 render_telecoupling_scene 步(source=step 喂前面各层→layers 自动归位;透明但增 planner 脆弱性);B) 引擎跑完**确定性自动追加**合成图(扫 tc_role 层≥1 就出;稳、不依赖 LLM、不动 planner);C) 维持手动。
+- 我倾向 **B(自动收尾)**。需定死:① Effects(CO2/FAMD)是图表不进地图;② 流的数量列**不能中途问人**(workflow 无人值守)——须从 flows 步计划取或自动选唯一数值列;③ 仅当产出≥1 空间层才出;④ 放最后/后处理;⑤ 进 synthesize 解读。
+- 抛给用户三问:自动 vs 可选;数量列自动选 vs 计划显式;workflow 步骤(A) vs 引擎后处理(B)。待用户定。
+
+### 续(同日):决定 C(按需合成)+ 真实旅游数据跑了一张合成图
+- 用户拍板:**不并入 workflow,用户要的时候才出合成图**(方案 C)。
+- 用真实 Wolong 旅游数据演示:`tourism_Systems.csv`(Role: Sending/Receiving)在 tc-pts 跑 run_draw_systems_from_table、`tourism_Flows.csv`(Quantity)在 spatial-flows 跑 run_draw_radial_flows → 均带 tc_role;再 render 跑 run_render_telecoupling_scene(layers 自动归位 + magnitude_field=Quantity)。
+- 结果 `feedbacks/_tc_render_test/tourism_scene.jpg`:弯弧汇聚 Wolong 按 Quantity 分级 + Sending 正三角/Receiving 倒三角 + Role/Quantity 图例 = 论文 Fig10 复刻。备注:多数流细粉线因真实 Quantity 多为 1(数据驱动,非渲染问题);旅游 plan 只产 systems+flows(无 agents/causes)。
+- 数据位置发现:`usecaseLevel_workflow/` 在 **fulldev 根**(不在 telecouplingAI-project 下)。
+- 待用户定:是否把"按需合成"写进 TELECOUPLING_RENDER_TEST_GUIDE.md 的 workflow 小节。无代码改动。
+
+### 续(同日):合成图图例贴边/出界 → 修
+- 用户:tourism_scene.jpg 的颜色条(+Role 框)被挤到图片边缘外。查证(裁右条):色带 bar_x=iw-_s(72)、Role 框右边距 _s(16) 太贴边(仅 ~27–41px)。
+- 修(仅 `_qgis_scene_render_worker.py` 合成图):色带 bar_x → iw-_s(104);Role 框 px 右边距 _s(16)→_s(38)、panel_w 165→150。重渲 tourism_scene2.jpg:两块图例均清晰在图内。
+- 未碰单图 worker(1920 宽空间足 + 避免动通用渲染逐字节一致)。热部署 render 容器;此改在 5eb1157 之上未提交,待统一 commit。
+
+### 续(同日,讨论+调研,无代码改动):Soybean Telecoupling 用例评估
+- 用户要做新用例 SoybeanTelecoupling(Brazil→China 大豆)。读了 `usecaseLevel_workflow/SampleData_SoybeanTelecoupling/` + `usecase_workflow_description/SoybeanTelecoupling_description.docx`(官方 Telecoupling Toolbox 案例)。
+- 五要素→现有工具→数据映射:Systems(Brazil_Systems_pfm.csv→run_draw_systems_from_table ✅)、Flows(DrawRadialFlows.csv 含 Quantity→run_draw_radial_flows ✅)、Effects-作物(AOI_raster_all1.img+crop_lookup_table.csv→run_crop_production_percentile ✅,SoyAreas_Morton.shp 当 AOI)、Effects-生境(lulc_2005.img+threats/sensitivity csv+threats2.zip→run_habitat_quality ✅)。**分析工具全已存在,本质=写个 soybean_plan.json 串现有工具,不需新代码。**
+- **4 个坑(已核实)**:① Agents 文件夹空(无数据);② Causes 用官方 Nutrition Metrics(要 AOI 面+男女身高),但**我们的 run_nutrition_metrics 要 population_csv**,对不上;③ LULC 是 .img(ERDAS),需验证我们工具能否直接读(否则转 tif);④ ChangeDetection(SoyAreas_Morton.shp)无专用工具,当 AOI/参考层。另:crop financial CSV 我们 crop 工具不直接吃(收入或接 cost-benefit);Effects 是栅格,不进 Fig10 合成图(合成=systems+flows)。
+- 建议:先做能干净跑的 systems+flows+crop+habitat(+按需合成图),跳过/搁置 agents、causes-nutrition、change-detection。抛 4 问待用户定(agents 编不编/causes 跳不跳/要不要先验证 .img/本轮范围)。
+
+### 续(同日,讨论,无代码改动):Soybean 收窄到 4 步子集
+- 用户提议只做 systems + flows + crop production + habitat quality 这 4 步。评估=最干净可行子集,工具全在、数据齐。
+- 映射:1) Brazil_Systems_pfm.csv→run_draw_systems_from_table(Role: Brazil Sending/China Receiving);2) DrawRadialFlows.csv→run_draw_radial_flows(数量列 Quantity);3) AOI_raster_all1.img+crop_lookup_table.csv(+SoyAreas_Morton.shp 当 aggregate)→run_crop_production_percentile;4) lulc_2005.img+threats/sensitivity csv+threats2.zip→run_habitat_quality。
+- 成果:1 张合成图(systems+flows,按需)+ 2 组 Effects 栅格(产量、生境退化)。
+- **唯一真风险=数据格式能否被 InVEST 工具吃下**:① .img 栅格;② crop_lookup_table 列名(name/code/is_crop vs InVEST 的 lucode/crop_name);③ habitat threats 表引用的威胁栅格路径(需解 threats2.zip)。光看判断不了,要实跑。
+- 我提议:拿样例数据把这 4 步**后端实跑自测**(不改代码),验证格式能否通,跑通即写 soybean_plan.json。待用户点头开跑。
+
+---
+
+## 2026-06-27/28 — Soybean Telecoupling 用例:4 步 workflow 跑通 + 渲染 + 截图(自主)
+
+### 用户授权
+- 用户:仿 tourism 把 soybean workflow 跑通+测试+截图,去睡了,自主多做;若是 InVEST 版本问题就改数据列名跑通。
+
+### 实跑 4 步(systems+flows+crop+habitat)
+- 先实跑发现 crop/habitat 撞 InVEST 3.14 格式,**改数据(不改代码)**:① crop_lookup_table → `lucode,crop_name`;② threats 表加 `cur_path`(rds_c.img/hum_c.img,从 threats2.zip 解出);③ sensitivity → `lulc,name,habitat,rds,hum`(InVEST 3.14 源码 `sensitivity_df[threat]`,威胁列直接用名、无 L_ 前缀)。本地 SampleData_SoybeanTelecoupling 三个 CSV 已同步修好。
+- 写 `soybean_plan.json`(4 步,8 inputs)+ `_gcp_wf_validate_soybean.py`,经**确定性引擎 run_plan** 跑:**4/4 done,24 files**(s1 systems / s2 flows / s3 crop:soybean_*_production.tif+aggregate / s4 habitat:quality_c.tif+deg_sum_c.tif)。
+
+### tc_role + 渲染
+- 发现 workflow 引擎在 tele-backend **内联**跑工具,而 8 个 tc_role 工具之前只部署到 spatial-flows/tc-pts → backend 旧工具产出的层无 tc_role。**补部署 8 工具到 tele-backend + 重启**,重跑 workflow → 层带 tc_role。
+- 渲染 4 张(截图 `feedbacks/_tc_render_test/soybean/` + 工作流 `_screenshots/`):01 合成图(Brazil→China/Spain/NL/Thailand,Sending▲/Receiving▽,Quantity 着色,**layers 自动归位**出图)、02 作物产量栅格、03 生境质量、04 生境退化。
+
+### 产物
+- 新建 `usecaseLevel_workflow/SoybeanTelecoupling_Workflow/`:soybean_plan.json、WORKFLOW.md(含 InVEST 数据修复说明,可复现)、_gcp_wf_validate_soybean.py、_screenshots/。
+- 范围说明:agents 无数据、causes 的 nutrition 工具不匹配、change-detection 无专用工具(SoyAreas_Morton.shp 当 crop AOI)——这 3 个搁置。
+
+### 下一步 / 待固化
+- 待 commit:本次 soybean 工作流 + 3 个数据 CSV 修复;另有上一轮 scene 图例定位修复(_qgis_scene_render_worker.py)也在 5eb1157 之上未提交。用户醒后确认是否一起 commit+push。
+
+### 续(2026-06-28):两个 workflow 的测试文档
+- 用户要 tourism / soybean 两个 use-case workflow 各做一份工作流测试指南(像工具测试文档,含输入数据文件夹)。
+- 新增 `TourismTelecoupling_Workflow/TOURISM_WORKFLOW_TEST_GUIDE.md`(5 步)+ `SoybeanTelecoupling_Workflow/SOYBEAN_WORKFLOW_TEST_GUIDE.md`(4 步)。每份:测试环境/上传哪个数据/提目标 prompt→预期计划卡/上传+运行→每步预期产出表/合成图+Effects 栅格渲染 prompt/检查清单/注意。
+- 输入数据文件夹都就位:Tourism_AllData_Upload(15)、Soybean_AllData_Upload(20,InVEST 表已改列名+威胁栅格同目录)。
+- 均在未跟踪的 usecaseLevel_workflow 下,无平台代码改动。
+
+### 续(2026-06-28,核实,无代码改动):soybean 网站规划的 catalog 缺口
+- 用户问"上传数据+prompt 就能出计划卡么"。核实 workflow catalog(catalog.py)收录:run_draw_systems_from_table ✅ / run_draw_radial_flows ✅ / run_habitat_quality ✅ / **run_crop_production_percentile ❌ 不在**。
+- 结论:tourism 5 工具都在 catalog → 网站规划正常(此前验证过)。**soybean 的 crop production 不在 catalog → LLM 规划不出该步**,计划卡会缺作物产量(或硬编无效工具)。另:soybean 只验证了后端引擎 4/4,**网站 LLM 规划未实测**。
+- 提议(待用户定):① 把 run_crop_production_percentile(+可选 regression)加进 catalog.py;② 浏览器实测 soybean 网站规划。需动一点代码 + 测网站。
+
+### 续(2026-06-28):catalog 补 crop production → soybean 网页规划像 tourism 一样可用(浏览器实测)
+- 用户要 soybean 在网页上像 tourism 一样走 Plan→Confirm→Execute,且以后 workflow 都用这套形式。
+- 根因(上轮查实):crop production 不在 workflow catalog → LLM 规划不出。
+- 改 `backend/workflow/catalog.py`:Effects 段加 `run_crop_production_percentile`(+把 habitat_quality 写全输入)+ 新增 soybean few-shot(systems→radial_flows→crop→habitat)。部署 tele-backend 重启,health 200,CAPABILITY_CATALOG 含 crop+soybean few-shot=True。
+- **浏览器实测**(http://34.42.83.50/,你授权 LLM 验证):发 soybean 目标 → **计划卡正常弹出,4 步**:run_draw_systems_from_table / run_commodity_trade / **run_crop_production_percentile** / run_habitat_quality + 结构图 + 需上传文件 + Confirm。截图已存。= soybean 现在网页上和 tourism 同款流程。
+- 小�
+nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样例是坐标流 radial_flows 格式)→ 已把测试指南目标 prompt 改成"draw the soybean flow lines …"+ 加注,稳定选 radial_flows。
+- 通用机制确立:**任何 workflow 的工具都必须在 catalog 里**,LLM 才规划得出。
+- 待固化:catalog.py + scene 图例修复均为热补丁,在 5eb1157 之上未提交。
+
+### 续(2026-06-28):soybean 执行报错 lulc_raster 缺失 → auto-map 不认 .img → 修
+- 用户网页跑 soybean,执行阶段 LLM 反复说 lulc_raster 缺失、execute_workflow_plan 重试 4+ 次。查 backend 日志:CSV 表(systems/flows/lulc_to_crop/threats/sensitivity)都 auto-map 上了,**两个 .img 栅格没绑上**。
+- 根因:`agent.py` `_KIND_EXTS["raster"]` 只有 `{.tif,.tiff}`,auto-map 按扩展名过滤 → `.img`(ERDAS)被跳过 → raster 输入永远空 → LLM 死循环重试。
+- 修:raster 扩展名加 `.img,.vrt,.bil,.asc,.jp2`。部署 tele-backend 重启,health 200。实测 _auto_map_inputs:lulc_2005.img→lulc_raster、AOI_raster_all1.img→crop_lulc 均正确绑定(名字重叠自动分清两个栅格)。
+- 用户需重新上传 Soybean_AllData_Upload + 重跑(后端重启可能清了 session 上传)。
+- 累计未提交热补丁(5eb1157 之上):scene 图例修复、catalog 加 crop production、agent.py auto-map 加 .img。
+
+### 续(2026-06-28,浏览器实测 soybean,进行中):规划已确认对,执行待用户上传
+- 浏览器驱动 http://34.42.83.50/ 发 soybean 目标(prompt 改用 "draw the soybean flow lines from origin to destination coordinates")→ 计划卡 4 步**全对**:run_draw_systems_from_table / **run_draw_radial_flows**(prompt 调整后不再误选 commodity_trade)/ run_crop_production_percentile / run_habitat_quality。
+- 文件上传:`file_upload` 工具**已不接受本机路径**(需控制器读内容),无法程序化上传 → 用户主动帮忙手动上传 Soybean_AllData_Upload 文件夹 + Confirm。
+- 待用户上传+运行后,验证 .img 栅格 auto-map 修复是否让 crop/habitat 两步跑通(上次卡死处)。
+
+### 续(2026-06-28):soybean 执行 .img 真正根因 = 上传校验拒 .img(第二处)
+- 用户网页跑 soybean 仍报 lulc_raster 缺失。截图顶部线索:"...rds_c.img. Supported formats: .tif,.tiff,.shp,.geojson,.gpkg,.html"(无 .img)。
+- 真根因:`main.py` `/api/chat` 的 `supported_extensions` 集合**不含 .img** → 上传时 4 个 .img 被当"不支持"跳过、根本没到服务器 → lulc/crop 栅格输入永远空。(我上一轮修的 auto-map _KIND_EXTS 是对的、也确实部署了,但文件根本没上传,轮不到 auto-map。)
+- 用户确认"要兼容 img";答疑:.img 是栅格,正确,不能用 shp 代替。
+- 修:`main.py` supported_extensions 加 `.img,.vrt,.bil,.asc,.jp2,.hdr,.aux` + 提示信息加 .img。部署 tele-backend 重启 health 200,确认 .img in supported_extensions。
+- 两处 .img 修复齐了:① main.py 上传校验 ② agent.py auto-map。浏览器已开新对话+计划卡(4 步对),待用户重新上传+运行验证。
+- 累计未提交热补丁(5eb1157 之上):scene 图例、catalog crop production、agent auto-map .img、main.py 上传 .img。
+
+### 续(2026-06-28):soybean 网页端到端跑通(用户确认)
+- 用户反馈"现在每个工具都可以运行了"→ 两处 .img 修复(上传校验 main.py + auto-map agent.py)生效,soybean 4 步在网页上端到端跑通。
+- 告知合成图用法:同对话发 "Combine the systems and flows into one telecoupling map, using Quantity as the flow magnitude" → render_telecoupling_scene 自动归位 systems+flows;crop/habitat 是独立栅格图,不进合成图。
+- 待固化(5eb1157 之上未提交热补丁):scene 图例、catalog crop production、agent auto-map .img、main.py 上传 .img。
+
+### 续(2026-06-28):合成图图例移到地图外(右侧面板)+ 字放大 2 倍
+- 用户:合成图图例仍会挡住地图上的点 → 要求图例放到图外(最右侧、紧贴图片),字放大 2 倍。
+- 改 `_qgis_scene_render_worker.py` 图例段:不再在地图上叠加,改为**把画布往右扩一条白面板(PANEL_W=340)**,地图贴左、图例画在右面板(细分隔线),字号 44/38(约 2x)。色带 + 分类项(三角/圆/星/小人)都在面板内,绝不覆盖地图。无内容时退回原图。
+- 部署 tele-celery-render(worker 每渲染重载),用真实 soybean systems+flows 渲验证:图例在右面板、不挡点、字清晰。截图 `feedbacks/_tc_render_test/soybean/05_composite_legend_outside.jpg`。
+- 仅改合成图;单图渲染图例未动。累计未提交热补丁再 +1(scene 图例外置)。
+
+### 续(2026-06-28):soybean/渲染这部分暂告段落(checkpoint)
+- 用户"这一部分暂时先这样"。状态留底:
+- ✅ Soybean workflow 网页端到端跑通(4 步 + 合成图,图例外置)。
+- ⚠️ 未提交热补丁(5 处,在 5eb1157 之上,GCP dev 热补丁未 baked,容器重建会回退):
+  1) `_qgis_scene_render_worker.py` 合成图图例定位修复 + 外置右面板/字放大2x
+  2) `workflow/catalog.py` 加 run_crop_production_percentile + soybean few-shot
+  3) `agent.py` auto-map `_KIND_EXTS["raster"]` 加 .img/.vrt/.bil/.asc/.jp2
+  4) `main.py` 上传 supported_extensions 加 .img 等
+  5) (含上面 1 的两次 scene 改动)
+- 待用户回来固化:① commit+push 这批;② 可选 rebuild 镜像;③ usecaseLevel_workflow(两工作流+数据)是否入库。
+
+### 续(2026-06-28):审阅 Run2 用户测试反馈(3 组,~32 工具)
+- 反馈在 Systematic_tests/UserSystematicTest_Run2_20260617/Run2_feedback/(3 zip:01-15test、Nick、MR)。解压读全 32 份 docx survey。
+- 总体非常正面:~32 次运行几乎全部"AI 选对工具+正确运行+出图成功"。
+- 具体问题:① 渲染图加载慢(08 Habitat ~54s、27 Scenario ~30s-1min)——**已被我近期 JPEG 预览修复,但只在 GCP dev,MSU 仍旧代码**;② AI 偶尔甩"列出全部 28 工具"的多余文字(Nick 05、测试者①)——未修(prompt);③ 渲染图例缺单位/标题(Nick 05);④ 12a DelineateIt 渲染报 "file not found: flow_direction.tif" 又渲出(未查);⑤ 部分测试包缺 .cpg(04/05/10,打包问题);⑥ 02 CBC transitions CSV 需手动编辑;⑦ 网站/上传慢(多为测试者网络)。
+- 关键结论:测试者最大抱怨(渲染慢)已修但未同步 MSU → 建议把 GCP 修复同步 MSU(见 project_msu_sync_pending);余者皆小。
+- 待用户定下一步:同步 MSU / 修 AI 甩工具清单 / 修 DelineateIt 渲染路径 / 出一份 markdown 综述。
+
+### 续(2026-06-29):今晚验收演示 — 打演示包 + 环境彩排
+- 用户今晚向验收用户演示两个工作流,要先预演避免搞砸。
+- 建自包含可发演示包:`Systematic_tests/Telecoupling_Workflow_Demo/`(+ .zip 3.27MB):README + 两份 TEST_GUIDE + 两个数据文件夹(Tourism 15 / Soybean 20)+ 5 张预期截图。dev 脚本/plan 未纳入。
+- 环境体检 GCP dev:health 200、39 容器、5 处演示依赖修复全部在线(catalog crop / 上传 .img / auto-map .img / scene 图例外置 / JPEG)。
+- 两工作流已验证:Tourism 引擎 5/5、Soybean 引擎 4/4 + 网页规划 4 步 + 用户确认每工具可跑。
+- **最大风险**:5 处皆热补丁未 baked,显式重建容器会回退→soybean 崩。建议演示前 commit+rebuild 固化。
+- 演示要点 + 雷区已整理给用户(无痕窗口/整文件夹上传/soybean 说 "flow lines" 别 "trade"/数量列 Quantity)。
+- 待用户定:① 现在 commit+rebuild 固化?② 浏览器预跑两个计划卡?

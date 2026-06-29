@@ -69,7 +69,14 @@ NOT from any single example dataset. Concretely:
   inputs: input_csv(file); animal_count_field, length_km_field (literal: column names);
   capacity_per_trip, co2_per_km_per_trip (literal: numbers, e.g. 1 and 29).
 - run_cost_benefit_analysis — net returns per system from cost/revenue data.
-- run_habitat_quality — InVEST habitat degradation from LULC + threats (needs rasters).
+- run_crop_production_percentile — InVEST crop yield/production from a land-cover raster.
+  inputs: landcover_raster_path(file/raster), landcover_to_crop_table_path(file: CSV with
+  'lucode','crop_name' columns), aggregate_polygon_path(file/vector, OPTIONAL: zonal AOI to
+  summarize yield over, e.g. study plots).
+- run_habitat_quality — InVEST habitat quality + degradation from land use + threats.
+  inputs: lulc_cur_path(file/raster), threats_table_path(file: CSV 'threat,max_dist,weight,
+  decay,cur_path'), sensitivity_table_path(file: CSV 'lulc,name,habitat,<threat>,...').
+  NOTE: the threat rasters named in the threats table's cur_path must be uploaded alongside it.
 
 ## Few-shot: tourism telecoupling — STRUCTURE + column EXAMPLES (Wolong dataset)
 This shows the typical STEP STRUCTURE with the column names from the Wolong tourism sample
@@ -88,6 +95,21 @@ Goal "analyze a tourism telecoupling" (however phrased — e.g. "旅游生态分
   5) run_factor_analysis_mixed_data (causes/survey table; quantitative_variables="affin,gdplog,dist")
 (These column names are the Wolong example — adapt them to the user's actual data. Add or drop
 steps to fit the user's goal and the files they actually have.)
+
+## Few-shot: soybean telecoupling — STRUCTURE + column EXAMPLES (Brazil→China dataset)
+Goal "analyze the Brazil-China soybean telecoupling" (however phrased) → up to 4 steps. This
+case pairs the spatial components (systems + flows) with InVEST EFFECTS models on land cover:
+  1) run_draw_systems_from_table   (systems table; x_field=X, y_field=Y;
+       Brazil=Sending, China/Spain/Netherlands/Thailand=Receiving via a 'Role' column)
+  2) run_draw_radial_flows         (flows table; from_x_field=FROM_X, from_y_field=FROM_Y,
+       to_x_field=TO_X, to_y_field=TO_Y; magnitude column e.g. Quantity)
+  3) run_crop_production_percentile (Effects: a land-cover raster + a 'lucode,crop_name' table;
+       OPTIONAL aggregate_polygon_path = the study-plot polygons to summarize yield over)
+  4) run_habitat_quality           (Effects: a current land-cover raster + a threats table
+       'threat,max_dist,weight,decay,cur_path' + a sensitivity table 'lulc,name,habitat,<threat>...';
+       the threat rasters named in cur_path must be uploaded alongside the threats table)
+(Effects steps 3-4 take RASTERS + TABLES, not coordinate columns — map each file by the role
+described above, using the user's actual filenames. Adapt or drop steps to the user's data.)
 """
 
 
