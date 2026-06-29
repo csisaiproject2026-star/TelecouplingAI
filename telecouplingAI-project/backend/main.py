@@ -445,22 +445,36 @@ def download_zip(session_id: str, req: ZipRequest):
     is removed after the response via a BackgroundTask.
     """
     shared_root = Path(settings.SHARED_DIR).resolve()
-    session_root = (shared_root / session_id).resolve()
 
+    # Scope the ZIP to the session the FILES were created in — derived from the paths
+    # themselves, NOT the caller's CURRENT session. The frontend keeps one session_id ref
+    # that it resets on "New Chat", so a result card from an earlier chat would otherwise
+    # be downloaded against the wrong session and 404 as "expired" even though the files
+    # are still on disk. We still require every path to resolve under SHARED_DIR (blocks
+    # traversal) and share ONE session segment (no cross-session bundling).
     seen: set[str] = set()
     members: list[tuple[str, str]] = []   # (abs_path, name_inside_zip)
+    member_session: str | None = None
     for p in req.paths:
         if not p or p in seen:
             continue
         seen.add(p)
         abs_p = Path(p).resolve()
-        try:                              # must live under THIS session's dir
-            abs_p.relative_to(session_root)
+        try:                              # must live under the outputs root
+            rel = abs_p.relative_to(shared_root)
         except ValueError:
+            continue
+        if not rel.parts:
+            continue
+        sess = rel.parts[0]               # the {session_id} segment of the path
+        if member_session is None:
+            member_session = sess
+        elif sess != member_session:      # don't mix two sessions in one ZIP
             continue
         if not abs_p.is_file():           # skip anything cleaned up / expired
             continue
-        members.append((str(abs_p), abs_p.relative_to(session_root).as_posix()))
+        members.append((str(abs_p),
+                        abs_p.relative_to(shared_root / member_session).as_posix()))
 
     if not members:
         raise HTTPException(
