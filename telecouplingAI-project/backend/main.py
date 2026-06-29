@@ -172,7 +172,7 @@ async def chat_endpoint(
             async with aiofiles.open(dest, "wb") as f:
                 await f.write(await uf.read())
             sm.add_uploaded_file(session_id, dest)
-            uploaded.append({"filename": rel, "path": dest})
+            uploaded.append({"filename": rel, "path": dest, "current_batch": True})
             logger.info(f"[upload] {uf.filename} → {dest}")
 
     # Include files previously uploaded via /api/upload in this session

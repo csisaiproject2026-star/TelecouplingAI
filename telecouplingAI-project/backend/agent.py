@@ -1573,17 +1573,70 @@ def _name_tokens(s: str) -> set[str]:
     return {t for t in re.split(r"[^a-z0-9]+", (s or "").lower()) if len(t) >= 3}
 
 
-def _auto_map_inputs(plan, inputs_map: dict[str, str], uploaded: list[dict]) -> dict[str, str]:
-    """Deterministically fill any required input the LLM did NOT map (or mapped to a
-    nonexistent path) by matching the user's actually-uploaded files by file KIND +
-    name overlap. Takes the fragile filename-matching out of the LLM's hands — e.g.
-    required input 'systems_table' (table) auto-binds to the uploaded 'tourism_Systems.csv'.
+def _csv_header_cols(path: str) -> set[str]:
+    """Lower-cased column names from a CSV's header row (empty for non-CSV / unreadable)."""
+    if not path.lower().endswith(".csv"):
+        return set()
+    try:
+        import csv as _csv
+        with open(path, "r", encoding="utf-8-sig", errors="ignore") as fh:
+            row = next(_csv.reader([fh.readline()]))
+        return {c.strip().strip('"').strip().lower() for c in row if c.strip()}
+    except Exception:
+        return set()
 
-    Uses GLOBAL-GREEDY assignment (best (input,file) pairs first), so a strong match like
-    flows_csv↔tourism_Flows is claimed before a weak one (causes_csv↔tourism_Flows) can
-    steal that file — otherwise low-overlap inputs grab files out from under better matches."""
-    import difflib
+
+_COL_PARAM_RE = re.compile(r"(_field|_fields|_attri|_variables|_col|_column)$")
+
+
+def _expected_cols_by_input(plan) -> dict[str, set[str]]:
+    """For each TABLE input id, the column names its consuming step references via literal
+    column params (x_field='X', quantitative_variables='affin,gdplog,dist', ...). Lets
+    auto-map bind a CSV input to the uploaded file that ACTUALLY has those columns — so two
+    same-kind files (e.g. two *_Systems.csv, one with X/Y and one with LON/LAT) can't
+    cross-bind when both happen to sit in the same session."""
     by_id = {ri.id: ri for ri in plan.required_inputs}
+    out: dict[str, set[str]] = {}
+    for st in plan.steps:
+        cols: set[str] = set()
+        for pname, src in st.inputs.items():
+            if src.source == "literal" and _COL_PARAM_RE.search(pname or ""):
+                val = src.value
+                if isinstance(val, str) and val.strip():
+                    cols |= {t.strip().lower() for t in val.split(",") if t.strip()}
+        if not cols:
+            continue
+        for pname, src in st.inputs.items():
+            if src.source == "input" and src.ref:
+                ri = by_id.get(src.ref)
+                if ri and (ri.file_kind or "table").lower() in ("table", "csv"):
+                    out.setdefault(src.ref, set()).update(cols)
+    return out
+
+
+def _auto_map_inputs(plan, inputs_map: dict[str, str], uploaded: list[dict],
+                     prefer_paths: set[str] | None = None) -> dict[str, str]:
+    """Deterministically fill any required input the LLM did NOT map (or mapped to a
+    nonexistent path) by matching the user's actually-uploaded files. Takes the fragile
+    filename-matching out of the LLM's hands — e.g. required input 'systems_table' (table)
+    auto-binds to the uploaded 'tourism_Systems.csv'.
+
+    Scoring per (input, file), highest first:
+      1. COLUMN match — if the step references literal columns (x_field='X', ...), the file
+         whose header HAS them wins; a file missing them is pushed below (so an X/Y systems
+         step never binds to a LON/LAT file even if both are in the session).
+      2. CURRENT-BATCH — files uploaded in THIS turn (prefer_paths) beat leftovers from an
+         earlier workflow in the same session (resolves ties like two flows CSVs that share
+         FROM_X/TO_X columns — the one just uploaded with this run wins).
+      3. name overlap (token intersection / jaccard / ratio).
+
+    GLOBAL-GREEDY assignment (best pairs first) so a strong match is claimed before a weak
+    one can steal its file."""
+    import difflib
+    prefer_paths = prefer_paths or set()
+    by_id = {ri.id: ri for ri in plan.required_inputs}
+    expected_cols = _expected_cols_by_input(plan)
+    _hdr_cache: dict[str, set[str]] = {}
     used = {p for p in inputs_map.values() if p}
     need = [iid for iid in plan.input_ids
             if not (inputs_map.get(iid) and os.path.exists(inputs_map[iid]))]
@@ -1598,6 +1651,7 @@ def _auto_map_inputs(plan, inputs_map: dict[str, str], uploaded: list[dict]) -> 
             kind = "raster"
         exts = _KIND_EXTS.get(kind) or set().union(*_KIND_EXTS.values())  # unknown -> any data ext
         key_toks = _name_tokens(f"{iid} {ri.label if ri else ''} {ri.description if ri else ''}")
+        want_cols = expected_cols.get(iid)
         for f in uploaded:
             path = f.get("path", "")
             if (os.path.splitext(f.get("filename", ""))[1].lower() not in exts
@@ -1608,7 +1662,15 @@ def _auto_map_inputs(plan, inputs_map: dict[str, str], uploaded: list[dict]) -> 
             inter = len(key_toks & ft)
             jacc = inter / (len(key_toks | ft) or 1)
             ratio = difflib.SequenceMatcher(None, iid.lower(), stem.lower()).ratio()
-            pairs.append(((inter, jacc, ratio), iid, path))
+            col_match = 0
+            if want_cols:
+                if path not in _hdr_cache:
+                    _hdr_cache[path] = _csv_header_cols(path)
+                fcols = _hdr_cache[path]
+                if fcols:
+                    col_match = 1 if want_cols <= fcols else -1
+            recent = 1 if path in prefer_paths else 0
+            pairs.append(((col_match, recent, inter, jacc, ratio), iid, path))
 
     pairs.sort(key=lambda x: x[0], reverse=True)   # best matches first
     done_inputs: set[str] = set()
@@ -2334,8 +2396,14 @@ async def run_agent(
                 # auto-map still couldn't fill.
                 llm_inputs = input_map_from_llm_args(tool_input)
                 inputs_map = dict(extra_inputs)   # file_overrides (explicit) win
+                # Files attached to THIS run message = the current workflow's batch; prefer
+                # them over leftovers from an earlier workflow in the same session.
+                _cur_batch = {f.get("path") for f in files
+                              if isinstance(f, dict) and f.get("current_batch")}
                 try:
-                    inputs_map = _auto_map_inputs(wf_plan, inputs_map, _sm.get_uploaded_files(session_id))
+                    inputs_map = _auto_map_inputs(wf_plan, inputs_map,
+                                                  _sm.get_uploaded_files(session_id),
+                                                  prefer_paths=_cur_batch)
                 except Exception:
                     logger.exception("[agent] auto-map inputs failed")
                 for k, v in llm_inputs.items():   # fallback only where still unmapped
