@@ -309,23 +309,49 @@ if _legend is not None:
 
         img = Image.open(p["output_path"]).convert("RGBA")
         iw, ih = img.size
-        draw = ImageDraw.Draw(img)
 
-        # Telecoupling layers get a larger legend; every other file keeps the
-        # original size (scale == 1.0 -> all literals below reproduce the old
-        # values exactly, so non-telecoupling output is byte-for-byte unchanged).
-        _lg_scale = 1.7 if _tc_kind else 1.0
+        # Telecoupling keeps its original in-map legend overlay (FROZEN: scale
+        # 1.7, regular face, drawn over the map). Generic (InVEST) rasters use a
+        # larger 2x BOLD BLACK legend placed in a dedicated white gutter
+        # added to the RIGHT of the map, so the big legend never covers the data
+        # (Run-2 feedback #1 + user: "2x, bold, black, don't cover the shp").
+        _lg_scale = 1.7 if _tc_kind else 2.0
 
         def _s(x):
             return int(round(x * _lg_scale))
 
         _fs, _fs_s = _s(14), _s(12)
+        # The system dejavu dir is empty in this image (PIL was silently falling
+        # back to the tiny bitmap default), so pull DejaVuSans from matplotlib's
+        # bundled fonts. Generic = BOLD; telecoupling keeps the exact original
+        # path + default fallback so its render stays byte-frozen.
         try:
-            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", _fs)
-            font_small = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", _fs_s)
+            import matplotlib as _mpl
+            _MPL_TTF = os.path.join(_mpl.get_data_path(), "fonts", "ttf")
         except Exception:
-            font = ImageFont.load_default()
-            font_small = font
+            _MPL_TTF = ("/opt/conda/envs/TeleCouplingAI/lib/python3.12/"
+                        "site-packages/matplotlib/mpl-data/fonts/ttf")
+
+        if _tc_kind:
+            _font_paths = ["/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"]
+        else:
+            _font_paths = [
+                os.path.join(_MPL_TTF, "DejaVuSans-Bold.ttf"),
+                "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+                os.path.join(_MPL_TTF, "DejaVuSans.ttf"),
+                "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+            ]
+
+        def _load_font(size):
+            for _fp in _font_paths:
+                try:
+                    return ImageFont.truetype(_fp, size)
+                except Exception:
+                    continue
+            return ImageFont.load_default()
+
+        font = _load_font(_fs)
+        font_small = _load_font(_fs_s)
 
         def _fmt(v):
             av = abs(v) if isinstance(v, (int, float)) else 0
@@ -341,18 +367,85 @@ if _legend is not None:
                 draw.text((x + dx, y + dy), text, fill=(255, 255, 255, 230), font=fnt)
             draw.text((x, y), text, fill=(0, 0, 0, 255), font=fnt)
 
+        # Human-readable title for raster color bars. Run-2 testers said the bar
+        # had "no title/units", only 3 bare numbers. We derive a label from the
+        # source filename (always safe — just reformatting the real name) and
+        # append a unit ONLY for a small high-confidence set of InVEST outputs
+        # (otherwise no unit, so we never assert a wrong one).
+        import re as _re
+        _RASTER_UNITS = [
+            ("wyield", "mm"), ("quickflow", "mm"), ("baseflow", "mm"),
+            ("sed_export", "t"), ("sed_retention", "t"),
+            # NDR nutrient exports (surface/subsurface/total, N or P) are kg/yr
+            ("surface_export", "kg/yr"), ("subsurface_export", "kg/yr"),
+            ("total_export", "kg/yr"), ("n_export", "kg/yr"), ("p_export", "kg/yr"),
+            ("filled_dem", "m"),
+        ]
+
+        def _raster_title(fp):
+            base = os.path.splitext(os.path.basename(fp))[0]
+            unit = next((u for key, u in _RASTER_UNITS if key in base.lower()), "")
+            # drop a trailing session/uuid hex chunk if the filename carries one
+            base = _re.sub(r"[_-][0-9a-f]{6,}(-[0-9a-f]+)*$", "", base)
+            label = base.replace("_", " ").replace("-", " ").strip().title()
+            if len(label) > 30:
+                label = label[:29] + "…"
+            return f"{label} ({unit})" if unit else label
+
         kind = _legend.get("kind") if isinstance(_legend, dict) else None
+
+        # Generic ONLY: widen the canvas with a white legend gutter on the right
+        # so the big 2x legend gets its own space and never overlaps the map/shp.
+        # Sized to the widest of {title, bar+gap+widest number}. Telecoupling is
+        # untouched (keeps drawing its legend over the map at scale 1.7).
+        if not _tc_kind:
+            _gap = _s(6)
+            _bar_w0 = _s(24)
+            if raster_legend is not None or kind == "graduated":
+                _vmin, _vmax = _legend["min"], _legend["max"]
+                _lbls = [_fmt(_vmax), _fmt((_vmin + _vmax) / 2), _fmt(_vmin)]
+                try:
+                    _mlw = max(font.getlength(t) for t in _lbls)
+                except Exception:
+                    _mlw = _fs * 5
+                # gutter is driven by the number block; a long title wraps to fit
+                _gutter = int(_bar_w0 + _gap + _mlw + _s(40))
+            elif kind == "categorical":
+                _gutter = _s(200) + _s(28)
+            else:
+                _gutter = 0
+            if _gutter > 0:
+                _canvas = Image.new("RGBA", (iw + _gutter, ih), (250, 250, 250, 255))
+                _canvas.paste(img, (0, 0))
+                img = _canvas
+                iw += _gutter
+
+        draw = ImageDraw.Draw(img)
 
         if raster_legend is not None or kind == "graduated":
             # Continuous color bar
             bar_w = _s(24)
             bar_h = int(ih * 0.55)
-            margin_r = _s(70)
-            bar_x = iw - margin_r
-            bar_y = (ih - bar_h) // 2
 
             ramp = _legend["ramp"]
             vmin, vmax = _legend["min"], _legend["max"]
+
+            # Size the right margin to the widest numeric label so the bigger
+            # (scale 1.5) fonts never clip off the right edge — the old fixed
+            # margin was tuned for the small 14px labels only.
+            _gap = _s(6)
+            if _tc_kind:
+                # Telecoupling flow legend stays byte-frozen on its old margin.
+                margin_r = _s(70)
+            else:
+                _labels = [_fmt(vmax), _fmt((vmin + vmax) / 2), _fmt(vmin)]
+                try:
+                    _max_lw = max(draw.textlength(t, font=font) for t in _labels)
+                except Exception:
+                    _max_lw = _fs * 4
+                margin_r = int(bar_w + _gap + _max_lw + _s(10))
+            bar_x = iw - margin_r
+            bar_y = (ih - bar_h) // 2
 
             bar = Image.new("RGBA", (bar_w, bar_h))
             bar_draw = ImageDraw.Draw(bar)
@@ -365,7 +458,7 @@ if _legend is not None:
                                outline=(0, 0, 0, 220), width=1)
             img.paste(bar, (bar_x, bar_y), bar)
 
-            text_x = bar_x + bar_w + _s(6)
+            text_x = bar_x + bar_w + _gap
             for ly, text in [
                 (bar_y,                       _fmt(vmax)),
                 (bar_y + bar_h // 2 - _s(7),  _fmt((vmin + vmax) / 2)),
@@ -373,7 +466,35 @@ if _legend is not None:
             ]:
                 _halo_text((text_x, ly), text, font)
             if "field" in _legend:
+                # graduated vector: keep the field-name header above the bar
                 _halo_text((bar_x - 4, bar_y - _s(22)), _legend["field"], font_small)
+            else:
+                # raster: no field name -> draw a filename-derived title, WRAPPED
+                # to the gutter width and right-aligned at the top of the gutter.
+                _title = _raster_title(p["file_path"])
+                _avail = margin_r
+                _lines, _cur = [], ""
+                for _wd in _title.split():
+                    _cand = (_cur + " " + _wd).strip()
+                    try:
+                        _fit = draw.textlength(_cand, font=font) <= _avail
+                    except Exception:
+                        _fit = len(_cand) * _fs * 0.5 <= _avail
+                    if _fit or not _cur:
+                        _cur = _cand
+                    else:
+                        _lines.append(_cur)
+                        _cur = _wd
+                if _cur:
+                    _lines.append(_cur)
+                _ty = _s(10)
+                for _ln in _lines:
+                    try:
+                        _lw = draw.textlength(_ln, font=font)
+                    except Exception:
+                        _lw = len(_ln) * _fs * 0.5
+                    _halo_text((max(bar_x - 4, iw - _lw - _s(12)), _ty), _ln, font)
+                    _ty += _fs + _s(6)
 
         elif kind == "categorical":
             # Stacked swatches + labels in the upper-right

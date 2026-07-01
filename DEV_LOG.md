@@ -5434,3 +5434,146 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - **最大风险**:5 处皆热补丁未 baked,显式重建容器会回退→soybean 崩。建议演示前 commit+rebuild 固化。
 - 演示要点 + 雷区已整理给用户(无痕窗口/整文件夹上传/soybean 说 "flow lines" 别 "trade"/数量列 Quantity)。
 - 待用户定:① 现在 commit+rebuild 固化?② 浏览器预跑两个计划卡?
+
+### 续(2026-06-29):演示固化(commit+push+rebuild)+ 浏览器预跑两计划卡
+- ① commit `af02fac`(soybean workflow 可用性修复:catalog crop + .img 上传/映射 + 合成图图例外置)+ push origin(5eb1157..af02fac)。
+- ② rebuild 固化:tar 同步本地 backend 源码→服务器(排除 .env*),4 关键文件 md5 服务器==本地;`docker build csic_backend:latest`(conda/pip 全缓存,只重做 COPY 0.1s);`compose up -d --force-recreate` 重建 39 容器;health 200。**重建后容器验证修复全 baked**(catalog_crop/upload_img/automap_img/scene 图例外置/jpeg/telecoupling_style/scene_tool/radial_flows tc_role/agent_person.svg 全 present)→ 演示期间容器重建不再丢补丁。
+- ③ 浏览器在已 baked 环境预跑:Tourism 计划卡 5 步全对、Soybean 4 步全对(radial_flows 正确)。
+- 演示包 `Systematic_tests/Telecoupling_Workflow_Demo(.zip)` 就绪。用户将手动测执行+合成图。
+
+### 续(2026-06-29):演示实测发现 tourism FAMD 绑错文件 → 修数据+指南
+- 用户实测 tourism 工作流,s5 FAMD 报 "Column mismatch ... affin/gdplog/dist"。盯后台日志定位:`auto-mapped input 'causes_csv' -> tourism_Flows.csv`(绑错!),famd_input.csv 没被用。根因:LLM 把 FAMD 输入命名 causes_csv,与文件名 famd_input.csv 无名字重叠,而数据里有两个 flows 文件(tourism_Flows + flows_with_distance),多余的 tourism_Flows 被 causes_csv 抢走;reconcile 正确拦截(没拿错文件乱跑)。
+- 修复(无代码改动,数据+文档):① 删冗余 tourism_Flows.csv(flows_with_distance 已覆盖 FROM_X/TO_X+length_km)→ causes_csv 只能绑 famd_input;② 两个 TEST_GUIDE 的运行步骤改为**详细运行 prompt**(点名每步用哪个文件,让 AI 用 file_overrides 精确绑定,绕开脆弱 auto-map)。demo 包重打 zip(3.27MB)。
+- 给用户当前卡住轮的即时解法(in-chat: use famd_input.csv for the factor analysis)。后台日志流仍开,待用户重跑验证绑定。
+- 潜在更稳的根治(未做,待定):auto-map 列感知匹配(按 step 的字段字面量选含这些列的文件)。
+
+### 续(2026-06-29):根治跨-workflow 文件误绑(列感知 + 当前批次优先)
+- 用户实测 soybean 在残留 tourism 文件的会话里跑,s1 systems 报 "Column mismatch x_field='X'/'Y'"。日志铁证:`auto-mapped 'systems_csv' -> tourism_Systems.csv`(LON/LAT)、`'flows_csv' -> flows_with_distance.csv`——服务器按 session 累积所有上传,旧 auto-map 只按 kind+名字打分,分不出两个 workflow。
+- 用户要求:让系统兼容"一个 session 多个 workflow 文件共存",并指出列感知仍有漏洞(两个 flows 同列)。
+- 修(commit `c1510bc`,已 push + rebuild + 重建 baked):`_auto_map_inputs` 改 3 级打分 `(列匹配, 当前批次, 名字)`:① `_expected_cols_by_input` 从 step 的字面量列参数(x_field/quantitative_variables…)推出每个 table 输入的期望列,绑到表头真含这些列的 CSV;② main.py 给本次请求上传打 `current_batch=True`,agent 取出作 `prefer_paths`,优先于旧 workflow 残留(解决同列 flows 歧义);③ 名字兜底。
+- 容器内混合会话测试:CASE1 soybean(prefer=soybean批)systems→Brazil/flows→DrawRadialFlows/FAMD→famd_input 全 PASS;CASE3 无 prefer 时列感知仍把 systems+FAMD 绑对。
+- 健康 200,39 容器。后台日志流重启盯用户实测。用户自测中。
+
+### 续(2026-06-29):演示包英文化 + download-zip 跨 session 修复 + 跨-workflow 修复生产验证
+- 演示包全英文化:Tourism README_DATA + 两份 TEST_GUIDE 译为英文(README_DATA 同步去掉已删的 tourism_Flows.csv,flows 改用 flows_with_distance.csv)。Python CJK 扫描确认无中文残留。expected_results 截图曾丢失,补回 4 张(英文命名:composite/crop_yield/habitat_quality/habitat_degradation)。重打包 2.97MB。
+- 跨-workflow auto-map 修复**生产验证通过**:用户 04:59 在残留 tourism 文件的 session 里跑 soybean,日志显示 systems_csv→Brazil_Systems_pfm.csv、flows_csv→DrawRadialFlows.csv 等全绑对,无 error/reconcile。
+- download-zip bug 根因:前端 `sessionId.current` 单引用、New Chat 时重置;`/api/download_zip/{session_id}` 按 URL 里的当前 session 校验文件路径 → 旧对话的结果卡(文件在旧 session 目录、磁盘仍在)被拒 404 "no longer available"。/data/outputs 有 397 个 session 目录,文件大多还在(Redis 24h TTL 过期≠rmtree)。
+- 修(commit `d717df0`,push+热补丁+重启+rebuild bake):download_zip 改为**从文件路径自身推导 session 段**(服务器生成、在 SHARED_DIR 下),不再信任 URL session_id;仍要求在 SHARED_DIR 下、同一 session、防穿越。纯后端,无需重建前端;对所有现存结果卡(含旧对话)生效。
+- 测试:用错误 session_id 请求旧 session 的结果文件 → HTTP 200 + 有效 zip(zipfile 验证 member 正确)。
+
+## 2026-07-01 — Run 2 用户真人反馈(4 个压缩包)提取 + 分析
+### 完成内容
+- 把 `Systematic_tests/UserSystematicTest_Run2_20260617/Run2_feedback/` 下 4 个 zip(`Test Report.zip`=超集 / `Nick.zip` / `Toolbox_testing_surveys_MR.zip` / `01-15test17documents.zip`)全部解压,写 `_docx2txt.py`(zipfile+XML 抽 `word/document.xml` 文本)把 80 份 docx 问卷转成 `_feedback_text/CSIS.txt`+`Nan.txt` 通读。
+- 测试者:Nan(完整 01–44)、Xin Lan(35–40 telecoupling)、Nick Manning(crop/forest/pollination/food/nutrition)、Michele Remer(scenario/OLS/FAMD/popdensity/radial/commodity/moran/geodetector)、Cori Sharp(AWY/HQ/NDR/RouteDEM/SWY/SDR/DelineateIt)。**全部走 MSU 公网 ai.telecoupling.msu.edu**。
+### 关键发现(总体:产品稳,工具识别几乎全对、极少真崩溃;反馈集中在呈现/信任/AI 叙述准确性)
+- **桶 A(GCP 已修、MSU 未同步)**:① telecoupling 点要素又小又淡 + causes 连续色带套分类数据(Xin 35–40)→ Fig.10 telecoupling_style 已修;② Habitat Quality 渲染图加载 ~54s(Nan)→ GCP 的 `_to_web_jpeg` 已修;③ DelineateIt 渲染冒 `❌ file not found (flow_direction.tif)` 但图已渲出(Nan 12a,假报错)→ 疑 BUG6 家族,待确认 GCP 是否覆盖此路径。→ 真实证据支撑 [[project_msu_sync_pending]] 回灌。
+- **桶 B(GCP 也未修的新问题)**:
+  - **B1【最高频·最该修】InVEST 栅格图例太小/无单位/无标题/无比例尺** — Cori Sharp 对其 7 个工具全写 "legend too small",Nick 对 3 个工具同样。核代码确认:`_qgis_zoom_render_worker.py` 通用色带=14px 字/24px 宽/只 max·mid·min 三数;1.7× 放大**只对 `_tc_kind` telecoupling 图层生效**,所有 InVEST 栅格仍最小号。一个文件改动覆盖面最大。
+  - **B2 AI 叙述过度承诺**(信任杀手):FAMD 说 pdf 多页实只 1 图;Commodity Trade 说有 top exporter+网络统计实只 total value;Crop Pollination 提议 analyze .dbf 一点就报错;CBA 提议把表格渲成地图。→ 收紧 SKILL/summary 提示词。
+  - **B3 未请求却 dump ~28 个工具**(Nick+Nan,跑 05 时):agent 提示词挂着逐字 `CAPABILITY_CATALOG`,模型偶发不请自来吐出。
+  - **B4 中间 UUID CSV 是噪音**(Nick 06);**B5 可信度**——测试者判断不了对错(Cori 每工具)。
+- **桶 C(引导/数据,非产品 bug)**:非空间工具应标步骤4/5可选(Michele);术语求解释 Prevalence/LLER/LISA;Coastal Vulnerability(24)缺 habitat_table CSV=数据打包;CBC 预处理(02)transitions 需手工编辑=正常;Scenario(27)漏传 base_lulc.tif。
+### 关键变更文件
+- 新增(未跟踪、分析脚手架):`Run2_feedback/_docx2txt.py`、`_extracted/`(~100MB 解压)、`_feedback_text/`(CSIS.txt/Nan.txt + _SIGNAL/_ERR 提取)。讨论定案后可清理。
+- 无产品代码改动(本轮为分析)。
+### 建议优先级 / 下一步(待用户拍板)
+1. B1 图例可读性(单文件、影响全部 InVEST);2. 启动 MSU 回灌(桶 A);3. B2 过度承诺 + B3 工具 dump(提示词层);4. B4/B5/桶 C 打磨。
+- 待用户定:先攻哪一桶;是否要把分析落成结构化 markdown 报告(按工具×主题双索引)放进 `Run2_feedback/`。
+### 测试状态
+- 本轮无代码/测试执行,纯反馈提取与分析。
+### 续:以表格向用户汇报 9 类主要问题(按优先级排序)
+- 覆盖范围说明:读的是 docx 提取的**文字**,问卷内**嵌入截图未逐张查看**(如需可后续补看)。
+- 9 类问题(1图例太小🔴 / 2 AI过度承诺🔴 / 3 工具dump🟡 / 4 telecoupling点要素·GCP已修 / 5 渲染图加载慢·GCP已修 / 6 假报错待确认 / 7 UUID噪音 / 8 可信度 / 9 引导数据)。
+- 仍待用户拍板:先修 #1 图例,还是先出结构化 markdown 报告放进 `Run2_feedback/`。
+### 续:核实 4 个 zip 全覆盖(用户追问)
+- 用 zipfile 按 basename+size 逐一比对:`Nick.zip`(7)、`Toolbox_testing_surveys_MR.zip`(8)、`01-15test17documents.zip`(docx) 全部同名同大小已含于 `Test Report.zip` 超集(80 docx),均已读。
+- 唯一在 docx 之外:`01-15test17documents.zip/note.txt`(2003B,Nan 随手笔记,超集内无)。补读后**无新问题**,与 Nan 问卷重合。两点补强桶 C:① 测试数据包缺 `.cpg`(04 watershed_gura / 05 aggregate_shape / 10 forest_carbon_edge_demo_aoi,引导列了但 input_data 没有,测试仍成功)=测试数据/引导打包不一致;② Nan 自述上传/开站慢"大概率是我网络节点的问题"→ #H 慢不全是服务器/WAF。
+- 结论:9 类问题不变。
+### 续:给出分阶段改进计划(待用户确认后动手)
+- 代码落实定位:#1 图例=`renderers/_qgis_zoom_render_worker.py` 第305–440 PIL 覆盖段(`_lg_scale=1.7 if _tc_kind else 1.0`,通用栅格仍 14/12px);#2 过度承诺=`agent.py` 现有 402–406 只防假渲染、缺"只描述真实产出"规则;#3 工具dump=`agent.py:285`+`CAPABILITY_CATALOG(:2014)`;#7 UUID CSV=`output_router.py` PATTERNS(crop_percentile/regression)。
+- **计划分 4 阶段**:
+  - Phase 0 MSU 回灌(不写新代码):把 GCP 已修的 telecoupling render(#4)/JPEG preview(#5)/BUG6(#6 部分)/FAMD/nutrition tar→build→recreate 到 MSU,红线=不覆盖 MSU `.env.docker`。
+  - Phase 1【最高优先·单文件】#1 图例:1a 通用图例 scale 1.0→~1.5(telecoupling 路径不动,保持隔离);1b 加标题行;1c 工具→输出→单位小查表(命不中回退字段名);1d 可选比例尺。回滚=scale 改回 1.0。
+  - Phase 2 提示词/SKILL 层:2a agent.py 加"只描述实际产出、不提议分析读不了的 .dbf/.shp、不承诺没有的统计量";2b 修 FAMD/commodity_trade/radial_flows 的 SKILL 过度宣称;2c 收紧"列全部工具"仅显式请求时触发。
+  - Phase 3 打磨:3a output_router 隐藏 `*_normalized_<uuid>.csv`;3b 总结加"典型范围"锚点+解释 Prevalence/LLER/LISA;3c 桶C 测试数据(补 .cpg 04/05/10、非空间工具标渲染可选、Coastal Vuln 补 habitat_table、Scenario 引导传 .tif)。
+  - 独立排查:#6 DelineateIt 假报错——不假设 BUG6 已覆盖,GCP 复现看是否误绑/双调用。
+- 建议顺序:Phase1 图例 → Phase0(连同 Phase1 一起回灌 MSU)→ Phase2 → Phase3,#6 穿插 Phase0 后。
+- **下一步(待用户确认):从 Phase 1 图例 1a+1b 开始动手。**
+- 用户确认工作流:先在 GCP dev 改好并验证 → 再回灌 MSU 生产(不直接在 MSU 开发)。等用户点头即从 Phase 1(GCP 上改图例)开工。
+
+## 2026-07-01 — Phase 1 落地:InVEST 栅格图例可读性(反馈 #1)
+### 完成内容(本地改 + 本地 PIL 仿真验证)
+- 改 `backend/renderers/_qgis_zoom_render_worker.py` 图例覆盖段,**仅影响通用栅格/graduated 色带,telecoupling 路径(`_tc_kind`)零改动**:
+  - **1a 放大**:`_lg_scale = 1.7 if _tc_kind else 1.0` → `else 1.5`(字 14→21px、色带 24→36px、边距同比放大)。
+  - **1b 标题**:栅格原本无 field 名 → 只有 3 个裸数字。新增 `_raster_title(file_path)`:由文件名反推可读标题,右上角 halo 绘制。
+  - **1c 单位**:仅对**高置信**的一小组 InVEST 输出(wyield/quickflow/baseflow→mm、sed_export/sed_retention→t、n_export/p_export→kg/yr、filled_dem→m)加单位后缀;命不中只显示美化后的文件名(**不瞎标单位**,遵循 evidence-based)。文件名尾部 uuid/hex 会被剥掉。
+  - **修 bug**:放大后数字会顶右边缘裁切 → 右边距改为**按最宽数字标签动态计算**(`margin_r=bar_w+gap+max_label_width+pad`),已验证连 `1.23e+05` 科学计数也完整不裁。
+- 验证:`Run2_feedback/_legend_sim.py`(纯 PIL 复刻绘制逻辑,无 QGIS)产出 `_legend_preview.png` 2×2 对比(BEFORE 小且裁切/无标题 vs AFTER 大+标题+单位+不裁)。`py_compile` 通过。
+### 关键变更文件
+- `backend/renderers/_qgis_zoom_render_worker.py`(唯一产品改动)
+- 新增(未跟踪,验证脚手架):`Run2_feedback/_legend_sim.py`、`_legend_preview.png`
+### 测试状态
+- ✅ 本地 PIL 仿真视觉验证通过、语法通过
+- ✅ **GCP 真机 QGIS 渲染验证通过**:热补丁 worker 进 `tele-celery-render`(worker 每次渲染是全新子进程,`docker cp` 即生效、无需重启),直接跑真实 InVEST .tif:
+  - NDR `n_surface_export.tif`(Cori 抱怨过图例的工具):图例标题 **"N Surface Export (kg/yr)"**、色带明显放大、数字 0.42/0.21/0.00 完整不裁。截图存 `Run2_feedback/_gcp_render/ndr_legend2.jpg`。
+  - 单位表已扩展覆盖 NDR surface/subsurface/total export → kg/yr。
+- ✅ **安全加固**:动态右边距 + 放大**只对非 telecoupling**生效(`if _tc_kind: margin_r=_s(70)` 冻结旧值),telecoupling flow 图例字节不变。
+- ✅ 已部署 GCP dev(**热补丁,未 baked 进 `csic_backend:latest`**;容器 recreate 会回退,备份在服务器 `~/_worker_backup.py`)。Phase 0 统一 rebuild 时再固化。
+- ⏳ 未 commit;MSU 未动(随 Phase 0 回灌)。
+### 传输避坑(记录备查)
+- Windows 环境 `ssh "cat bin"` / `base64` 管道会在 ~1MB 处被 CR 截断 → 二进制损坏。可靠做法:服务器端先把大 PNG 缩成小 JPEG(<1MB)→ `base64 -w0` → 本地 `tr -d '\r\n'` → `base64 -d`,md5 校验一致。`scp` 在本机同样被截断。
+### 停在此处(待用户决定)
+- Phase 1 图例已上 GCP dev 热补丁。等用户:① 先上 GCP 网站亲眼看图例效果再继续,还是 ② 直接接着做 Phase 2(agent.py 加"只描述真实产出"规则 + 收紧工具 dump + 修 FAMD/commodity_trade/radial_flows 的 SKILL 过度宣称)。
+- 已告知用户 Phase 1 测试方法:上 **GCP dev http://34.42.83.50/**(非 MSU,补丁只在 GCP)→ 跑任一出 .tif 的 InVEST 工具(建议 Annual Water Yield / Carbon / NDR)→ "render the result map" → 检查色带放大、右上角标题(如 `Wyield (mm)`)、数字不裁切。注意热补丁 recreate 会回退,要趁现在测。
+
+## 2026-07-01 — 用户测试中发现:上传慢 + 进度条"一直闪"(诊断,未改)
+### 诊断结论
+- **上传慢 = 网络,非服务器**:GCP `uptime` load 0.02、磁盘 74%、nginx/backend/fileserver/frontend 全 healthy、nginx `client_max_body_size 500M`。GCP 在美国机房,国内上传走国际链路本身慢(与 Nan 反馈自述"我网络节点问题"一致)。**非产品 bug**。
+- **进度条"一直闪" = 已知取舍,可修**:`frontend/src/lib/streaming.js` 有两条路径——① `uploadFilesWithProgress()` 用 XHR 有**真实字节进度**(status uploading→processing→done),但**当前未被调用**;② 实际走 `streamChat()` 的 **`fetch()`**(文件+消息一次性 POST),fetch 无上传进度事件 → 直接 `percent:100,status:'processing'` → `App.jsx` 那条 bar 加 `animate-pulse` = 用户看到的"一直闪"。当初改 fetch 的原因(注释):旧"XHR 上传→开 SSE"两步式偶尔卡住不发起 chat 请求,故合并成一次 fetch,代价=丢进度条。
+### 建议(待用户确认)
+- 把文件上传切回已有的 XHR 进度版(先 `await uploadFilesWithProgress` 传完 → 再发纯文本 `streamChat`),进度条恢复"从空到满";用干净 await+错误处理规避历史"卡住"风险。**上传可靠性敏感区,已问用户是否要改**。
+### 关键文件(涉及)
+- `frontend/src/lib/streaming.js`(uploadFilesWithProgress / streamChat)、`frontend/src/App.jsx`(uploadProgress state + 进度条 UI ~682-703)
+### 状态
+- 仅诊断,**未改任何代码**。等用户定:修进度条 vs 专注 Phase 2。
+
+## 2026-07-01 — 回溯"上传方式为何改"+ 实证 MSU/GCP 前端分歧
+### 为什么当初改上传(证据=streaming.js 注释,非猜)
+- **旧=两步式**:① XHR POST `/api/upload`(有真实字节进度,"从空到满")→ ② 单独发纯文本请求开 `/api/chat` SSE。
+- **痛点**:"传完→再开 SSE"的交接**偶尔失灵**,上传完成但第二步聊天请求没触发 → 用户**卡死在"上传完但 AI 无响应"**(对应反馈里"跑着卡住/Failed to fetch/要开新对话才好")。
+- **改=单 fetch**:文件+消息打包进同一个 `/api/chat` POST(`fetchEventSource`,body=FormData 含 files),保证聊天必启动,消灭"上传完卡死"。**代价**:fetch 无上传进度事件 → 进度条只能不确定脉冲(=用户看到的"一直闪")。
+### 实证:MSU 与 GCP 前端不是同一版(抓公网 bundle 比对)
+- 抓 `https://ai.telecoupling.msu.edu/assets/index-Cp4o_lN4.js`(291KB)grep:
+  - **MSU=旧两步式**:含 `o.open("POST","/api/upload")...o.upload.onprogress`(XHR 真进度),且 chat 的 FormData **只 append message+model、不含 files**(`await Iv(...)` 先传文件再发纯文本 chat)。**有真进度条**。
+  - 缺 `FILES_ATTACHED` 标记(GCP 现有,workflow 特性)→ 证实 MSU 前端**比 GCP 旧**。
+  - **GCP=新单 fetch**(当前 repo `streamChat`:formData 含 files → 一次 `fetchEventSource('/api/chat')`)。**无真进度、脉冲闪**。
+- **结论**:用户在 GCP 看到的"闪" vs 测试者在 MSU 看到的"能填满",差别就是这次改动本身。**退回 XHR = 把特意干掉的"卡死"风险请回来。**
+### 建议方向(待用户确认)
+- 不退回两步式;在**保留单 fetch 可靠性**前提下加**平滑合成进度**(按文件大小/时间估算 0→~90% 再等服务器),兼得可靠 + "从空到满"观感。
+### 关键文件
+- `frontend/src/lib/streaming.js`(streamChat 单-fetch / uploadFilesWithProgress 旧 XHR 死代码)
+### 用户决定
+- **上传方式暂时不动**(2026-07-01)。进度条"闪"保持现状,不为它牺牲单-fetch 的可靠性。回到别处推进。
+
+## 2026-07-01 — 图例字号调档 5x→3x→2x(用户看效果逐步缩小)+ 热补丁 GCP dev
+### 完成内容
+- 用户看 Phase 1 的 **5x bold** 图例后觉得"太大",本 session 逐步调档:**5x → 3x → 2x**(bold 全程保持),当前部署 = **2x**。
+- 改 `backend/renderers/_qgis_zoom_render_worker.py` 第 318 行 `_lg_scale = 1.7 if _tc_kind else <N>`,注释里 "Nx" 描述同步更新。
+- 字号缩小的同时,右侧白色 gutter 宽度是**按字号动态计算**的,gutter 会相应变窄不留多余空白;色带旁数字标签、raster 标题一并缩放。
+- telecoupling 自己的图例路径(`_tc_kind`,scale 1.7,画在图上)**零改动**,保持 byte-frozen。
+### 部署(按惯用热补丁流程,每档都推)
+- scp 26KB 到 GCP 主机 → `docker cp` 进 `tele-celery-render:/app/renderers/_qgis_zoom_render_worker.py`。worker 每次渲染是全新子进程,**即时生效、无需重启**。
+- 每次 md5 本地=容器内一致校验通过,无截断。当前 2x 版 md5 = `c208073f5393ff7bd4e5d76d7397e051`。
+- 备份:5x 版存服务器 `~/_worker_5x_backup.py`;原始 baseline 仍在 `~/_worker_backup.py`。
+- 仍是**热补丁,未 baked 进 `csis_backend:latest`**,容器 recreate 会回退 → 随 Phase 0 统一 rebuild 时固化。MSU 未动。
+### 关键变更文件
+- `backend/renderers/_qgis_zoom_render_worker.py`(唯一产品改动;仍未 commit)
+### 测试状态(GCP dev 真机 4 支图例全测,直接跑 render worker)
+- 方法:在 `tele-celery-render` 容器内用真实输出文件跑 `_qgis_zoom_render_worker.py`,产图缩成 JPEG 拉回本地 `feedbacks/_tc_render_test/legend_2x/`。选直接跑 worker(非走网站 Gemini)是因为它更快更确定,且测的正是改动那段代码。
+- ✅ **连续栅格色带**(`wyield.tif`):右侧白 gutter 内标题 **"Wyield (mm)"**(bold黑)、2x 色带、3 数字 1508.63/754.32/0.00 不裁、不压图。
+- ✅ **graduated 矢量**(`watershed_results_wyield.shp`→字段 `precip_mn`):field header + 2x 色带正常。**注**:该 shp 只有 1 个 watershed→min≈max,三个数字都显示 1494.66,是**数据退化(单要素)不是图例 bug**。
+- ✅ **categorical 矢量**(**合成 4 类** `class` 字段,服务器无现成 LISA/cluster 输出):右上 "class" 图例框 4 个 swatch(Cropland/Forest/Urban/Water)bold 可读、落在 gutter 不压数据。**此前从未验过的分支,现确认 2x 下正常。**
+- ✅ **telecoupling 回归**(`radial_flows.shp` + `render_as=flows`):Fig.10 粉紫弧线 flow + O-D marker 正常渲染,telecoupling 样式未被 Phase 1 破坏。该 flow 文件无 magnitude→`legend=null`,故不触发 PIL 图例;且 `_lg_scale=1.7 if _tc_kind` 分支本就一字未改、gutter/title 全被 `if not _tc_kind` 挡住,构造上不受影响。
+- ✅ **bold 字体确认加载**:所有图例文字均为清晰粗体,"系统 dejavu 空目录→退回小位图"的隐患不存在(matplotlib DejaVuSans-Bold 生效)。
+- 观察:`exit=139`(QGIS/Qt 进程退出时 teardown SIGSEGV)在 PNG 写完+JSON 打印之后发生,输出完好,属已知容器内退出段错误,与本改动无关。
+- ⏳ 未决:2x 档位用户确认后 → commit / Phase 0 固化进镜像 / 回灌 MSU。测试脚手架留在服务器 `/data/outputs/_legend_test/`(可删)。
