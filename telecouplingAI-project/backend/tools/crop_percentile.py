@@ -96,11 +96,18 @@ async def run_crop_percentile(
     workspace_dir, folder_name = generate_output_dir("crop_production_percentile", session_id)
     progress_callback(10, "Created output directory")
 
+    # The normalized copy of the user's landcover->crop table is an INTERNAL
+    # InVEST input, not a result. Write it into _csis_intermediate/ (in
+    # output_router.SKIP_DIRS) so it never shows up in the user-facing output
+    # list (Run-2 feedback, Nick: the *_normalized_<uuid>.csv files are noise).
+    # InVEST still reads it by absolute path; InVEST never touches this dir.
     progress_callback(15, "Normalizing crop names in input table...")
+    _intermediate_dir = os.path.join(workspace_dir, "_csis_intermediate")
+    os.makedirs(_intermediate_dir, exist_ok=True)
     lulc_crop_path = _rewrite_crop_csv(
         params["landcover_to_crop_table_path"],
         supported,
-        workspace_dir,
+        _intermediate_dir,
         f"landcover_to_crop_normalized_{task_id}.csv",
     )
 
