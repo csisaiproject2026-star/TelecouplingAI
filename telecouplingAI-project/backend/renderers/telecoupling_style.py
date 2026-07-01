@@ -164,7 +164,7 @@ def flow_symbol(color, width, mcolor):
         ml.setPlacement(placement)
         ms = QgsMarkerSymbol.createSimple({
             "name": "circle", "color": mcolor.name(),
-            "size": "2.4", "outline_color": "black", "outline_width": "0.2",
+            "size": "3.2", "outline_color": "black", "outline_width": "0.3",
         })
         ml.setSubSymbol(ms)
         sym.appendSymbolLayer(ml)
@@ -218,7 +218,7 @@ def style_systems(layer, category_field=None):
     if not cf:
         ms = QgsMarkerSymbol.createSimple({
             "name": "triangle", "color": "#3fae3f",
-            "size": "5.5", "outline_color": "black", "outline_width": "0.3"})
+            "size": "9", "outline_color": "black", "outline_width": "0.5"})
         layer.setRenderer(QgsSingleSymbolRenderer(ms))
         return layer, None
     vals = sorted({f[cf] for f in layer.getFeatures() if f[cf] is not None}, key=str)
@@ -226,16 +226,16 @@ def style_systems(layer, category_field=None):
     for v in vals:
         sv = str(v).lower()
         if "spill" in sv:
-            col, mshape, size, angle, gshape = (255, 140, 0), "circle", "5", "0", "circle"
+            col, mshape, size, angle, gshape = (255, 140, 0), "circle", "8", "0", "circle"
         elif "receiv" in sv:
             # Receiving -> inverted (downward) solid green triangle
-            col, mshape, size, angle, gshape = (11, 107, 11), "triangle", "7.5", "180", "triangle_down"
+            col, mshape, size, angle, gshape = (11, 107, 11), "triangle", "11", "180", "triangle_down"
         else:
             # Sending -> upright solid green triangle
-            col, mshape, size, angle, gshape = (11, 107, 11), "triangle", "7.5", "0", "triangle_up"
+            col, mshape, size, angle, gshape = (11, 107, 11), "triangle", "11", "0", "triangle_up"
         ms = QgsMarkerSymbol.createSimple({
             "name": mshape, "color": "#%02x%02x%02x" % col, "size": size,
-            "angle": angle, "outline_color": "black", "outline_width": "0.4"})
+            "angle": angle, "outline_color": "black", "outline_width": "0.6"})
         cats.append(QgsRendererCategory(v, ms, str(v)))
         entries.append((str(v), col[0], col[1], col[2], gshape))
     layer.setRenderer(QgsCategorizedSymbolRenderer(cf, cats))
@@ -246,13 +246,13 @@ def style_agents(layer):
     """Replace the default dot with a person icon."""
     if os.path.isfile(PERSON_SVG):
         sl = QgsSvgMarkerSymbolLayer(PERSON_SVG)
-        sl.setSize(9)
+        sl.setSize(13)
         sym = QgsMarkerSymbol()
         sym.changeSymbolLayer(0, sl)
     else:
         sym = QgsMarkerSymbol.createSimple({
             "name": "pentagon", "color": "#333333",
-            "size": "4.5", "outline_color": "white", "outline_width": "0.5"})
+            "size": "7", "outline_color": "white", "outline_width": "0.6"})
     layer.setRenderer(QgsSingleSymbolRenderer(sym))
     return layer, None
 
@@ -261,7 +261,7 @@ def style_causes(layer):
     """Telecoupling causes (drivers) -> red star markers."""
     ms = QgsMarkerSymbol.createSimple({
         "name": "star", "color": "#d62728",
-        "size": "7.5", "outline_color": "black", "outline_width": "0.3"})
+        "size": "11", "outline_color": "black", "outline_width": "0.5"})
     layer.setRenderer(QgsSingleSymbolRenderer(ms))
     # one-entry legend so the star is explained
     return layer, {"kind": "categorical", "field": "Causes",
