@@ -5577,3 +5577,40 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - ✅ **bold 字体确认加载**:所有图例文字均为清晰粗体,"系统 dejavu 空目录→退回小位图"的隐患不存在(matplotlib DejaVuSans-Bold 生效)。
 - 观察:`exit=139`(QGIS/Qt 进程退出时 teardown SIGSEGV)在 PNG 写完+JSON 打印之后发生,输出完好,属已知容器内退出段错误,与本改动无关。
 - ⏳ 未决:2x 档位用户确认后 → commit / Phase 0 固化进镜像 / 回灌 MSU。测试脚手架留在服务器 `/data/outputs/_legend_test/`(可删)。
+
+## 2026-07-02 — Run-2 反馈批量改进(自主夜间执行,用户睡觉,早上验收)
+用户指示:把 Run-2 反馈需要改进的**全部做完 + 自测 + 截图**;并提醒"反馈基于 **MSU 旧版**,GCP 更新,有些 bug 可能已修好,先在 GCP 验证再改"。全程在 **GCP dev** 上"先验证后改",每项渲染真实文件截图。截图 + 索引见 `feedbacks/Run2_improvements_20260702_screenshots/`(含 README 逐图说明)。
+
+### 逐项结论(★=本次改代码, ✓已修=GCP 早于 MSU 已修好, —=非bug/已有引导)
+| 项 | 反馈来源 | 结论 |
+|----|---------|------|
+| **图例可读性 2x** | Cori/Nick #1 | ★ 已完成(见上一条),本晚 commit `6cf93c8` |
+| **A1 telecoupling marker 太小** | Xin 37/38/39 | ★ 放大 systems 三角 7.5→11、agents 人形 9→13、causes 星 7.5→11 + 加粗描边。commit `12fa8c3` |
+| **A2 causes 应 categorical** | Xin 37 | ✓已修:GCP 上 causes 本就红星+categorical 图例(MSU 旧版才是连续色带)。渲染确认 |
+| **B1 AI 罗列全部 28 工具** | Nan/Nick 05 | ★ system prompt 加"未明确要求勿罗列工具"。commit `08d02b0` |
+| **B2 AI 宣称不存在的产出** | Run-2 综合 | ★ 加"只描述返回列表里真实存在的文件"规则(也中和了 SKILL POST_EXECUTION 列的*预期*文件)。commit `08d02b0` |
+| **C1 media_flows 只认 lon/lat** | Xin 40 | ✓已修:GCP 上 add_media_flows 已接受 `longitude/latitude`(容器 line59 确认)。剩自流(source 国当 target)属小优化,未做 |
+| **C2 coastal vuln habitat_table 报错** | Nan 24 | —非bug:habitat_table 是可选;SKILL 已详述"含 habitat 需提供关联保护等级的 CSV"。报错其实是 agent 正确在要该表 |
+| **C3 CBC transitions 需手改** | Nan/CSIS 02 | —非bug:InVEST 固有;cbc-preprocessor SKILL 已明确"requires manual editing before Tool 3"+各扰动强度含义。⚠️ 提示正常工作 |
+| **D1 crop CSV uuid 杂乱** | Nick 06 | ★ 归一化中间表改写入 `_csis_intermediate/`(加进 output_router.SKIP_DIRS),不再当结果列出。route_outputs 测试通过。commit `cf6be65` |
+| **D2 delineateit 渲染 file-not-found** | Nan 12a | —非bug:delineateit 产 watersheds.gpkg,本不产 flow_direction.tif(那是 RouteDEM 的);报错正确,混淆源于 AI 建议了不存在的文件 → 已被 B2 兜住 |
+| **上传慢/进度条闪** | 多人 | —已诊断=网络(GCP 在美国),非服务器 bug;进度条用户 07-01 决定不动 |
+
+### 关键变更文件(本晚 4 个 commit,均在 `gcp-head`)
+- `renderers/_qgis_zoom_render_worker.py`(图例 2x)、`renderers/telecoupling_style.py`(marker 放大)
+- `renderers/output_router.py` + `tools/crop_percentile.py` + `tools/crop_regression.py`(D1)
+- `agent.py`(B1/B2)
+
+### 部署状态(GCP dev 全部已生效)
+- **render 层**(worker/telecoupling_style):热补丁 `docker cp` 进 `tele-celery-render`,每次渲染新子进程→即时生效。
+- **crop 工具**(D1):`docker cp` 进 `tele-celery-crop-pct/-reg` + **重启**这两个 worker(celery 常驻进程需重启重载)→ 已生效、import OK。
+- **agent**(B1/B2):`docker cp` 进 `tele-backend` + py_compile 门禁 + **重启** → `Up (healthy)`、startup complete、/health=200。
+- 所有备份留在服务器 home:`~/_worker_5x_backup.py`/`~/_worker_backup.py`/`~/_tcstyle_backup.py`/`~/_output_router_backup.py`/`~/_agent_backup.py`。
+
+### ⚠️ 两个需要你在场的一步(我故意没连夜做)
+1. **整镜像 bake(Phase 0)**:主机源码树 `~/csis-platform/telecouplingAI-project/backend/` 是 **stale 的**(worker 还停在 `else 1.0`),且运行容器里有历史"热补丁但没写回源码"的改动(Phase A telecoupling、BUG6/7 等)。从 stale 源码 rebuild 会**回退**这些。安全做法=用 CLAUDE.md 的 tar 工作流把**本地 git 工作树**完整推到主机→`docker build`(镜像名 **`csic_backend:latest`**,context=`./backend`)→`docker compose up -d --force-recreate`→冒烟。**建议你在场做，能立刻回滚。** 目前改动已 commit(git=真源) + 热补丁生效,recreate 前不会丢。
+2. **回灌 MSU**:今晚 MSU 不通(VPN 没开,ssh 超时)。等你开 VPN 后按 tar 工作流回灌。
+
+### 自测方式(可复现)
+- 直接在 `tele-celery-render` 容器内跑 `_qgis_zoom_render_worker.py` 渲染真实 .tif/.shp,产图缩 JPEG 拉回本地看(比走网站 Gemini 快且确定)。D1 用 `route_outputs()` 构造 workspace 单测。
+- B1/B2 是 prompt 改动,**无法确定性单测**,仅验证了不破坏 agent 启动(重启后 healthy)。**需早上用真人聊天做 LLM 冒烟**(跑个 crop percentile,看 AI 是否还罗列全部工具 + 是否只描述真实产出)。
