@@ -26,8 +26,9 @@
 ---
 
 ## 部署状态与后续
-- **本表 #1/#2/#4/#5/#6/#10 = 本次改代码**，共 6 个 commit 在 `gcp-head` 分支；均已**热补丁**在 GCP dev 生效。
-- **#3/#7 = GCP 早已修好**；**#8/#9/#11 = 非 bug（已有引导 / 被 #6 约束）**；**#12 = 不改**。
-- ⏳ **待固化**：整套改动目前是热补丁，容器 recreate 会回退。需在场做一次镜像 bake（`csic_backend:latest`）+ recreate 固化。
-- ⏳ **待回灌 MSU**：需校园网/VPN；MSU 打通后按 tar 工作流同步，届时真实测试者才能在 MSU 上看到这些改进。
-- **#5/#6 需真人 LLM 冒烟**（prompt 改动无法确定性单测），其余渲染/输出类改动均已在 GCP dev 真机自测（见截图）。
+- **本表 #1/#2/#4/#5/#6/#10/#14 = 本次改代码**，均已 commit 到 `gcp-head` 分支。
+- **#3/#7/#13 = GCP 早已修好**；**#8/#9/#11 = 非 bug（已有引导 / 被 #6 约束）**；**#12 = 不改**。
+- ✅ **已固化（2026-07-02）**：git `backend/` 同步到 GCP 主机 → 重建镜像 `csic_backend:latest` → `docker compose up -d --force-recreate` 全部 39 容器上新镜像。验证：全容器健康、`/health`=200、agent+google-genai import 正常（依赖升级未破坏）、镜像内代码确认为新版。回滚镜像：`csic_backend:prebake_20260702`。改动不再随 recreate 回退。
+- ✅ **betweenness 结论（钉死）**：本平台（GCP，已固化）betweenness = **`1167.86`（原始计数，与 Nan 一致）**；`0.068864` 只存在于 **MSU 旧版**（归一化）。用固化后镜像重跑核实。
+- ⏳ **待回灌 MSU（暂停，等用户命令）**：需校园网/VPN；打通后按 tar 工作流把 git 同步到 MSU 主机→rebuild→recreate（MSU 各自的 `.env.docker` 永不覆盖），届时真实测试者才在 MSU 看到这些改进。
+- **#5/#6 需真人 LLM 冒烟**（prompt 改动无法确定性单测），其余渲染/输出/网络类改动均已在 GCP dev 真机自测（见截图 + network CSV）。
