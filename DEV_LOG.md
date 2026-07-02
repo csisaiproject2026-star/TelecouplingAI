@@ -5678,3 +5678,10 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - soybean 要有数据:把 crop 表里 soybean 的 lucode 改成 landcover 里真实存在的编码(非 1000)——**改输入数据,非改代码**。标准测试数据本身有此坑(soybean→1000 永远空)。
 - 已向用户提议(未做,待定):crop 工具跑完后,若某 crop 的 lucode 在 LULC 中 0 像素,给友好提示避免误解。
 - 测试产物留在服务器 `/data/outputs/_croptest*`(可删)。
+
+## 2026-07-02 — 修:栅格图例标题被截断(用户报 wheat_yield_50th)commit `62970f7`
+- 现象:图例标题 "Wheat Yield 50Th **Productio**" —— "Production" 顶到图像右边缘被切(数字 0.38/0.19/0.00 正常)。
+- 根因:gutter 宽度只按数字标签算(`_bar_w0+_gap+_mlw+_s(40)`),但标题的单词("Production" 2x 粗体)比 gutter 宽,单词不能断 → 越界裁切。
+- 修 `_qgis_zoom_render_worker.py`:① gutter 宽度取 `max(数字块, 最宽标题词 + _s(28))`;② 标题改为按 gutter 内宽换行、从 gutter 左缘**左对齐**绘制(去掉原来会顶右缘的定位)。
+- 验证(GCP 热补丁):wheat_yield_50th 标题完整显示 "Wheat Yield / 50Th / Production";wyield(短标题)不受影响。
+- 部署:render worker 每次新子进程,热补丁即时生效;已 commit + 同步主机源码。**注意:此修复尚未 bake 进镜像**(镜像仍是旧版),容器 recreate 会回退——待与 MSU 回灌一起做一次 rebuild 固化,或单独重 bake。
