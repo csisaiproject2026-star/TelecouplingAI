@@ -1851,6 +1851,23 @@ def _looks_like_workflow_replan(message: str) -> bool:
     return any(x.lower() in m for x in _WORKFLOW_REPLAN_MARKERS)
 
 
+# A direct "render / visualize THIS spatial file" request. Requires BOTH a render
+# verb AND a spatial-file reference (.shp/.tif/…), so a plain "visualize the
+# output.shp" routes straight to render_spatial_file (single tool), while an
+# open-ended "visualize the impact of X" analysis goal (no file ref) is NOT
+# hijacked. Fixes Flash ALSO proposing a bogus workflow plan card (that
+# references render_spatial_file, which is not a workflow tool) for a render.
+_SPATIAL_FILE_RE = re.compile(r"\.(shp|tif|tiff|geojson|gpkg)\b", re.IGNORECASE)
+_RENDER_VERBS = ("render", "visualize", "可视化", "渲染", "display", "plot", "show", "map")
+
+
+def _looks_like_render_request(message: str) -> bool:
+    if not _SPATIAL_FILE_RE.search(message):
+        return False
+    m = message.lower()
+    return any(v in m for v in _RENDER_VERBS)
+
+
 # Marker the frontend appends when the user's send carries freshly-attached files.
 # Used (only when a workflow plan is already stored) to deterministically RUN the
 # workflow on the "upload files + send" turn of the confirm→upload→run flow.
@@ -2061,6 +2078,12 @@ async def run_agent(
 
     # Detect which tool the user is requesting. Used in retry nudge messages.
     detected_tool_name = _detect_tool_from_message(user_text)
+    # Direct render request (render/visualize a specific .shp/.tif) → route to
+    # render_spatial_file as the single iteration-0 tool, so Flash can't ALSO
+    # emit a workflow plan card referencing render_spatial_file. Only when no
+    # run_* tool was already keyword-detected.
+    if detected_tool_name is None and _looks_like_render_request(user_text):
+        detected_tool_name = "render_spatial_file"
     if detected_tool_name:
         logger.info(f"[agent] keyword-routing → {detected_tool_name}")
 
