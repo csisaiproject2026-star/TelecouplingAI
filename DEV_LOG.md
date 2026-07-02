@@ -5639,3 +5639,21 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - 改 `r_scripts/network_analysis.R`:CSV 加 `pagerank`(`page_rank()$vector`)+ `community`(`membership()`,与 SHP cluster 同源);所有指标按 V(g) 顺序,列对齐;旧列数值不变(向后兼容)。
 - 验证(GCP 真机重跑 nodes/links/World_countries_2002.shp,walktrap):新表头 `degree,closeness,betweenness,pagerank,community`;USA 行 deg237/clo0.41/betw1167.86/pr0.0189/community5;6 个社区。
 - R 脚本每次是新 Rscript 进程,热补丁 `docker cp` 进 `tele-celery-net` 即时生效(备份 `~/_network_analysis_backup.R`)。
+
+## 2026-07-02 — 固化:把本轮所有改动 bake 进 GCP 镜像(用户命令,MSU 暂不动)
+### 背景/安全判断
+- 真正在跑的镜像 `csic_backend:latest` 是 **06-30 构建**(非那个 8 周前的 `csis-backend`),= 我本轮 Run-2 之前的基线;我这两天全是热补丁**且都已 commit**。故 **git = 基线 + 我的全部改动 = 当前运行态**,从 git rebuild 不回退。
+- 主机源码树是 stale 的(worker 曾停在 `else 1.0`),所以**先把 git 的 `backend/` 同步到主机**(tar 覆盖,排除 env/__pycache__),再从 git 源 rebuild。
+### 步骤(全部在 GCP,MSU 未碰)
+1. 提交待提交文档(commit `f581cb9`);先 `docker tag csic_backend:latest csic_backend:prebake_20260702` 备份可回滚。
+2. `tar backend/ | ssh ... tar x` 同步 git→主机;校验 worker=2.0 / marker×3 / network pagerank / agent 护栏 / crop D1 全部落位。
+3. `docker build -t csic_backend:latest .`(build context `./backend`)。**注意:requirements 未锁版本,rebuild 升级了依赖**(pydantic 2.10→2.13、google-genai→2.10.0、natcap.invest 3.14.3 等)——任何 rebuild 的固有漂移。
+4. `docker compose up -d --force-recreate` → 39 容器全部上新镜像。
+### 验证(固化后镜像代码,已 recreate 非热补丁)
+- ✅ 全容器无 unhealthy/restarting/exited;`/health`=200。
+- ✅ **agent + google-genai import OK**(依赖漂移未破坏 agent 启动)——最担心的点排除。
+- ✅ 镜像内 render worker=`_lg_scale = 2.0`、network R 含 `page_rank`。
+- ✅ 重跑 network(同数据):CSV 5 列 `degree,closeness,betweenness,pagerank,community`;**USA betweenness = 1167.86**(与 Nan 一致;`0.068864` 是 MSU 旧版归一化值)。
+### 状态
+- GCP 固化完成,可回滚(`csic_backend:prebake_20260702`)。热补丁 home 备份(`~/_*backup*`)现已冗余但保留。
+- ⏳ **MSU 回灌:按用户指示暂停,等命令**。届时按 CLAUDE.md tar 工作流同步 git→MSU 主机→rebuild→recreate(注意 MSU 各自的 `.env.docker` 永不覆盖)。
