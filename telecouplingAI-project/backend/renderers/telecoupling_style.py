@@ -197,7 +197,10 @@ def style_flows(layer, magnitude_field=None):
     else:
         c = QColor(200, 30, 120)
         layer.setRenderer(QgsSingleSymbolRenderer(flow_symbol(c, 1.8, c)))
-        legend = None
+        # uniform (no magnitude field) -> one-entry legend so the flow line is
+        # explained, instead of no legend at all
+        legend = {"kind": "categorical", "field": "Flows",
+                  "entries": [("Flow", 200, 30, 120, "line")]}
     return layer, legend
 
 
@@ -254,7 +257,9 @@ def style_agents(layer):
             "name": "pentagon", "color": "#333333",
             "size": "7", "outline_color": "white", "outline_width": "0.6"})
     layer.setRenderer(QgsSingleSymbolRenderer(sym))
-    return layer, None
+    # one-entry legend so the person marker is explained (matches causes)
+    return layer, {"kind": "categorical", "field": "Agents",
+                   "entries": [("Agent", 51, 51, 51, "person")]}
 
 
 def style_causes(layer):

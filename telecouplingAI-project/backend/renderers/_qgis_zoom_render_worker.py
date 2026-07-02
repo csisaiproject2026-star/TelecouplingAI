@@ -310,21 +310,22 @@ if _legend is not None:
         img = Image.open(p["output_path"]).convert("RGBA")
         iw, ih = img.size
 
-        # Telecoupling keeps its original in-map legend overlay (FROZEN: scale
-        # 1.7, regular face, drawn over the map). Generic (InVEST) rasters use a
-        # larger 2x BOLD BLACK legend placed in a dedicated white gutter
-        # added to the RIGHT of the map, so the big legend never covers the data
-        # (Run-2 feedback #1 + user: "2x, bold, black, don't cover the shp").
-        _lg_scale = 1.7 if _tc_kind else 2.0
+        # EVERY legend — generic InVEST rasters AND telecoupling
+        # systems/agents/causes/flows — now uses the SAME big, readable overlay:
+        # 2x scale + BOLD BLACK DejaVuSans. (The telecoupling branch used to be
+        # frozen at 1.7x regular face, which made its legend visibly smaller and
+        # lighter than the raster legend; user asked for consistency.) Generic
+        # rasters still get a dedicated white gutter (below); telecoupling keeps
+        # its compact legend box drawn over the map — same font size + weight.
+        _lg_scale = 2.0
 
         def _s(x):
             return int(round(x * _lg_scale))
 
         _fs, _fs_s = _s(14), _s(12)
         # The system dejavu dir is empty in this image (PIL was silently falling
-        # back to the tiny bitmap default), so pull DejaVuSans from matplotlib's
-        # bundled fonts. Generic = BOLD; telecoupling keeps the exact original
-        # path + default fallback so its render stays byte-frozen.
+        # back to the tiny bitmap default), so pull DejaVuSans-Bold from
+        # matplotlib's bundled fonts — BOLD for every legend now.
         try:
             import matplotlib as _mpl
             _MPL_TTF = os.path.join(_mpl.get_data_path(), "fonts", "ttf")
@@ -332,15 +333,12 @@ if _legend is not None:
             _MPL_TTF = ("/opt/conda/envs/TeleCouplingAI/lib/python3.12/"
                         "site-packages/matplotlib/mpl-data/fonts/ttf")
 
-        if _tc_kind:
-            _font_paths = ["/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"]
-        else:
-            _font_paths = [
-                os.path.join(_MPL_TTF, "DejaVuSans-Bold.ttf"),
-                "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-                os.path.join(_MPL_TTF, "DejaVuSans.ttf"),
-                "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-            ]
+        _font_paths = [
+            os.path.join(_MPL_TTF, "DejaVuSans-Bold.ttf"),
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+            os.path.join(_MPL_TTF, "DejaVuSans.ttf"),
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        ]
 
         def _load_font(size):
             for _fp in _font_paths:
@@ -545,6 +543,22 @@ if _legend is not None:
                              (_cy + (_R if k % 2 == 0 else _R * 0.42) * _m.sin(-_m.pi / 2 + k * _m.pi / 5)))
                             for k in range(10)]
                     _d.polygon(_pts, fill=(r, g, b, 255), outline=(0, 0, 0, 220))
+                elif gshape == "person":
+                    # simple person glyph (head + shoulders) for agents
+                    _cx = (x0 + x1) / 2
+                    _hr = sw * 0.17
+                    _hy = y0 + sw * 0.24
+                    _d.ellipse([(_cx - _hr, _hy - _hr), (_cx + _hr, _hy + _hr)],
+                               fill=(r, g, b, 255), outline=(0, 0, 0, 220))
+                    _by = _hy + _hr
+                    _d.polygon([(_cx - sw * 0.30, y1), (_cx + sw * 0.30, y1),
+                                (_cx + sw * 0.15, _by), (_cx - sw * 0.15, _by)],
+                               fill=(r, g, b, 255), outline=(0, 0, 0, 220))
+                elif gshape == "line":
+                    # thick colored line for flows
+                    _ly = (y0 + y1) // 2
+                    _d.line([(x0, _ly), (x1, _ly)], fill=(r, g, b, 255),
+                            width=max(2, sw // 4))
                 else:  # rect — generic categorical, unchanged
                     _d.rectangle([(x0, y0), (x1, y1)],
                                  fill=(r, g, b, 230), outline=(0, 0, 0, 200), width=1)
