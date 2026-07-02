@@ -45,9 +45,12 @@ async def run_network_analysis(
         "node_size":            params.get("node_size", 0.05),
         "edge_width":           params.get("edge_width", 0.833333),
         "label_size":           params.get("label_size", 0.8),
-        "out_pdf":              os.path.join(workspace_dir, f"network_plot_{task_id}.pdf"),
-        "out_csv":              os.path.join(workspace_dir, f"network_stats_{task_id}.csv"),
-        "out_shp":              os.path.join(workspace_dir, f"output_{task_id}.shp"),
+        # Clean, stable output names (no task_id in the filename — the workspace
+        # dir is already unique per run, so the uuid was just noise the user saw
+        # in every filename). Run-2: "output still has session id".
+        "out_pdf":              os.path.join(workspace_dir, "network_plot.pdf"),
+        "out_csv":              os.path.join(workspace_dir, "network_stats.csv"),
+        "out_shp":              os.path.join(workspace_dir, "network_communities.shp"),
     }
 
     progress_callback(20, "Running R network analysis...")

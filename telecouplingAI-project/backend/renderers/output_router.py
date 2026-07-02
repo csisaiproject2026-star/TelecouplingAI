@@ -52,9 +52,9 @@ PATTERNS: dict[str, dict[str, list[str]]] = {
                 "aggregate_results_*.csv", "aggregate_results.csv"],
     },
     "network_analysis": {
-        "qgis": ["output_*.shp"],
-        "csv": ["network_stats_*.csv"],
-        "download": ["network_plot_*.pdf"],
+        "qgis": ["network_communities.shp", "output_*.shp"],
+        "csv": ["network_stats.csv", "network_stats_*.csv"],
+        "download": ["network_plot.pdf", "network_plot_*.pdf"],
     },
     "carbon": {
         "qgis": ["tot_c_cur*.tif", "tot_c_fut*.tif", "tot_c_redd*.tif",
