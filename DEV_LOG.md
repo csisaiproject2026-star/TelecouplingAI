@@ -5663,3 +5663,18 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - 更正结论:**我们平台 betweenness = 1167.86(原始计数),MSU 与 GCP 一致、正确**;`0.068864` 从来不是我们的输出,也没有"旧版归一化"这回事。closeness 我们平台一直有(0.28–0.41)。
 - 仍成立:截图中 "Nan's"(=我们平台)确实 **不含 pagerank / 不在 CSV 显示 communities**,而 "My"(外部工具)有 → 这是我们真缺的,已在 `network_analysis.R` 补进 CSV(commit `49fca06`,已固化)。故 pagerank/community 的改动有效、保留。
 - 已同步修正 `Run2_Feedback_Fixes_20260702.md` 第 13 行与底部 betweenness 结论。
+
+## 2026-07-02 — 排查"Crop Percentile 出来的 TIF 不对 / 渲染中间一个大方块"(用户报)——结论:非 bug
+### 症状
+- 用户最近一次 crop percentile run(`csis_168a4210`,固化后 05:13)的 `soybean_observed_production.tif` 全 0(MIN=MAX=MEAN=STDDEV=0),渲染成一整块均匀色 = "大方块";barley/wheat 的 TIF 正常有值。
+### 证据链(全部实测,非猜)
+- baked 镜像 natcap.invest=3.14.3 / pygeoprocessing=2.4.10 / gdal=3.12.2,与 prebake **一致**(地理库 conda 装、固化未改)→ 排除依赖漂移影响 crop 数学。
+- 用**当前 baked 代码**渲染**固化前的旧 crop TIF**(soybean_observed 06-29)→ 正常出图(viridis、有空间变化、图例在 gutter)→ **渲染代码没坏**。
+- 坏 run 的 `_csis_intermediate/` 归一化表(我的 D1 产物)内容**正确**:barley→1 / wheat→20 / soybean→**1000**。
+- 关键:该 run 及**标准测试数据** `tools/05_crop_production_percentile/input_data/` 的 crop 表都把 **soybean 映到 lucode 1000**,而 landcover.tif 的实际 lucode 只有 {1..255}(实测 np.unique),**没有 1000** → soybean 面积=0 → observed 全 0。这是**输入数据决定的必然结果**,与代码版本无关。
+- 用标准数据在 baked 代码实跑验证:barley_observed MAX=0.314、wheat_observed MAX=0.0031(正常),soybean_observed=0(符合预期,lucode 1000 缺失);D1 隐藏 `_normalized` 正常、无泄漏。渲染 barley 正常出图。
+### 结论 / 下一步
+- **Crop Percentile 工具没坏,D1 改动没影响 TIF 数学**(D1 只挪了归一化表位置,内容不变)。旧 06-29 run soybean 有值是因为那次表用 soybean→lucode 1(存在)。
+- soybean 要有数据:把 crop 表里 soybean 的 lucode 改成 landcover 里真实存在的编码(非 1000)——**改输入数据,非改代码**。标准测试数据本身有此坑(soybean→1000 永远空)。
+- 已向用户提议(未做,待定):crop 工具跑完后,若某 crop 的 lucode 在 LULC 中 0 像素,给友好提示避免误解。
+- 测试产物留在服务器 `/data/outputs/_croptest*`(可删)。
