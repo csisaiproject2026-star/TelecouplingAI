@@ -20,7 +20,7 @@
 | 10 | **crop 输出里一堆带长 uuid 的无意义 CSV**（Nick 06）| 把归一化的中间输入表改写到隐藏子目录 `_csis_intermediate/`（加入扫描跳过表）→ 不再当结果列给用户 | 跑 Crop Percentile / Regression → 输出文件列表里**不再出现** `*_normalized_<uuid>.csv`，只剩 `result_table.csv` / `aggregate_results.csv` / 各 `.tif` |
 | 11 | **DelineateIt 渲染 `flow_direction.tif` 报 file not found 却又出图**（Nan 12a）| `— 非 bug`：DelineateIt 产出的是 `watersheds.gpkg`，本就不产 `flow_direction.tif`（那是 RouteDEM 的）；报错是对的。根因是 AI 建议了不存在的文件 → 已被 #6 规则约束 | 跑 DelineateIt → render **`watersheds.gpkg`**（真实输出）；AI 不应再建议渲染 `flow_direction.tif` |
 | 12 | **上传慢 / 开站慢 / 进度条一直闪**（多位）| `— 已诊断，非服务器 bug`：上传慢=GCP 在美国机房、国际链路慢；进度条闪=已知取舍（用户 07-01 决定不动）| — |
-| 13 | **Network Analysis 对比 Nan 参考：closeness 缺失、betweenness 尺度差 ~17000 倍（归一化 vs 原始）**（截图 `Screenshot 2026-07-01 ...png`）| `✓ GCP 已修`：GCP 的 `network_analysis.R` 早已输出 **degree + closeness(normalized) + betweenness(原始计数)**；截图测的是 MSU 旧版。用真实数据核实与 Nan **精确吻合**：USA betweenness=**1167.86**（与 Nan 完全一致）、closeness=0.41、Top 节点 USA/CAN/BEL/AUS 一致 | 跑 Network Analysis → 开 `network_stats_*.csv` → `betweenness` 为原始计数（USA 1167.86，非 0.0x）、`closeness` 在 0.28–0.41 |
+| 13 | **Network Analysis 指标对比截图**（`Screenshot 2026-07-01 ...png`）：betweenness "差 ~17000 倍"、closeness "Missing"（❌）| `— 非平台问题（标签澄清）`：截图是 **"Nan's Results" = 我们平台在 MSU 跑的结果** vs **"My Results" = 别人用自己的工具跑的结果** 的对比（**不是**新旧版本）。**我们平台**：betweenness=**1167.86（原始计数）**、closeness **有**（0.28–0.41），两者都正确且 **MSU 与 GCP 一致**。`0.068864`、"closeness missing" 是**对方那个外部工具**的口径（归一化 betweenness、且他们自己没算 closeness），**不是我们的输出**。| 跑 Network Analysis → `network_stats_*.csv`：`betweenness` 为原始计数（USA 1167.86）、有 `closeness` 列（0.28–0.41）。GCP 已用真实数据核实，与 MSU 一致 |
 | 14 | **PageRank 和 communities 不在 CSV 里**（用户 07-02：PageRank 未计算；community 只在输出 SHP 的 `cluster_N`，不在 stats CSV）| ★ 改 `network_analysis.R`：CSV **新增 `pagerank` 列**（`page_rank()$vector`）和 **`community` 列**（`membership()`，与 SHP 的 cluster 一致）。现 CSV 五列：degree/closeness/betweenness/pagerank/community。commit `49fca06`（R 每次新进程，热补丁即时生效）| 跑 Network Analysis → 开 `network_stats_*.csv` → 表头含 **pagerank** 与 **community**。已用真实数据核实：USA=deg237/clo0.41/betw1167.86/pr0.0189/community5，walktrap 共 6 组 |
 
 ---
@@ -29,6 +29,6 @@
 - **本表 #1/#2/#4/#5/#6/#10/#14 = 本次改代码**，均已 commit 到 `gcp-head` 分支。
 - **#3/#7/#13 = GCP 早已修好**；**#8/#9/#11 = 非 bug（已有引导 / 被 #6 约束）**；**#12 = 不改**。
 - ✅ **已固化（2026-07-02）**：git `backend/` 同步到 GCP 主机 → 重建镜像 `csic_backend:latest` → `docker compose up -d --force-recreate` 全部 39 容器上新镜像。验证：全容器健康、`/health`=200、agent+google-genai import 正常（依赖升级未破坏）、镜像内代码确认为新版。回滚镜像：`csic_backend:prebake_20260702`。改动不再随 recreate 回退。
-- ✅ **betweenness 结论（钉死）**：本平台（GCP，已固化）betweenness = **`1167.86`（原始计数，与 Nan 一致）**；`0.068864` 只存在于 **MSU 旧版**（归一化）。用固化后镜像重跑核实。
+- ✅ **betweenness 结论（钉死）**：我们平台 betweenness = **`1167.86`（原始计数）**，且 **MSU 与 GCP 一致**、正确。截图里 "Nan's Results" = 我们平台在 **MSU** 跑的结果（1167.86），"My Results" = **别人用自己工具**跑的归一化值（`0.068864`）——`0.068864` **不是我们平台输出**，也不是任何"旧版本"。用固化后镜像重跑核实我们的值仍是 1167.86。
 - ⏳ **待回灌 MSU（暂停，等用户命令）**：需校园网/VPN；打通后按 tar 工作流把 git 同步到 MSU 主机→rebuild→recreate（MSU 各自的 `.env.docker` 永不覆盖），届时真实测试者才在 MSU 看到这些改进。
 - **#5/#6 需真人 LLM 冒烟**（prompt 改动无法确定性单测），其余渲染/输出/网络类改动均已在 GCP dev 真机自测（见截图 + network CSV）。

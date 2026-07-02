@@ -5653,7 +5653,13 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - ✅ 全容器无 unhealthy/restarting/exited;`/health`=200。
 - ✅ **agent + google-genai import OK**(依赖漂移未破坏 agent 启动)——最担心的点排除。
 - ✅ 镜像内 render worker=`_lg_scale = 2.0`、network R 含 `page_rank`。
-- ✅ 重跑 network(同数据):CSV 5 列 `degree,closeness,betweenness,pagerank,community`;**USA betweenness = 1167.86**(与 Nan 一致;`0.068864` 是 MSU 旧版归一化值)。
+- ✅ 重跑 network(同数据):CSV 5 列 `degree,closeness,betweenness,pagerank,community`;**USA betweenness = 1167.86**(原始计数,MSU 与 GCP 一致)。[更正见下条]
 ### 状态
 - GCP 固化完成,可回滚(`csic_backend:prebake_20260702`)。热补丁 home 备份(`~/_*backup*`)现已冗余但保留。
 - ⏳ **MSU 回灌:按用户指示暂停,等命令**。届时按 CLAUDE.md tar 工作流同步 git→MSU 主机→rebuild→recreate(注意 MSU 各自的 `.env.docker` 永不覆盖)。
+
+## 2026-07-02 — 更正:network 截图两列标签理解反了(用户指出)
+- 之前我写"`0.068864` 是 MSU 旧版归一化值"——**错**。用户澄清:截图 `Screenshot 2026-07-01...png` 里 **"Nan's Results"(1167.86) = 我们平台在 MSU 上跑的结果**,**"My Results"(0.068864) = 别人用他们自己的工具跑的结果**(归一化,且对方没算 closeness)。
+- 更正结论:**我们平台 betweenness = 1167.86(原始计数),MSU 与 GCP 一致、正确**;`0.068864` 从来不是我们的输出,也没有"旧版归一化"这回事。closeness 我们平台一直有(0.28–0.41)。
+- 仍成立:截图中 "Nan's"(=我们平台)确实 **不含 pagerank / 不在 CSV 显示 communities**,而 "My"(外部工具)有 → 这是我们真缺的,已在 `network_analysis.R` 补进 CSV(commit `49fca06`,已固化)。故 pagerank/community 的改动有效、保留。
+- 已同步修正 `Run2_Feedback_Fixes_20260702.md` 第 13 行与底部 betweenness 结论。
