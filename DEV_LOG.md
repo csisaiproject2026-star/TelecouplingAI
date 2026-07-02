@@ -5708,3 +5708,13 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - 验证:6 个用例确定性测试全过(用户原消息命中 render;"visualize the impact"/"analyze the .csv"不命中;run_* 工具检测不受影响)。
 ### 部署
 - 均已 commit + 同步主机源码;`network_analysis.py`+`output_router.py` docker cp 进 `tele-celery-net`、`agent.py` 进 `tele-backend`,重启两个 worker 生效(celery/FastAPI 常驻需重启重载)。**尚未 bake 进镜像**,随下次 rebuild 固化。
+
+## 2026-07-02 — MSU 回灌卡在连通性(排查记录,避免重复踩)
+- 准备回灌 MSU(把本轮 Run-2 全套 + 历史 GCP 领先项一起推),但 **SSH 连不上**。彻底排查后定性:
+  - MSU **活着**:公网 `https://ai.telecoupling.msu.edu/health`=200(走 WAF)。
+  - 本机(Claude 跑在用户机器上)实测:**ICMP ping 35.9.219.33 通、raw TCP:80 OPEN、TCP:22 与 443 超时**。sandbox 开/关一样。
+  - 用户当前用 **UPNet**(HTTP 代理,本机 `HTTP_PROXY=127.0.0.1:29758`)——只暴露 80,**不给 SSH:22**。试过 `ssh -o ProxyCommand="connect -H 127.0.0.1:29758 %h %p"` 穿代理 → 代理**拒绝到 22 的 CONNECT**("Connection closed")。
+  - 对照 `msu_dev.md` §5:2026-05-28 成功部署时是**经校园网**(服务器 last login 来自 `172.21.x` 内网)、**raw TCP:22 OPEN、直连 `ssh csis-msu` 即可**。
+  - **结论:UPNet 代理连不了 SSH;需和当年一样的校园网/全隧道 VPN(能 raw 直连 35.9.219.33:22)。等用户切网。**
+- **回灌时 MSU 关键差异(务必遵守,摘自 msu_dev.md)**:① 数据目录在 `/home/jianan2/csis-data/`(非 GCP 的 `/data/`);② `.env.docker` **绝不覆盖**(`FILE_SERVER_URL=http://35.9.219.33/download/` 走 80、host 路径不同);③ MSU 当年镜像是从 GCP `docker save|load` 传的、非本地 rebuild——回灌可同法传镜像或本地 rebuild,到时定。
+- 全部代码改动已 commit(gcp-head),GCP dev 已生效。**待办不变:等 MSU SSH 通 → 只读比对 GCP↔MSU → 定计划 → 谨慎回灌 + 一并 bake 未固化的修复。**
