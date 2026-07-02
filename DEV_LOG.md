@@ -5614,3 +5614,12 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 ### 自测方式(可复现)
 - 直接在 `tele-celery-render` 容器内跑 `_qgis_zoom_render_worker.py` 渲染真实 .tif/.shp,产图缩 JPEG 拉回本地看(比走网站 Gemini 快且确定)。D1 用 `route_outputs()` 构造 workspace 单测。
 - B1/B2 是 prompt 改动,**无法确定性单测**,仅验证了不破坏 agent 启动(重启后 healthy)。**需早上用真人聊天做 LLM 冒烟**(跑个 crop percentile,看 AI 是否还罗列全部工具 + 是否只描述真实产出)。
+
+## 2026-07-02 — 图例一致性收尾(用户早上发现的两个问题)
+用户观察:① agent/flow 渲染**没有图例**;② systems/causes 图例字号不是 2x、也不 bold,和 `jpg_raster` 不一样——"不是同一个函数么?"。查明:是同一段函数,但按 `_tc_kind` 分叉,我上次做栅格图例时把 telecoupling 那支**冻结在 1.7x + 常规体**了;且 `style_agents` 返回 `None`(无图例)、`style_flows` 仅在有 magnitude 时才给图例。
+### 改动(commit `cffb673`)
+- `_qgis_zoom_render_worker.py`:**去掉图例段的 `_tc_kind` 冻结**——所有图例(栅格+telecoupling)统一 **2x + BOLD**。telecoupling 仍是"图上紧凑图例框"、栅格仍用右侧白 gutter(仅位置不同,字号/字重现在一致)。图例绘制新增 **"person"** 与 **"line"** 两种图形。
+- `telecoupling_style.py`:`style_agents` 返回单条 "Agents: Agent"(person 图形);`style_flows` 无 magnitude 时返回单条 "Flows: Flow"(line 图形),不再是 None。
+### 验证(GCP dev 真机)
+- systems/causes 图例明显变大 + 粗体(对比旧 `*2.jpg`);**agents 现有 "Agent" 人形图例、flows 现有 "Flow" 线图例**(旧版都没有)。截图 `feedbacks/Run2_improvements_20260702_screenshots/*3.jpg`。
+- 已热补丁进 `tele-celery-render`(即时生效)。

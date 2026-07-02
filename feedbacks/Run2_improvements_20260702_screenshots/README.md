@@ -22,3 +22,15 @@
 | — | `jpg_causes2.jpg` | causes 红星 + **categorical "Causes" 图例**（A2 在 GCP 本就已是 categorical，非连续色带） |
 
 > 对比看 systemsX / agentsX 两组即可感受放大效果。
+
+## C. 图例一致性收尾（用户早上发现：agent/flow 无图例 + systems/causes 图例没 2x/bold）
+改动：去掉图例段的 telecoupling 冻结 → 所有图例统一 **2x + bold**；给 agents/flows 补图例。
+
+| 图 | 展示 |
+|----|------|
+| `jpg_systems3.jpg` | systems "Role" 图例现在 **2x + 粗体**（对比 `systems2` 的 1.7x 常规体） |
+| `jpg_causes3.jpg` | causes "Cause" 红星图例，2x + 粗体 |
+| `jpg_agents3.jpg` | **新增** agents "Agent" 人形图标图例（之前无图例） |
+| `jpg_flows3.jpg` | **新增** flows "Flow" 粉线图例（之前无图例） |
+
+> `*3.jpg` 是最终一致版；四类 telecoupling 渲染现在都有统一的 2x 粗体图例。
