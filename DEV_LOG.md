@@ -5685,3 +5685,14 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - 修 `_qgis_zoom_render_worker.py`:① gutter 宽度取 `max(数字块, 最宽标题词 + _s(28))`;② 标题改为按 gutter 内宽换行、从 gutter 左缘**左对齐**绘制(去掉原来会顶右缘的定位)。
 - 验证(GCP 热补丁):wheat_yield_50th 标题完整显示 "Wheat Yield / 50Th / Production";wyield(短标题)不受影响。
 - 部署:render worker 每次新子进程,热补丁即时生效;已 commit + 同步主机源码。**注意:此修复尚未 bake 进镜像**(镜像仍是旧版),容器 recreate 会回退——待与 MSU 回灌一起做一次 rebuild 固化,或单独重 bake。
+
+## 2026-07-02 — 修 Coastal Vulnerability 反复报错(用户报 #24,测试中崩多次才成功)
+### 根因(实证:GCP worker 日志 + InVEST 源码)
+- 那次 run(csis_168a4210)05:40–05:43 **连崩 4 次**,错误依次:`KeyError: 'population_radius'` → `KeyError: 'shelf_contour_vector_path'` → `KeyError: 'habitat_table_path'` → 第 4 次成功。
+- InVEST 3.14.3 `coastal_vulnerability.py`:`args['shelf_contour_vector_path']`(L941)、`args['habitat_table_path']`(L964)**无条件访问、无守卫** → 实际是**必填**(文档也标 required);而 slr(L1009)、population(L1022)有 `in args and != ''` 守卫 → 才是真可选。我们工具原来把 habitat/shelf 当可选(缺就不传)→ agent 每漏一个,InVEST 就 KeyError 一次。
+### 改动
+- **后端** `tools/coastal_vulnerability.py`(commit `3e11e66`):habitat_table_path + shelf_contour_vector_path 加入 REQUIRED_KEYS 并传真实路径;slr/population 传 '' 安全跳过(InVEST 有守卫);population 光栅+半径耦合(要么都给要么都不给)。GCP 实测:仅必填+habitat+shelf、无 slr/population → **一次成功**(coastal_exposure.csv/.gpkg)。worker 已重启生效 + 同步主机源码(**尚未 bake 进镜像**,recreate 会回退)。
+- **SKILL** `run-coastal-vulnerability`(commit `65b7986`):把 habitat/shelf 从"可选"改为**必填**,新增**上传文件名→参数映射**表,population 需 raster+radius 同给。`.claude` 是**绑定挂载**(host→容器),已 scp 到 host + 重启 tele-backend 载入(健康),**不需 bake**(挂载即生效、survive recreate)。
+- **测试数据+指南**(未入 git):`tools/24_coastal_vulnerability/input_data/` **扁平化**——移除 `GrandBahama_Habitats/` 子文件夹,habitat 文件(Coral/CoastalForest/Mangrove/seagrass/Natural_Habitats.csv)上移到 input_data/ 根(相对路径仍解析)。`Testing_Guide.md` 改为扁平结构+必填说明,`Testing_Guide.pdf` 用 markdown+xhtml2pdf(同 `_build_tool_packs.py` 方法)重生成。**input_data 166MB,按仓库惯例(测试数据不入 git)保留在磁盘、未提交。**
+### 待办
+- 与 MSU 回灌一起:rebuild 固化(把 coastal 后端修复 + 其他未 baked 的 render 修复一起 bake 进镜像)。SKILL/测试数据无需 bake。
