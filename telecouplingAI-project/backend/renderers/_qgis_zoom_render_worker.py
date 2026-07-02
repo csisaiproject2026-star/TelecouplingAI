@@ -392,11 +392,11 @@ if _legend is not None:
 
         kind = _legend.get("kind") if isinstance(_legend, dict) else None
 
-        # Generic ONLY: widen the canvas with a white legend gutter on the right
-        # so the big 2x legend gets its own space and never overlaps the map/shp.
-        # Sized to the widest of {title, bar+gap+widest number}. Telecoupling is
-        # untouched (keeps drawing its legend over the map at scale 1.7).
-        if not _tc_kind:
+        # EVERY legend gets a white gutter on the RIGHT so the 2x legend never
+        # overlaps the map/data — telecoupling included now (user: put the legend
+        # on the right like the raster, don't cover the map). Sized to the widest
+        # of {title, bar+gap+widest number} or the fixed categorical panel width.
+        if True:
             _gap = _s(6)
             _bar_w0 = _s(24)
             if raster_legend is not None or kind == "graduated":
@@ -428,20 +428,16 @@ if _legend is not None:
             ramp = _legend["ramp"]
             vmin, vmax = _legend["min"], _legend["max"]
 
-            # Size the right margin to the widest numeric label so the bigger
-            # (scale 1.5) fonts never clip off the right edge — the old fixed
-            # margin was tuned for the small 14px labels only.
+            # Size the right margin to the widest numeric label so the bigger 2x
+            # fonts never clip off the right edge (telecoupling flow legends live
+            # in the gutter like everything else now).
             _gap = _s(6)
-            if _tc_kind:
-                # Telecoupling flow legend stays byte-frozen on its old margin.
-                margin_r = _s(70)
-            else:
-                _labels = [_fmt(vmax), _fmt((vmin + vmax) / 2), _fmt(vmin)]
-                try:
-                    _max_lw = max(draw.textlength(t, font=font) for t in _labels)
-                except Exception:
-                    _max_lw = _fs * 4
-                margin_r = int(bar_w + _gap + _max_lw + _s(10))
+            _labels = [_fmt(vmax), _fmt((vmin + vmax) / 2), _fmt(vmin)]
+            try:
+                _max_lw = max(draw.textlength(t, font=font) for t in _labels)
+            except Exception:
+                _max_lw = _fs * 4
+            margin_r = int(bar_w + _gap + _max_lw + _s(10))
             bar_x = iw - margin_r
             bar_y = (ih - bar_h) // 2
 
@@ -544,16 +540,39 @@ if _legend is not None:
                             for k in range(10)]
                     _d.polygon(_pts, fill=(r, g, b, 255), outline=(0, 0, 0, 220))
                 elif gshape == "person":
-                    # simple person glyph (head + shoulders) for agents
-                    _cx = (x0 + x1) / 2
-                    _hr = sw * 0.17
-                    _hy = y0 + sw * 0.24
-                    _d.ellipse([(_cx - _hr, _hy - _hr), (_cx + _hr, _hy + _hr)],
-                               fill=(r, g, b, 255), outline=(0, 0, 0, 220))
-                    _by = _hy + _hr
-                    _d.polygon([(_cx - sw * 0.30, y1), (_cx + sw * 0.30, y1),
-                                (_cx + sw * 0.15, _by), (_cx - sw * 0.15, _by)],
-                               fill=(r, g, b, 255), outline=(0, 0, 0, 220))
+                    # Render the ACTUAL agent SVG so the legend glyph matches the
+                    # map marker exactly. Fall back to a drawn silhouette if the
+                    # SVG can't be rasterized.
+                    _person_ok = False
+                    try:
+                        from qgis.PyQt.QtSvg import QSvgRenderer as _QSvg
+                        from qgis.PyQt.QtGui import QImage as _QI, QPainter as _QP
+                        from qgis.PyQt.QtCore import QRectF as _QR, Qt as _Qt
+                        _svgp = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                             "assets", "agent_person.svg")
+                        if os.path.isfile(_svgp):
+                            _qi = _QI(sw, sw, _QI.Format_ARGB32)
+                            _qi.fill(_Qt.transparent)
+                            _qp = _QP(_qi)
+                            _QSvg(_svgp).render(_qp, _QR(0, 0, float(sw), float(sw)))
+                            _qp.end()
+                            _pic = Image.frombytes("RGBA", (sw, sw),
+                                                   _qi.bits().asstring(sw * sw * 4),
+                                                   "raw", "BGRA")
+                            img.paste(_pic, (int(x0), int(y0)), _pic)
+                            _person_ok = True
+                    except Exception:
+                        _person_ok = False
+                    if not _person_ok:
+                        _cx = (x0 + x1) / 2
+                        _hr = sw * 0.17
+                        _hy = y0 + sw * 0.24
+                        _d.ellipse([(_cx - _hr, _hy - _hr), (_cx + _hr, _hy + _hr)],
+                                   fill=(r, g, b, 255), outline=(0, 0, 0, 220))
+                        _by = _hy + _hr
+                        _d.polygon([(_cx - sw * 0.30, y1), (_cx + sw * 0.30, y1),
+                                    (_cx + sw * 0.15, _by), (_cx - sw * 0.15, _by)],
+                                   fill=(r, g, b, 255), outline=(0, 0, 0, 220))
                 elif gshape == "line":
                     # thick colored line for flows
                     _ly = (y0 + y1) // 2
