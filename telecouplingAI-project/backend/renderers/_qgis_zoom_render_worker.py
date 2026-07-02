@@ -406,8 +406,20 @@ if _legend is not None:
                     _mlw = max(font.getlength(t) for t in _lbls)
                 except Exception:
                     _mlw = _fs * 5
-                # gutter is driven by the number block; a long title wraps to fit
-                _gutter = int(_bar_w0 + _gap + _mlw + _s(40))
+                _num_gutter = int(_bar_w0 + _gap + _mlw + _s(40))
+                # A raster title (filename-derived) can contain a single word
+                # wider than the number block (e.g. "Production"); words can't
+                # break, so size the gutter to the WIDEST title word too — else
+                # the title clips off the right edge.
+                _title_word_w = 0
+                if "field" not in _legend:
+                    try:
+                        _title_word_w = max(
+                            (font.getlength(w) for w in _raster_title(p["file_path"]).split()),
+                            default=0)
+                    except Exception:
+                        _title_word_w = 0
+                _gutter = max(_num_gutter, int(_title_word_w + _s(28)))
             elif kind == "categorical":
                 _gutter = _s(200) + _s(28)
             else:
@@ -463,10 +475,13 @@ if _legend is not None:
                 # graduated vector: keep the field-name header above the bar
                 _halo_text((bar_x - 4, bar_y - _s(22)), _legend["field"], font_small)
             else:
-                # raster: no field name -> draw a filename-derived title, WRAPPED
-                # to the gutter width and right-aligned at the top of the gutter.
+                # raster: no field name -> filename-derived title, wrapped to the
+                # gutter INTERIOR and drawn LEFT-aligned from the gutter's left
+                # edge. The gutter was sized above to fit the widest title word,
+                # so no word can clip off the right edge.
                 _title = _raster_title(p["file_path"])
-                _avail = margin_r
+                _tx = iw - _gutter + _s(10)        # gutter left edge + pad
+                _avail = _gutter - _s(18)
                 _lines, _cur = [], ""
                 for _wd in _title.split():
                     _cand = (_cur + " " + _wd).strip()
@@ -483,11 +498,7 @@ if _legend is not None:
                     _lines.append(_cur)
                 _ty = _s(10)
                 for _ln in _lines:
-                    try:
-                        _lw = draw.textlength(_ln, font=font)
-                    except Exception:
-                        _lw = len(_ln) * _fs * 0.5
-                    _halo_text((max(bar_x - 4, iw - _lw - _s(12)), _ty), _ln, font)
+                    _halo_text((_tx, _ty), _ln, font)
                     _ty += _fs + _s(6)
 
         elif kind == "categorical":
