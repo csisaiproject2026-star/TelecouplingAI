@@ -5696,3 +5696,14 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - **测试数据+指南**(未入 git):`tools/24_coastal_vulnerability/input_data/` **扁平化**——移除 `GrandBahama_Habitats/` 子文件夹,habitat 文件(Coral/CoastalForest/Mangrove/seagrass/Natural_Habitats.csv)上移到 input_data/ 根(相对路径仍解析)。`Testing_Guide.md` 改为扁平结构+必填说明,`Testing_Guide.pdf` 用 markdown+xhtml2pdf(同 `_build_tool_packs.py` 方法)重生成。**input_data 166MB,按仓库惯例(测试数据不入 git)保留在磁盘、未提交。**
 ### 待办
 - 与 MSU 回灌一起:rebuild 固化(把 coastal 后端修复 + 其他未 baked 的 render 修复一起 bake 进镜像)。SKILL/测试数据无需 bake。
+
+## 2026-07-02 — Network Analysis 两个问题(用户测试反馈)
+### 问题1:输出文件名带 session id → commit `b405081`
+- `network_analysis.py` 把 `task_id`(uuid)拼进了每个输出名(`output_<uuid>.shp`/`network_stats_<uuid>.csv`/`network_plot_<uuid>.pdf`),用户每次下载都看到一串 uuid。workspace 目录本就按 run 唯一,uuid 是多余噪音。
+- 改干净名:`network_communities.shp` / `network_stats.csv` / `network_plot.pdf`;`output_router.py` 的 network 模式加上新名(旧模式保留向后兼容)。实跑验证:输出名干净、分类正确(stats→csv、shp/pdf→download)。
+### 问题2:"visualize the X.shp" 渲染正常但弹出坏的 Analysis plan 卡 → commit `d4afc3e`
+- 根因:`_looks_like_workflow_goal` 对该消息本返回 False(无 workflow 关键词),所以不是后端强制——是 **Flash 在 AUTO 模式下既调 render_spatial_file 又调 propose_workflow_plan**,生成的计划卡引用 render_spatial_file(非 workflow 工具)→ 校验失败报 "unknown tool"。
+- 修 `agent.py`:加 `_looks_like_render_request`(**render 动词 + 空间文件后缀 .shp/.tif/… 两者都要**),命中就把 `detected_tool_name` 设为 `render_spatial_file` → iteration 0 只给这一个工具 → 模型无法再提计划卡。要求有文件后缀,故"visualize the impact of X"这类开放式分析目标不受影响。
+- 验证:6 个用例确定性测试全过(用户原消息命中 render;"visualize the impact"/"analyze the .csv"不命中;run_* 工具检测不受影响)。
+### 部署
+- 均已 commit + 同步主机源码;`network_analysis.py`+`output_router.py` docker cp 进 `tele-celery-net`、`agent.py` 进 `tele-backend`,重启两个 worker 生效(celery/FastAPI 常驻需重启重载)。**尚未 bake 进镜像**,随下次 rebuild 固化。
