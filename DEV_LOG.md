@@ -5704,6 +5704,7 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 ### 问题2:"visualize the X.shp" 渲染正常但弹出坏的 Analysis plan 卡 → commit `d4afc3e`
 - 根因:`_looks_like_workflow_goal` 对该消息本返回 False(无 workflow 关键词),所以不是后端强制——是 **Flash 在 AUTO 模式下既调 render_spatial_file 又调 propose_workflow_plan**,生成的计划卡引用 render_spatial_file(非 workflow 工具)→ 校验失败报 "unknown tool"。
 - 修 `agent.py`:加 `_looks_like_render_request`(**render 动词 + 空间文件后缀 .shp/.tif/… 两者都要**),命中就把 `detected_tool_name` 设为 `render_spatial_file` → iteration 0 只给这一个工具 → 模型无法再提计划卡。要求有文件后缀,故"visualize the impact of X"这类开放式分析目标不受影响。
+- **设计选择(勿改成 mode=ANY)**:这里用的是"**收窄 tools 列表 + 保持 AUTO**",不是 `mode=ANY` 强制。因为触发是启发式、会误判(如用户在**问**"为什么 output.shp 渲染得不对");ANY 会**强行渲染**而不是答问,而 AUTO+收窄只是把 propose_workflow_plan 拿掉、模型仍可选择回文字 → 误判时优雅降级。原则:问题是"多调了不该调的"→拿掉该工具;ANY 用于反向问题"该调却不调"(如 workflow 强制)。
 - 验证:6 个用例确定性测试全过(用户原消息命中 render;"visualize the impact"/"analyze the .csv"不命中;run_* 工具检测不受影响)。
 ### 部署
 - 均已 commit + 同步主机源码;`network_analysis.py`+`output_router.py` docker cp 进 `tele-celery-net`、`agent.py` 进 `tele-backend`,重启两个 worker 生效(celery/FastAPI 常驻需重启重载)。**尚未 bake 进镜像**,随下次 rebuild 固化。
