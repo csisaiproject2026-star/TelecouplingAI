@@ -5627,3 +5627,15 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - **图例挪到右侧 gutter**:telecoupling 图例之前画在图上,用户要求像栅格一样放右侧白 gutter 不遮挡地图。去掉图例段剩余的 `_tc_kind` gutter/margin 冻结 → systems/agents/causes/flows 图例都进右 gutter。
 - **agent 图例小人用真 SVG**:之前是近似手绘,和地图 marker 不一致。改成用 `QSvgRenderer` 把真正的 `assets/agent_person.svg` 渲进图例 swatch(带手绘兜底) → 图例小人和地图 marker 一模一样。
 - 验证(GCP dev 真机 `*4.jpg`):agents/systems/flows 图例均在右 gutter、地图不被遮挡;agent 小人=真 SVG;栅格图例不变。
+### 交付文档
+- 应用户要求做了三列对照表(反馈问题 / 我的改动 / 现在怎么测):`Systematic_tests/UserSystematicTest_Run2_20260617/Run2_feedback/Run2_Feedback_Fixes_20260702.md`。12 行,标注 本次改代码 / ✓GCP已修 / —非bug / 不改;顶部含测试环境(GCP dev,勿用 MSU)与通用渲染测试流程。
+### 追加反馈核实:Network Analysis 指标(用户新加截图 `Screenshot 2026-07-01...png`)
+- 截图对比 Nan 参考:平台 closeness 缺失、betweenness 尺度差 ~17000 倍(归一化 vs 原始)。
+- **核实=`✓ GCP 已修`**:GCP 容器 `network_analysis.R:129-132` 已输出 degree + `closeness(normalized=TRUE)` + `betweenness()`(igraph 默认原始计数)。真实 CSV `network_stats_*.csv` 佐证:含 `closeness` 列(ALB 0.28 / AUS 0.33,落在 Nan 0.28–0.41 区间)、`betweenness` 为原始计数(ALB 20.6 / AUS 591,与 Nan USA 1167 同量级)。截图测的是 MSU 旧版。→ 无需改代码,已加为对照表第 13 行。
+- 可选微调(未做,待用户定):中心度目前用第 97 行的布局边权加权;若要与 Nan 无权原始值完全一致,可对 closeness/betweenness 传 `weights=NA`。量级+排名已一致,倾向不改。
+- 第二张 `Telecoupling-Agentic-AI.png` 是 GitHub 仓库主页,背景引用、非可执行意见。
+### 追加改动:network_stats CSV 增加 pagerank + community 列(用户要求)commit `49fca06`
+- 核实:betweenness/closeness/degree 早已对齐 Nan(用真实 country-trade 数据重跑,USA betweenness=**1167.86** 与 Nan 完全一致,Top 节点 USA/CAN/BEL/AUS 一致);但 **pagerank 从未计算**、**community 只在 SHP 的 cluster_N 不在 stats CSV**。
+- 改 `r_scripts/network_analysis.R`:CSV 加 `pagerank`(`page_rank()$vector`)+ `community`(`membership()`,与 SHP cluster 同源);所有指标按 V(g) 顺序,列对齐;旧列数值不变(向后兼容)。
+- 验证(GCP 真机重跑 nodes/links/World_countries_2002.shp,walktrap):新表头 `degree,closeness,betweenness,pagerank,community`;USA 行 deg237/clo0.41/betw1167.86/pr0.0189/community5;6 个社区。
+- R 脚本每次是新 Rscript 进程,热补丁 `docker cp` 进 `tele-celery-net` 即时生效(备份 `~/_network_analysis_backup.R`)。
