@@ -33,4 +33,14 @@
 | `jpg_agents3.jpg` | **新增** agents "Agent" 人形图标图例（之前无图例） |
 | `jpg_flows3.jpg` | **新增** flows "Flow" 粉线图例（之前无图例） |
 
-> `*3.jpg` 是最终一致版；四类 telecoupling 渲染现在都有统一的 2x 粗体图例。
+> `*3.jpg` = 图例统一 2x+bold（但仍画在图上）。
+
+## D. 图例移到右侧 gutter + agent 用真 SVG（用户第二轮：不该遮挡地图 + 小人要和地图一致）
+`*4.jpg` = **最终版**。图例像 `jpg_raster` 一样放右侧白 gutter 不遮挡地图；agent 图例用真 `agent_person.svg` 渲染。
+
+| 图 | 展示 |
+|----|------|
+| `jpg_agents4.jpg` | 图例进右 gutter；**小人=真 SVG**，与地图 marker 一致 |
+| `jpg_systems4.jpg` | "Role" 三角图例进右 gutter，地图不被遮挡 |
+| `jpg_flows4.jpg` | "Flow" 粉线图例进右 gutter |
+| `jpg_raster4.jpg` | 栅格对照，未受影响 |

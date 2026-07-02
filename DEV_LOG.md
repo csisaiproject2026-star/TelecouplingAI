@@ -5623,3 +5623,7 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 ### 验证(GCP dev 真机)
 - systems/causes 图例明显变大 + 粗体(对比旧 `*2.jpg`);**agents 现有 "Agent" 人形图例、flows 现有 "Flow" 线图例**(旧版都没有)。截图 `feedbacks/Run2_improvements_20260702_screenshots/*3.jpg`。
 - 已热补丁进 `tele-celery-render`(即时生效)。
+### 追加(用户再指出两点)commit `dcf34b8`
+- **图例挪到右侧 gutter**:telecoupling 图例之前画在图上,用户要求像栅格一样放右侧白 gutter 不遮挡地图。去掉图例段剩余的 `_tc_kind` gutter/margin 冻结 → systems/agents/causes/flows 图例都进右 gutter。
+- **agent 图例小人用真 SVG**:之前是近似手绘,和地图 marker 不一致。改成用 `QSvgRenderer` 把真正的 `assets/agent_person.svg` 渲进图例 swatch(带手绘兜底) → 图例小人和地图 marker 一模一样。
+- 验证(GCP dev 真机 `*4.jpg`):agents/systems/flows 图例均在右 gutter、地图不被遮挡;agent 小人=真 SVG;栅格图例不变。
