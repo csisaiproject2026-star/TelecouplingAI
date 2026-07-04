@@ -646,7 +646,7 @@ function App() {
             <div className="animate-in fade-in slide-in-from-bottom-6 duration-1000">
               <h1 className="text-6xl font-medium tracking-tight mb-2">
                 <span className="bg-clip-text text-transparent bg-gradient-to-r from-[#4285f4] via-[#9b72cb] to-[#d96570]">
-                  Hi, CSIS
+                  Hi, Users.
                 </span>
               </h1>
               <h2 className="text-5xl font-medium text-[#c4c7c5] mb-12">How can I help you today?</h2>

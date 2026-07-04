@@ -2503,6 +2503,14 @@ async def run_agent(
             # ── Step 0: generic pre-flight — catch missing input files before
             # dispatching, so the user gets a friendly "file not found / not
             # uploaded" message instead of a cryptic crash inside the worker.
+            if tool_name in {"render_spatial_file", "render_telecoupling_scene"}:
+                from shared.file_reference_resolver import resolve_render_file_references
+
+                tool_input = resolve_render_file_references(
+                    tool_name,
+                    tool_input,
+                    _sm.get_output_files(session_id) + _sm.get_uploaded_files(session_id),
+                )
             try:
                 validate_file_params_exist(tool_input)
                 _specs = TOOL_FILE_SPECS.get(tool_name)

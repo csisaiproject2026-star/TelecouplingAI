@@ -179,7 +179,11 @@ try:
         av = abs(v)
         return f"{v:.0f}" if (av == 0 or av >= 1) else f"{v:.2f}"
 
-    # Gather category rows (systems + causes + agent).
+    # Gather category rows (flows, systems, causes, and agents).
+    flow_rows = []
+    if flow_legend and flow_legend.get("kind") == "categorical":
+        for e in flow_legend["entries"]:
+            flow_rows.append((e[0], (e[1], e[2], e[3]), e[4] if len(e) > 4 else "line"))
     rows = []
     if system_legend and system_legend.get("kind") == "categorical":
         for e in system_legend["entries"]:
@@ -193,8 +197,8 @@ try:
 
     # Draw the legend in a WHITE PANEL to the RIGHT of the map (never overlaps the
     # map, so it can't cover any point), with ~2x larger text for readability.
-    if has_bar or rows:
-        PANEL_W = 340
+    if has_bar or flow_rows or rows:
+        PANEL_W = 460
         canvas = Image.new("RGB", (iw + PANEL_W, ih), (255, 255, 255))
         canvas.paste(map_img, (0, 0))
         canvas.paste((220, 220, 220), (iw, 0, iw + 2, ih))  # thin divider line
@@ -230,6 +234,34 @@ try:
             draw.text((tx, cy + bar_h - 26), _fmt(vmin), fill=(0, 0, 0), font=F_ENTRY)
             cy += bar_h + 60
 
+        # --- categorical flows (country relationship) ---
+        if flow_rows:
+            draw.text(
+                (x0, cy),
+                str(flow_legend.get("field", "Flows")),
+                fill=(0, 0, 0),
+                font=F_TITLE,
+            )
+            cy += 70
+            gw = 46
+            row_h = gw + 24
+            for label, rgb, _shape in flow_rows:
+                mid_y = cy + gw // 2
+                draw.line([(x0, mid_y), (x0 + gw, mid_y)], fill=rgb, width=10)
+                draw.ellipse(
+                    [(x0 - 5, mid_y - 5), (x0 + 5, mid_y + 5)],
+                    fill=rgb,
+                    outline=(0, 0, 0),
+                )
+                draw.ellipse(
+                    [(x0 + gw - 5, mid_y - 5), (x0 + gw + 5, mid_y + 5)],
+                    fill=rgb,
+                    outline=(0, 0, 0),
+                )
+                draw.text((x0 + gw + 20, cy + 4), str(label), fill=(0, 0, 0), font=F_ENTRY)
+                cy += row_h
+            cy += 20
+
         # --- categories (systems / causes / agent) ---
         if rows:
             field = system_legend["field"] if system_legend else "Legend"
@@ -257,6 +289,8 @@ try:
                              (_cy + (_R if k % 2 == 0 else _R * 0.42) * _m.sin(-_m.pi / 2 + k * _m.pi / 5)))
                             for k in range(10)]
                     draw.polygon(_pts, fill=rgb, outline=(0, 0, 0))
+                elif shape == "line":
+                    draw.line([(x0, cy + gw // 2), (x1, cy + gw // 2)], fill=rgb, width=10)
                 else:
                     draw.rectangle([(x0, cy), (x1, y1)], fill=rgb, outline=(0, 0, 0))
                 draw.text((x1 + 20, cy + 4), str(label), fill=(0, 0, 0), font=F_ENTRY)
