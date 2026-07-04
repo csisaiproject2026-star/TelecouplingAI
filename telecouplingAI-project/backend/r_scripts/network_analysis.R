@@ -125,11 +125,20 @@ V(network_graph)$label <- V(network_graph)$name
 V(network_graph)$label.cex <- label_size
 
 # Network statistics CSV
+# Per-node metrics. All igraph calls below return values in V(network_graph)
+# order, so the columns line up positionally. We now also include pagerank and
+# the community/cluster id per node (same assignment written to the SHP as
+# cluster_N) so every node-level metric lives in ONE CSV (Run-2: reviewer asked
+# whether pagerank + communities were in the CSV — before this they were not).
 message("Computing network statistics...")
 deg_stat  <- degree(network_graph)
 clo_stat  <- closeness(network_graph, normalized = TRUE)
 betw_stat <- betweenness(network_graph)
-inte_csv  <- data.frame(degree = deg_stat, closeness = clo_stat, betweenness = betw_stat)
+pr_stat   <- page_rank(network_graph)$vector
+comm_stat <- as.integer(membership(MyClusters.community))
+inte_csv  <- data.frame(degree = deg_stat, closeness = clo_stat,
+                        betweenness = betw_stat, pagerank = pr_stat,
+                        community = comm_stat)
 dir.create(dirname(out_csv), showWarnings = FALSE, recursive = TRUE)
 write.csv(inte_csv, file = out_csv)
 message(paste("CSV written to:", out_csv))

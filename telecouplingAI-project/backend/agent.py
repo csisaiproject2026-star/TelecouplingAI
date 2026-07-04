@@ -282,7 +282,7 @@ Always respond in the same language as the user.
 
 ## Available Tools Overview
 
-When a user asks you to list all supported tools, respond with the exact markdown list below. Copy it verbatim — do NOT rephrase, reorder, or add function call names (run_xxx). Always start the list on a new paragraph (blank line before the first section header).
+Do NOT proactively list, enumerate, or describe the available tools/models in your replies. When the user asks to run an analysis or names a task, silently pick the single most appropriate tool and either run it or ask only for its missing parameters — never preface your answer with the tool catalog or a rundown of what you "can" do. Output the full list below ONLY when the user explicitly asks something like "what tools/models do you support?" or "list all tools". In that one case, respond with the exact markdown list below, copied verbatim — do NOT rephrase, reorder, or add function call names (run_xxx). Always start the list on a new paragraph (blank line before the first section header).
 
 **InVEST Ecosystem Services Tools**
 - **Network Analysis Grouping**: Performs network/flow analysis using R + igraph for community detection and clustering.
@@ -396,6 +396,11 @@ Users often provide parameters across multiple messages. Follow this pattern:
 - When listing output files, mention only the filename (e.g. `aligned_lulc_2010.tif`), not the full path
 - internal_path values in tool results are for your internal tool calls only — do NOT echo them to the user
 - Uploaded file paths prepended to messages are for tool parameter resolution only — do NOT repeat them to the user
+
+## Describing Outputs (IMPORTANT — accuracy over enthusiasm)
+- Only mention output files that ACTUALLY appear in the tool result's returned file list. Never claim a file was produced (e.g. a report.html, a .tif, a chart, a map) unless it is present in those results.
+- Do not describe results, maps, numbers, or findings you did not actually receive from a tool call or a read_file_content result. Base every claim strictly on real returned data — not on the tool's general description of what it "can" do.
+- If the user expected an output that was not produced (e.g. no .tif, no report), say so plainly instead of implying it exists.
 
 ## Image / Map Output Rules (CRITICAL)
 - NEVER write inline image data in your text response. Specifically: do NOT emit `![...](data:image/png;base64,...)`, do NOT emit any `data:image/*;base64,...` URLs, and do NOT emit fake/fabricated base64 byte strings.
@@ -1846,6 +1851,23 @@ def _looks_like_workflow_replan(message: str) -> bool:
     return any(x.lower() in m for x in _WORKFLOW_REPLAN_MARKERS)
 
 
+# A direct "render / visualize THIS spatial file" request. Requires BOTH a render
+# verb AND a spatial-file reference (.shp/.tif/…), so a plain "visualize the
+# output.shp" routes straight to render_spatial_file (single tool), while an
+# open-ended "visualize the impact of X" analysis goal (no file ref) is NOT
+# hijacked. Fixes Flash ALSO proposing a bogus workflow plan card (that
+# references render_spatial_file, which is not a workflow tool) for a render.
+_SPATIAL_FILE_RE = re.compile(r"\.(shp|tif|tiff|geojson|gpkg)\b", re.IGNORECASE)
+_RENDER_VERBS = ("render", "visualize", "可视化", "渲染", "display", "plot", "show", "map")
+
+
+def _looks_like_render_request(message: str) -> bool:
+    if not _SPATIAL_FILE_RE.search(message):
+        return False
+    m = message.lower()
+    return any(v in m for v in _RENDER_VERBS)
+
+
 # Marker the frontend appends when the user's send carries freshly-attached files.
 # Used (only when a workflow plan is already stored) to deterministically RUN the
 # workflow on the "upload files + send" turn of the confirm→upload→run flow.
@@ -2056,6 +2078,12 @@ async def run_agent(
 
     # Detect which tool the user is requesting. Used in retry nudge messages.
     detected_tool_name = _detect_tool_from_message(user_text)
+    # Direct render request (render/visualize a specific .shp/.tif) → route to
+    # render_spatial_file as the single iteration-0 tool, so Flash can't ALSO
+    # emit a workflow plan card referencing render_spatial_file. Only when no
+    # run_* tool was already keyword-detected.
+    if detected_tool_name is None and _looks_like_render_request(user_text):
+        detected_tool_name = "render_spatial_file"
     if detected_tool_name:
         logger.info(f"[agent] keyword-routing → {detected_tool_name}")
 
@@ -2475,6 +2503,14 @@ async def run_agent(
             # ── Step 0: generic pre-flight — catch missing input files before
             # dispatching, so the user gets a friendly "file not found / not
             # uploaded" message instead of a cryptic crash inside the worker.
+            if tool_name in {"render_spatial_file", "render_telecoupling_scene"}:
+                from shared.file_reference_resolver import resolve_render_file_references
+
+                tool_input = resolve_render_file_references(
+                    tool_name,
+                    tool_input,
+                    _sm.get_output_files(session_id) + _sm.get_uploaded_files(session_id),
+                )
             try:
                 validate_file_params_exist(tool_input)
                 _specs = TOOL_FILE_SPECS.get(tool_name)

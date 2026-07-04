@@ -36,8 +36,22 @@ from qgis.core import (
     QgsWkbTypes,
     Qgis,
     QgsGradientColorRamp,
+    QgsApplication,
+    QgsSpatialIndex,
+    QgsCoordinateTransform,
+    QgsProject,
+    QgsField,
 )
+from qgis.PyQt.QtCore import QVariant
 from qgis.PyQt.QtGui import QColor
+
+from renderers.telecoupling_classification import (
+    FLOW_RELATION_STYLES,
+    country_relation,
+    find_flow_relation_field,
+    normalize_flow_relation,
+    system_style,
+)
 
 TELECOUPLING_ENABLED = os.environ.get("TELECOUPLING_STYLE", "1").strip() != "0"
 PERSON_SVG = str(Path(__file__).parent / "assets" / "agent_person.svg")
@@ -137,17 +151,85 @@ def _curve(geom, bend=0.18, seg=26):
     return QgsGeometry.fromPolylineXY(out)
 
 
+def _world_countries_layer():
+    path = Path(QgsApplication.pkgDataPath()) / "resources" / "data" / "world_map.gpkg"
+    if not path.is_file():
+        return None
+    layer = QgsVectorLayer(f"{path}|layername=countries", "countries", "ogr")
+    return layer if layer.isValid() else None
+
+
+def _country_for_point(point, features, index):
+    point_geometry = QgsGeometry.fromPointXY(point)
+    for feature_id in index.intersects(point_geometry.boundingBox()):
+        feature = features.get(feature_id)
+        if feature and feature.geometry().intersects(point_geometry):
+            return feature_id
+    nearest = index.nearestNeighbor(point, 1)
+    if nearest:
+        feature = features.get(nearest[0])
+        if feature and feature.geometry().distance(point_geometry) <= 1.0:
+            return nearest[0]
+    return None
+
+
+def _flow_relations(src):
+    field_names = [field.name() for field in src.fields()]
+    explicit_field = find_flow_relation_field(field_names)
+    source_features = list(src.getFeatures())
+    if explicit_field:
+        return [normalize_flow_relation(feature[explicit_field]) for feature in source_features]
+
+    countries = _world_countries_layer()
+    if countries is None:
+        return ["Unknown"] * len(source_features)
+    country_features = {feature.id(): feature for feature in countries.getFeatures()}
+    country_index = QgsSpatialIndex()
+    for country_feature in country_features.values():
+        country_index.addFeature(country_feature)
+    transform = QgsCoordinateTransform(src.crs(), countries.crs(), QgsProject.instance())
+    pair_cache = {}
+    relations = []
+    for feature in source_features:
+        geometry = feature.geometry()
+        points = geometry.asMultiPolyline()[0] if geometry.isMultipart() else geometry.asPolyline()
+        if len(points) < 2:
+            relations.append("Unknown")
+            continue
+        origin = transform.transform(QgsPointXY(points[0]))
+        destination = transform.transform(QgsPointXY(points[-1]))
+        origin_id = _country_for_point(origin, country_features, country_index)
+        destination_id = _country_for_point(destination, country_features, country_index)
+        pair = tuple(sorted(
+            (origin_id, destination_id),
+            key=lambda value: -1 if value is None else value,
+        ))
+        if pair not in pair_cache:
+            touches = False
+            distance = None
+            if origin_id is not None and destination_id is not None and origin_id != destination_id:
+                origin_geometry = country_features[origin_id].geometry()
+                destination_geometry = country_features[destination_id].geometry()
+                touches = origin_geometry.touches(destination_geometry)
+                distance = origin_geometry.distance(destination_geometry)
+            pair_cache[pair] = country_relation(origin_id, destination_id, touches, distance)
+        relations.append(pair_cache[pair])
+    return relations
+
+
 def build_curved(src):
     """Return an in-memory copy of the flow layer with curved geometries,
     keeping all attributes so graduated styling still works."""
     mem = QgsVectorLayer("LineString?crs=%s" % src.crs().authid(), "flows_curved", "memory")
     dp = mem.dataProvider()
+    relations = _flow_relations(src)
     dp.addAttributes(src.fields())
+    dp.addAttributes([QgsField("tc_relation", QVariant.String)])
     mem.updateFields()
     feats = []
-    for f in src.getFeatures():
+    for index, f in enumerate(src.getFeatures()):
         nf = QgsFeature(mem.fields())
-        nf.setAttributes(f.attributes())
+        nf.setAttributes(f.attributes() + [relations[index]])
         nf.setGeometry(_curve(f.geometry()))
         feats.append(nf)
     dp.addFeatures(feats)
@@ -164,7 +246,7 @@ def flow_symbol(color, width, mcolor):
         ml.setPlacement(placement)
         ms = QgsMarkerSymbol.createSimple({
             "name": "circle", "color": mcolor.name(),
-            "size": "2.4", "outline_color": "black", "outline_width": "0.2",
+            "size": "3.2", "outline_color": "black", "outline_width": "0.3",
         })
         ml.setSubSymbol(ms)
         sym.appendSymbolLayer(ml)
@@ -172,9 +254,31 @@ def flow_symbol(color, width, mcolor):
 
 
 def style_flows(layer, magnitude_field=None):
-    """Curved arcs, color + width graduated by the chosen magnitude field, with
-    origin/destination markers. Uniform thick line when no field is supplied."""
+    """Color curved flows by country relation, with magnitude fallback."""
     layer = build_curved(layer)
+    relation_values = {
+        str(feature["tc_relation"])
+        for feature in layer.getFeatures()
+        if feature["tc_relation"] not in (None, "")
+    }
+    if relation_values - {"Unknown"}:
+        categories, entries = [], []
+        for label, rgb in FLOW_RELATION_STYLES.items():
+            if label not in relation_values:
+                continue
+            red, green, blue = rgb
+            color = QColor(red, green, blue)
+            categories.append(
+                QgsRendererCategory(label, flow_symbol(color, 2.8, color), label)
+            )
+            entries.append((label, red, green, blue, "line"))
+        layer.setRenderer(QgsCategorizedSymbolRenderer("tc_relation", categories))
+        return layer, {
+            "kind": "categorical",
+            "field": "Country relation",
+            "entries": entries,
+        }
+
     fr = flow_ramp()
     mag = (magnitude_field or "").strip()
     fields = [f.name() for f in layer.fields()]
@@ -197,7 +301,10 @@ def style_flows(layer, magnitude_field=None):
     else:
         c = QColor(200, 30, 120)
         layer.setRenderer(QgsSingleSymbolRenderer(flow_symbol(c, 1.8, c)))
-        legend = None
+        # uniform (no magnitude field) -> one-entry legend so the flow line is
+        # explained, instead of no legend at all
+        legend = {"kind": "categorical", "field": "Flows",
+                  "entries": [("Flow", 200, 30, 120, "line")]}
     return layer, legend
 
 
@@ -218,24 +325,16 @@ def style_systems(layer, category_field=None):
     if not cf:
         ms = QgsMarkerSymbol.createSimple({
             "name": "triangle", "color": "#3fae3f",
-            "size": "5.5", "outline_color": "black", "outline_width": "0.3"})
+            "size": "9", "outline_color": "black", "outline_width": "0.5"})
         layer.setRenderer(QgsSingleSymbolRenderer(ms))
         return layer, None
     vals = sorted({f[cf] for f in layer.getFeatures() if f[cf] is not None}, key=str)
     cats, entries = [], []
     for v in vals:
-        sv = str(v).lower()
-        if "spill" in sv:
-            col, mshape, size, angle, gshape = (255, 140, 0), "circle", "5", "0", "circle"
-        elif "receiv" in sv:
-            # Receiving -> inverted (downward) solid green triangle
-            col, mshape, size, angle, gshape = (11, 107, 11), "triangle", "7.5", "180", "triangle_down"
-        else:
-            # Sending -> upright solid green triangle
-            col, mshape, size, angle, gshape = (11, 107, 11), "triangle", "7.5", "0", "triangle_up"
+        col, mshape, size, angle, gshape = system_style(v)
         ms = QgsMarkerSymbol.createSimple({
             "name": mshape, "color": "#%02x%02x%02x" % col, "size": size,
-            "angle": angle, "outline_color": "black", "outline_width": "0.4"})
+            "angle": angle, "outline_color": "black", "outline_width": "0.6"})
         cats.append(QgsRendererCategory(v, ms, str(v)))
         entries.append((str(v), col[0], col[1], col[2], gshape))
     layer.setRenderer(QgsCategorizedSymbolRenderer(cf, cats))
@@ -246,22 +345,24 @@ def style_agents(layer):
     """Replace the default dot with a person icon."""
     if os.path.isfile(PERSON_SVG):
         sl = QgsSvgMarkerSymbolLayer(PERSON_SVG)
-        sl.setSize(9)
+        sl.setSize(13)
         sym = QgsMarkerSymbol()
         sym.changeSymbolLayer(0, sl)
     else:
         sym = QgsMarkerSymbol.createSimple({
             "name": "pentagon", "color": "#333333",
-            "size": "4.5", "outline_color": "white", "outline_width": "0.5"})
+            "size": "7", "outline_color": "white", "outline_width": "0.6"})
     layer.setRenderer(QgsSingleSymbolRenderer(sym))
-    return layer, None
+    # one-entry legend so the person marker is explained (matches causes)
+    return layer, {"kind": "categorical", "field": "Agents",
+                   "entries": [("Agent", 51, 51, 51, "person")]}
 
 
 def style_causes(layer):
     """Telecoupling causes (drivers) -> red star markers."""
     ms = QgsMarkerSymbol.createSimple({
         "name": "star", "color": "#d62728",
-        "size": "7.5", "outline_color": "black", "outline_width": "0.3"})
+        "size": "11", "outline_color": "black", "outline_width": "0.5"})
     layer.setRenderer(QgsSingleSymbolRenderer(ms))
     # one-entry legend so the star is explained
     return layer, {"kind": "categorical", "field": "Causes",

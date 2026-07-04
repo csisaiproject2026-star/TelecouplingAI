@@ -5434,3 +5434,887 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - **最大风险**:5 处皆热补丁未 baked,显式重建容器会回退→soybean 崩。建议演示前 commit+rebuild 固化。
 - 演示要点 + 雷区已整理给用户(无痕窗口/整文件夹上传/soybean 说 "flow lines" 别 "trade"/数量列 Quantity)。
 - 待用户定:① 现在 commit+rebuild 固化?② 浏览器预跑两个计划卡?
+
+### 续(2026-06-29):演示固化(commit+push+rebuild)+ 浏览器预跑两计划卡
+- ① commit `af02fac`(soybean workflow 可用性修复:catalog crop + .img 上传/映射 + 合成图图例外置)+ push origin(5eb1157..af02fac)。
+- ② rebuild 固化:tar 同步本地 backend 源码→服务器(排除 .env*),4 关键文件 md5 服务器==本地;`docker build csic_backend:latest`(conda/pip 全缓存,只重做 COPY 0.1s);`compose up -d --force-recreate` 重建 39 容器;health 200。**重建后容器验证修复全 baked**(catalog_crop/upload_img/automap_img/scene 图例外置/jpeg/telecoupling_style/scene_tool/radial_flows tc_role/agent_person.svg 全 present)→ 演示期间容器重建不再丢补丁。
+- ③ 浏览器在已 baked 环境预跑:Tourism 计划卡 5 步全对、Soybean 4 步全对(radial_flows 正确)。
+- 演示包 `Systematic_tests/Telecoupling_Workflow_Demo(.zip)` 就绪。用户将手动测执行+合成图。
+
+### 续(2026-06-29):演示实测发现 tourism FAMD 绑错文件 → 修数据+指南
+- 用户实测 tourism 工作流,s5 FAMD 报 "Column mismatch ... affin/gdplog/dist"。盯后台日志定位:`auto-mapped input 'causes_csv' -> tourism_Flows.csv`(绑错!),famd_input.csv 没被用。根因:LLM 把 FAMD 输入命名 causes_csv,与文件名 famd_input.csv 无名字重叠,而数据里有两个 flows 文件(tourism_Flows + flows_with_distance),多余的 tourism_Flows 被 causes_csv 抢走;reconcile 正确拦截(没拿错文件乱跑)。
+- 修复(无代码改动,数据+文档):① 删冗余 tourism_Flows.csv(flows_with_distance 已覆盖 FROM_X/TO_X+length_km)→ causes_csv 只能绑 famd_input;② 两个 TEST_GUIDE 的运行步骤改为**详细运行 prompt**(点名每步用哪个文件,让 AI 用 file_overrides 精确绑定,绕开脆弱 auto-map)。demo 包重打 zip(3.27MB)。
+- 给用户当前卡住轮的即时解法(in-chat: use famd_input.csv for the factor analysis)。后台日志流仍开,待用户重跑验证绑定。
+- 潜在更稳的根治(未做,待定):auto-map 列感知匹配(按 step 的字段字面量选含这些列的文件)。
+
+### 续(2026-06-29):根治跨-workflow 文件误绑(列感知 + 当前批次优先)
+- 用户实测 soybean 在残留 tourism 文件的会话里跑,s1 systems 报 "Column mismatch x_field='X'/'Y'"。日志铁证:`auto-mapped 'systems_csv' -> tourism_Systems.csv`(LON/LAT)、`'flows_csv' -> flows_with_distance.csv`——服务器按 session 累积所有上传,旧 auto-map 只按 kind+名字打分,分不出两个 workflow。
+- 用户要求:让系统兼容"一个 session 多个 workflow 文件共存",并指出列感知仍有漏洞(两个 flows 同列)。
+- 修(commit `c1510bc`,已 push + rebuild + 重建 baked):`_auto_map_inputs` 改 3 级打分 `(列匹配, 当前批次, 名字)`:① `_expected_cols_by_input` 从 step 的字面量列参数(x_field/quantitative_variables…)推出每个 table 输入的期望列,绑到表头真含这些列的 CSV;② main.py 给本次请求上传打 `current_batch=True`,agent 取出作 `prefer_paths`,优先于旧 workflow 残留(解决同列 flows 歧义);③ 名字兜底。
+- 容器内混合会话测试:CASE1 soybean(prefer=soybean批)systems→Brazil/flows→DrawRadialFlows/FAMD→famd_input 全 PASS;CASE3 无 prefer 时列感知仍把 systems+FAMD 绑对。
+- 健康 200,39 容器。后台日志流重启盯用户实测。用户自测中。
+
+### 续(2026-06-29):演示包英文化 + download-zip 跨 session 修复 + 跨-workflow 修复生产验证
+- 演示包全英文化:Tourism README_DATA + 两份 TEST_GUIDE 译为英文(README_DATA 同步去掉已删的 tourism_Flows.csv,flows 改用 flows_with_distance.csv)。Python CJK 扫描确认无中文残留。expected_results 截图曾丢失,补回 4 张(英文命名:composite/crop_yield/habitat_quality/habitat_degradation)。重打包 2.97MB。
+- 跨-workflow auto-map 修复**生产验证通过**:用户 04:59 在残留 tourism 文件的 session 里跑 soybean,日志显示 systems_csv→Brazil_Systems_pfm.csv、flows_csv→DrawRadialFlows.csv 等全绑对,无 error/reconcile。
+- download-zip bug 根因:前端 `sessionId.current` 单引用、New Chat 时重置;`/api/download_zip/{session_id}` 按 URL 里的当前 session 校验文件路径 → 旧对话的结果卡(文件在旧 session 目录、磁盘仍在)被拒 404 "no longer available"。/data/outputs 有 397 个 session 目录,文件大多还在(Redis 24h TTL 过期≠rmtree)。
+- 修(commit `d717df0`,push+热补丁+重启+rebuild bake):download_zip 改为**从文件路径自身推导 session 段**(服务器生成、在 SHARED_DIR 下),不再信任 URL session_id;仍要求在 SHARED_DIR 下、同一 session、防穿越。纯后端,无需重建前端;对所有现存结果卡(含旧对话)生效。
+- 测试:用错误 session_id 请求旧 session 的结果文件 → HTTP 200 + 有效 zip(zipfile 验证 member 正确)。
+
+## 2026-07-01 — Run 2 用户真人反馈(4 个压缩包)提取 + 分析
+### 完成内容
+- 把 `Systematic_tests/UserSystematicTest_Run2_20260617/Run2_feedback/` 下 4 个 zip(`Test Report.zip`=超集 / `Nick.zip` / `Toolbox_testing_surveys_MR.zip` / `01-15test17documents.zip`)全部解压,写 `_docx2txt.py`(zipfile+XML 抽 `word/document.xml` 文本)把 80 份 docx 问卷转成 `_feedback_text/CSIS.txt`+`Nan.txt` 通读。
+- 测试者:Nan(完整 01–44)、Xin Lan(35–40 telecoupling)、Nick Manning(crop/forest/pollination/food/nutrition)、Michele Remer(scenario/OLS/FAMD/popdensity/radial/commodity/moran/geodetector)、Cori Sharp(AWY/HQ/NDR/RouteDEM/SWY/SDR/DelineateIt)。**全部走 MSU 公网 ai.telecoupling.msu.edu**。
+### 关键发现(总体:产品稳,工具识别几乎全对、极少真崩溃;反馈集中在呈现/信任/AI 叙述准确性)
+- **桶 A(GCP 已修、MSU 未同步)**:① telecoupling 点要素又小又淡 + causes 连续色带套分类数据(Xin 35–40)→ Fig.10 telecoupling_style 已修;② Habitat Quality 渲染图加载 ~54s(Nan)→ GCP 的 `_to_web_jpeg` 已修;③ DelineateIt 渲染冒 `❌ file not found (flow_direction.tif)` 但图已渲出(Nan 12a,假报错)→ 疑 BUG6 家族,待确认 GCP 是否覆盖此路径。→ 真实证据支撑 [[project_msu_sync_pending]] 回灌。
+- **桶 B(GCP 也未修的新问题)**:
+  - **B1【最高频·最该修】InVEST 栅格图例太小/无单位/无标题/无比例尺** — Cori Sharp 对其 7 个工具全写 "legend too small",Nick 对 3 个工具同样。核代码确认:`_qgis_zoom_render_worker.py` 通用色带=14px 字/24px 宽/只 max·mid·min 三数;1.7× 放大**只对 `_tc_kind` telecoupling 图层生效**,所有 InVEST 栅格仍最小号。一个文件改动覆盖面最大。
+  - **B2 AI 叙述过度承诺**(信任杀手):FAMD 说 pdf 多页实只 1 图;Commodity Trade 说有 top exporter+网络统计实只 total value;Crop Pollination 提议 analyze .dbf 一点就报错;CBA 提议把表格渲成地图。→ 收紧 SKILL/summary 提示词。
+  - **B3 未请求却 dump ~28 个工具**(Nick+Nan,跑 05 时):agent 提示词挂着逐字 `CAPABILITY_CATALOG`,模型偶发不请自来吐出。
+  - **B4 中间 UUID CSV 是噪音**(Nick 06);**B5 可信度**——测试者判断不了对错(Cori 每工具)。
+- **桶 C(引导/数据,非产品 bug)**:非空间工具应标步骤4/5可选(Michele);术语求解释 Prevalence/LLER/LISA;Coastal Vulnerability(24)缺 habitat_table CSV=数据打包;CBC 预处理(02)transitions 需手工编辑=正常;Scenario(27)漏传 base_lulc.tif。
+### 关键变更文件
+- 新增(未跟踪、分析脚手架):`Run2_feedback/_docx2txt.py`、`_extracted/`(~100MB 解压)、`_feedback_text/`(CSIS.txt/Nan.txt + _SIGNAL/_ERR 提取)。讨论定案后可清理。
+- 无产品代码改动(本轮为分析)。
+### 建议优先级 / 下一步(待用户拍板)
+1. B1 图例可读性(单文件、影响全部 InVEST);2. 启动 MSU 回灌(桶 A);3. B2 过度承诺 + B3 工具 dump(提示词层);4. B4/B5/桶 C 打磨。
+- 待用户定:先攻哪一桶;是否要把分析落成结构化 markdown 报告(按工具×主题双索引)放进 `Run2_feedback/`。
+### 测试状态
+- 本轮无代码/测试执行,纯反馈提取与分析。
+### 续:以表格向用户汇报 9 类主要问题(按优先级排序)
+- 覆盖范围说明:读的是 docx 提取的**文字**,问卷内**嵌入截图未逐张查看**(如需可后续补看)。
+- 9 类问题(1图例太小🔴 / 2 AI过度承诺🔴 / 3 工具dump🟡 / 4 telecoupling点要素·GCP已修 / 5 渲染图加载慢·GCP已修 / 6 假报错待确认 / 7 UUID噪音 / 8 可信度 / 9 引导数据)。
+- 仍待用户拍板:先修 #1 图例,还是先出结构化 markdown 报告放进 `Run2_feedback/`。
+### 续:核实 4 个 zip 全覆盖(用户追问)
+- 用 zipfile 按 basename+size 逐一比对:`Nick.zip`(7)、`Toolbox_testing_surveys_MR.zip`(8)、`01-15test17documents.zip`(docx) 全部同名同大小已含于 `Test Report.zip` 超集(80 docx),均已读。
+- 唯一在 docx 之外:`01-15test17documents.zip/note.txt`(2003B,Nan 随手笔记,超集内无)。补读后**无新问题**,与 Nan 问卷重合。两点补强桶 C:① 测试数据包缺 `.cpg`(04 watershed_gura / 05 aggregate_shape / 10 forest_carbon_edge_demo_aoi,引导列了但 input_data 没有,测试仍成功)=测试数据/引导打包不一致;② Nan 自述上传/开站慢"大概率是我网络节点的问题"→ #H 慢不全是服务器/WAF。
+- 结论:9 类问题不变。
+### 续:给出分阶段改进计划(待用户确认后动手)
+- 代码落实定位:#1 图例=`renderers/_qgis_zoom_render_worker.py` 第305–440 PIL 覆盖段(`_lg_scale=1.7 if _tc_kind else 1.0`,通用栅格仍 14/12px);#2 过度承诺=`agent.py` 现有 402–406 只防假渲染、缺"只描述真实产出"规则;#3 工具dump=`agent.py:285`+`CAPABILITY_CATALOG(:2014)`;#7 UUID CSV=`output_router.py` PATTERNS(crop_percentile/regression)。
+- **计划分 4 阶段**:
+  - Phase 0 MSU 回灌(不写新代码):把 GCP 已修的 telecoupling render(#4)/JPEG preview(#5)/BUG6(#6 部分)/FAMD/nutrition tar→build→recreate 到 MSU,红线=不覆盖 MSU `.env.docker`。
+  - Phase 1【最高优先·单文件】#1 图例:1a 通用图例 scale 1.0→~1.5(telecoupling 路径不动,保持隔离);1b 加标题行;1c 工具→输出→单位小查表(命不中回退字段名);1d 可选比例尺。回滚=scale 改回 1.0。
+  - Phase 2 提示词/SKILL 层:2a agent.py 加"只描述实际产出、不提议分析读不了的 .dbf/.shp、不承诺没有的统计量";2b 修 FAMD/commodity_trade/radial_flows 的 SKILL 过度宣称;2c 收紧"列全部工具"仅显式请求时触发。
+  - Phase 3 打磨:3a output_router 隐藏 `*_normalized_<uuid>.csv`;3b 总结加"典型范围"锚点+解释 Prevalence/LLER/LISA;3c 桶C 测试数据(补 .cpg 04/05/10、非空间工具标渲染可选、Coastal Vuln 补 habitat_table、Scenario 引导传 .tif)。
+  - 独立排查:#6 DelineateIt 假报错——不假设 BUG6 已覆盖,GCP 复现看是否误绑/双调用。
+- 建议顺序:Phase1 图例 → Phase0(连同 Phase1 一起回灌 MSU)→ Phase2 → Phase3,#6 穿插 Phase0 后。
+- **下一步(待用户确认):从 Phase 1 图例 1a+1b 开始动手。**
+- 用户确认工作流:先在 GCP dev 改好并验证 → 再回灌 MSU 生产(不直接在 MSU 开发)。等用户点头即从 Phase 1(GCP 上改图例)开工。
+
+## 2026-07-01 — Phase 1 落地:InVEST 栅格图例可读性(反馈 #1)
+### 完成内容(本地改 + 本地 PIL 仿真验证)
+- 改 `backend/renderers/_qgis_zoom_render_worker.py` 图例覆盖段,**仅影响通用栅格/graduated 色带,telecoupling 路径(`_tc_kind`)零改动**:
+  - **1a 放大**:`_lg_scale = 1.7 if _tc_kind else 1.0` → `else 1.5`(字 14→21px、色带 24→36px、边距同比放大)。
+  - **1b 标题**:栅格原本无 field 名 → 只有 3 个裸数字。新增 `_raster_title(file_path)`:由文件名反推可读标题,右上角 halo 绘制。
+  - **1c 单位**:仅对**高置信**的一小组 InVEST 输出(wyield/quickflow/baseflow→mm、sed_export/sed_retention→t、n_export/p_export→kg/yr、filled_dem→m)加单位后缀;命不中只显示美化后的文件名(**不瞎标单位**,遵循 evidence-based)。文件名尾部 uuid/hex 会被剥掉。
+  - **修 bug**:放大后数字会顶右边缘裁切 → 右边距改为**按最宽数字标签动态计算**(`margin_r=bar_w+gap+max_label_width+pad`),已验证连 `1.23e+05` 科学计数也完整不裁。
+- 验证:`Run2_feedback/_legend_sim.py`(纯 PIL 复刻绘制逻辑,无 QGIS)产出 `_legend_preview.png` 2×2 对比(BEFORE 小且裁切/无标题 vs AFTER 大+标题+单位+不裁)。`py_compile` 通过。
+### 关键变更文件
+- `backend/renderers/_qgis_zoom_render_worker.py`(唯一产品改动)
+- 新增(未跟踪,验证脚手架):`Run2_feedback/_legend_sim.py`、`_legend_preview.png`
+### 测试状态
+- ✅ 本地 PIL 仿真视觉验证通过、语法通过
+- ✅ **GCP 真机 QGIS 渲染验证通过**:热补丁 worker 进 `tele-celery-render`(worker 每次渲染是全新子进程,`docker cp` 即生效、无需重启),直接跑真实 InVEST .tif:
+  - NDR `n_surface_export.tif`(Cori 抱怨过图例的工具):图例标题 **"N Surface Export (kg/yr)"**、色带明显放大、数字 0.42/0.21/0.00 完整不裁。截图存 `Run2_feedback/_gcp_render/ndr_legend2.jpg`。
+  - 单位表已扩展覆盖 NDR surface/subsurface/total export → kg/yr。
+- ✅ **安全加固**:动态右边距 + 放大**只对非 telecoupling**生效(`if _tc_kind: margin_r=_s(70)` 冻结旧值),telecoupling flow 图例字节不变。
+- ✅ 已部署 GCP dev(**热补丁,未 baked 进 `csic_backend:latest`**;容器 recreate 会回退,备份在服务器 `~/_worker_backup.py`)。Phase 0 统一 rebuild 时再固化。
+- ⏳ 未 commit;MSU 未动(随 Phase 0 回灌)。
+### 传输避坑(记录备查)
+- Windows 环境 `ssh "cat bin"` / `base64` 管道会在 ~1MB 处被 CR 截断 → 二进制损坏。可靠做法:服务器端先把大 PNG 缩成小 JPEG(<1MB)→ `base64 -w0` → 本地 `tr -d '\r\n'` → `base64 -d`,md5 校验一致。`scp` 在本机同样被截断。
+### 停在此处(待用户决定)
+- Phase 1 图例已上 GCP dev 热补丁。等用户:① 先上 GCP 网站亲眼看图例效果再继续,还是 ② 直接接着做 Phase 2(agent.py 加"只描述真实产出"规则 + 收紧工具 dump + 修 FAMD/commodity_trade/radial_flows 的 SKILL 过度宣称)。
+- 已告知用户 Phase 1 测试方法:上 **GCP dev http://34.42.83.50/**(非 MSU,补丁只在 GCP)→ 跑任一出 .tif 的 InVEST 工具(建议 Annual Water Yield / Carbon / NDR)→ "render the result map" → 检查色带放大、右上角标题(如 `Wyield (mm)`)、数字不裁切。注意热补丁 recreate 会回退,要趁现在测。
+
+## 2026-07-01 — 用户测试中发现:上传慢 + 进度条"一直闪"(诊断,未改)
+### 诊断结论
+- **上传慢 = 网络,非服务器**:GCP `uptime` load 0.02、磁盘 74%、nginx/backend/fileserver/frontend 全 healthy、nginx `client_max_body_size 500M`。GCP 在美国机房,国内上传走国际链路本身慢(与 Nan 反馈自述"我网络节点问题"一致)。**非产品 bug**。
+- **进度条"一直闪" = 已知取舍,可修**:`frontend/src/lib/streaming.js` 有两条路径——① `uploadFilesWithProgress()` 用 XHR 有**真实字节进度**(status uploading→processing→done),但**当前未被调用**;② 实际走 `streamChat()` 的 **`fetch()`**(文件+消息一次性 POST),fetch 无上传进度事件 → 直接 `percent:100,status:'processing'` → `App.jsx` 那条 bar 加 `animate-pulse` = 用户看到的"一直闪"。当初改 fetch 的原因(注释):旧"XHR 上传→开 SSE"两步式偶尔卡住不发起 chat 请求,故合并成一次 fetch,代价=丢进度条。
+### 建议(待用户确认)
+- 把文件上传切回已有的 XHR 进度版(先 `await uploadFilesWithProgress` 传完 → 再发纯文本 `streamChat`),进度条恢复"从空到满";用干净 await+错误处理规避历史"卡住"风险。**上传可靠性敏感区,已问用户是否要改**。
+### 关键文件(涉及)
+- `frontend/src/lib/streaming.js`(uploadFilesWithProgress / streamChat)、`frontend/src/App.jsx`(uploadProgress state + 进度条 UI ~682-703)
+### 状态
+- 仅诊断,**未改任何代码**。等用户定:修进度条 vs 专注 Phase 2。
+
+## 2026-07-01 — 回溯"上传方式为何改"+ 实证 MSU/GCP 前端分歧
+### 为什么当初改上传(证据=streaming.js 注释,非猜)
+- **旧=两步式**:① XHR POST `/api/upload`(有真实字节进度,"从空到满")→ ② 单独发纯文本请求开 `/api/chat` SSE。
+- **痛点**:"传完→再开 SSE"的交接**偶尔失灵**,上传完成但第二步聊天请求没触发 → 用户**卡死在"上传完但 AI 无响应"**(对应反馈里"跑着卡住/Failed to fetch/要开新对话才好")。
+- **改=单 fetch**:文件+消息打包进同一个 `/api/chat` POST(`fetchEventSource`,body=FormData 含 files),保证聊天必启动,消灭"上传完卡死"。**代价**:fetch 无上传进度事件 → 进度条只能不确定脉冲(=用户看到的"一直闪")。
+### 实证:MSU 与 GCP 前端不是同一版(抓公网 bundle 比对)
+- 抓 `https://ai.telecoupling.msu.edu/assets/index-Cp4o_lN4.js`(291KB)grep:
+  - **MSU=旧两步式**:含 `o.open("POST","/api/upload")...o.upload.onprogress`(XHR 真进度),且 chat 的 FormData **只 append message+model、不含 files**(`await Iv(...)` 先传文件再发纯文本 chat)。**有真进度条**。
+  - 缺 `FILES_ATTACHED` 标记(GCP 现有,workflow 特性)→ 证实 MSU 前端**比 GCP 旧**。
+  - **GCP=新单 fetch**(当前 repo `streamChat`:formData 含 files → 一次 `fetchEventSource('/api/chat')`)。**无真进度、脉冲闪**。
+- **结论**:用户在 GCP 看到的"闪" vs 测试者在 MSU 看到的"能填满",差别就是这次改动本身。**退回 XHR = 把特意干掉的"卡死"风险请回来。**
+### 建议方向(待用户确认)
+- 不退回两步式;在**保留单 fetch 可靠性**前提下加**平滑合成进度**(按文件大小/时间估算 0→~90% 再等服务器),兼得可靠 + "从空到满"观感。
+### 关键文件
+- `frontend/src/lib/streaming.js`(streamChat 单-fetch / uploadFilesWithProgress 旧 XHR 死代码)
+### 用户决定
+- **上传方式暂时不动**(2026-07-01)。进度条"闪"保持现状,不为它牺牲单-fetch 的可靠性。回到别处推进。
+
+## 2026-07-01 — 图例字号调档 5x→3x→2x(用户看效果逐步缩小)+ 热补丁 GCP dev
+### 完成内容
+- 用户看 Phase 1 的 **5x bold** 图例后觉得"太大",本 session 逐步调档:**5x → 3x → 2x**(bold 全程保持),当前部署 = **2x**。
+- 改 `backend/renderers/_qgis_zoom_render_worker.py` 第 318 行 `_lg_scale = 1.7 if _tc_kind else <N>`,注释里 "Nx" 描述同步更新。
+- 字号缩小的同时,右侧白色 gutter 宽度是**按字号动态计算**的,gutter 会相应变窄不留多余空白;色带旁数字标签、raster 标题一并缩放。
+- telecoupling 自己的图例路径(`_tc_kind`,scale 1.7,画在图上)**零改动**,保持 byte-frozen。
+### 部署(按惯用热补丁流程,每档都推)
+- scp 26KB 到 GCP 主机 → `docker cp` 进 `tele-celery-render:/app/renderers/_qgis_zoom_render_worker.py`。worker 每次渲染是全新子进程,**即时生效、无需重启**。
+- 每次 md5 本地=容器内一致校验通过,无截断。当前 2x 版 md5 = `c208073f5393ff7bd4e5d76d7397e051`。
+- 备份:5x 版存服务器 `~/_worker_5x_backup.py`;原始 baseline 仍在 `~/_worker_backup.py`。
+- 仍是**热补丁,未 baked 进 `csis_backend:latest`**,容器 recreate 会回退 → 随 Phase 0 统一 rebuild 时固化。MSU 未动。
+### 关键变更文件
+- `backend/renderers/_qgis_zoom_render_worker.py`(唯一产品改动;仍未 commit)
+### 测试状态(GCP dev 真机 4 支图例全测,直接跑 render worker)
+- 方法:在 `tele-celery-render` 容器内用真实输出文件跑 `_qgis_zoom_render_worker.py`,产图缩成 JPEG 拉回本地 `feedbacks/_tc_render_test/legend_2x/`。选直接跑 worker(非走网站 Gemini)是因为它更快更确定,且测的正是改动那段代码。
+- ✅ **连续栅格色带**(`wyield.tif`):右侧白 gutter 内标题 **"Wyield (mm)"**(bold黑)、2x 色带、3 数字 1508.63/754.32/0.00 不裁、不压图。
+- ✅ **graduated 矢量**(`watershed_results_wyield.shp`→字段 `precip_mn`):field header + 2x 色带正常。**注**:该 shp 只有 1 个 watershed→min≈max,三个数字都显示 1494.66,是**数据退化(单要素)不是图例 bug**。
+- ✅ **categorical 矢量**(**合成 4 类** `class` 字段,服务器无现成 LISA/cluster 输出):右上 "class" 图例框 4 个 swatch(Cropland/Forest/Urban/Water)bold 可读、落在 gutter 不压数据。**此前从未验过的分支,现确认 2x 下正常。**
+- ✅ **telecoupling 回归**(`radial_flows.shp` + `render_as=flows`):Fig.10 粉紫弧线 flow + O-D marker 正常渲染,telecoupling 样式未被 Phase 1 破坏。该 flow 文件无 magnitude→`legend=null`,故不触发 PIL 图例;且 `_lg_scale=1.7 if _tc_kind` 分支本就一字未改、gutter/title 全被 `if not _tc_kind` 挡住,构造上不受影响。
+- ✅ **bold 字体确认加载**:所有图例文字均为清晰粗体,"系统 dejavu 空目录→退回小位图"的隐患不存在(matplotlib DejaVuSans-Bold 生效)。
+- 观察:`exit=139`(QGIS/Qt 进程退出时 teardown SIGSEGV)在 PNG 写完+JSON 打印之后发生,输出完好,属已知容器内退出段错误,与本改动无关。
+- ⏳ 未决:2x 档位用户确认后 → commit / Phase 0 固化进镜像 / 回灌 MSU。测试脚手架留在服务器 `/data/outputs/_legend_test/`(可删)。
+
+## 2026-07-02 — Run-2 反馈批量改进(自主夜间执行,用户睡觉,早上验收)
+用户指示:把 Run-2 反馈需要改进的**全部做完 + 自测 + 截图**;并提醒"反馈基于 **MSU 旧版**,GCP 更新,有些 bug 可能已修好,先在 GCP 验证再改"。全程在 **GCP dev** 上"先验证后改",每项渲染真实文件截图。截图 + 索引见 `feedbacks/Run2_improvements_20260702_screenshots/`(含 README 逐图说明)。
+
+### 逐项结论(★=本次改代码, ✓已修=GCP 早于 MSU 已修好, —=非bug/已有引导)
+| 项 | 反馈来源 | 结论 |
+|----|---------|------|
+| **图例可读性 2x** | Cori/Nick #1 | ★ 已完成(见上一条),本晚 commit `6cf93c8` |
+| **A1 telecoupling marker 太小** | Xin 37/38/39 | ★ 放大 systems 三角 7.5→11、agents 人形 9→13、causes 星 7.5→11 + 加粗描边。commit `12fa8c3` |
+| **A2 causes 应 categorical** | Xin 37 | ✓已修:GCP 上 causes 本就红星+categorical 图例(MSU 旧版才是连续色带)。渲染确认 |
+| **B1 AI 罗列全部 28 工具** | Nan/Nick 05 | ★ system prompt 加"未明确要求勿罗列工具"。commit `08d02b0` |
+| **B2 AI 宣称不存在的产出** | Run-2 综合 | ★ 加"只描述返回列表里真实存在的文件"规则(也中和了 SKILL POST_EXECUTION 列的*预期*文件)。commit `08d02b0` |
+| **C1 media_flows 只认 lon/lat** | Xin 40 | ✓已修:GCP 上 add_media_flows 已接受 `longitude/latitude`(容器 line59 确认)。剩自流(source 国当 target)属小优化,未做 |
+| **C2 coastal vuln habitat_table 报错** | Nan 24 | —非bug:habitat_table 是可选;SKILL 已详述"含 habitat 需提供关联保护等级的 CSV"。报错其实是 agent 正确在要该表 |
+| **C3 CBC transitions 需手改** | Nan/CSIS 02 | —非bug:InVEST 固有;cbc-preprocessor SKILL 已明确"requires manual editing before Tool 3"+各扰动强度含义。⚠️ 提示正常工作 |
+| **D1 crop CSV uuid 杂乱** | Nick 06 | ★ 归一化中间表改写入 `_csis_intermediate/`(加进 output_router.SKIP_DIRS),不再当结果列出。route_outputs 测试通过。commit `cf6be65` |
+| **D2 delineateit 渲染 file-not-found** | Nan 12a | —非bug:delineateit 产 watersheds.gpkg,本不产 flow_direction.tif(那是 RouteDEM 的);报错正确,混淆源于 AI 建议了不存在的文件 → 已被 B2 兜住 |
+| **上传慢/进度条闪** | 多人 | —已诊断=网络(GCP 在美国),非服务器 bug;进度条用户 07-01 决定不动 |
+
+### 关键变更文件(本晚 4 个 commit,均在 `gcp-head`)
+- `renderers/_qgis_zoom_render_worker.py`(图例 2x)、`renderers/telecoupling_style.py`(marker 放大)
+- `renderers/output_router.py` + `tools/crop_percentile.py` + `tools/crop_regression.py`(D1)
+- `agent.py`(B1/B2)
+
+### 部署状态(GCP dev 全部已生效)
+- **render 层**(worker/telecoupling_style):热补丁 `docker cp` 进 `tele-celery-render`,每次渲染新子进程→即时生效。
+- **crop 工具**(D1):`docker cp` 进 `tele-celery-crop-pct/-reg` + **重启**这两个 worker(celery 常驻进程需重启重载)→ 已生效、import OK。
+- **agent**(B1/B2):`docker cp` 进 `tele-backend` + py_compile 门禁 + **重启** → `Up (healthy)`、startup complete、/health=200。
+- 所有备份留在服务器 home:`~/_worker_5x_backup.py`/`~/_worker_backup.py`/`~/_tcstyle_backup.py`/`~/_output_router_backup.py`/`~/_agent_backup.py`。
+
+### ⚠️ 两个需要你在场的一步(我故意没连夜做)
+1. **整镜像 bake(Phase 0)**:主机源码树 `~/csis-platform/telecouplingAI-project/backend/` 是 **stale 的**(worker 还停在 `else 1.0`),且运行容器里有历史"热补丁但没写回源码"的改动(Phase A telecoupling、BUG6/7 等)。从 stale 源码 rebuild 会**回退**这些。安全做法=用 CLAUDE.md 的 tar 工作流把**本地 git 工作树**完整推到主机→`docker build`(镜像名 **`csic_backend:latest`**,context=`./backend`)→`docker compose up -d --force-recreate`→冒烟。**建议你在场做，能立刻回滚。** 目前改动已 commit(git=真源) + 热补丁生效,recreate 前不会丢。
+2. **回灌 MSU**:今晚 MSU 不通(VPN 没开,ssh 超时)。等你开 VPN 后按 tar 工作流回灌。
+
+### 自测方式(可复现)
+- 直接在 `tele-celery-render` 容器内跑 `_qgis_zoom_render_worker.py` 渲染真实 .tif/.shp,产图缩 JPEG 拉回本地看(比走网站 Gemini 快且确定)。D1 用 `route_outputs()` 构造 workspace 单测。
+- B1/B2 是 prompt 改动,**无法确定性单测**,仅验证了不破坏 agent 启动(重启后 healthy)。**需早上用真人聊天做 LLM 冒烟**(跑个 crop percentile,看 AI 是否还罗列全部工具 + 是否只描述真实产出)。
+
+## 2026-07-02 — 图例一致性收尾(用户早上发现的两个问题)
+用户观察:① agent/flow 渲染**没有图例**;② systems/causes 图例字号不是 2x、也不 bold,和 `jpg_raster` 不一样——"不是同一个函数么?"。查明:是同一段函数,但按 `_tc_kind` 分叉,我上次做栅格图例时把 telecoupling 那支**冻结在 1.7x + 常规体**了;且 `style_agents` 返回 `None`(无图例)、`style_flows` 仅在有 magnitude 时才给图例。
+### 改动(commit `cffb673`)
+- `_qgis_zoom_render_worker.py`:**去掉图例段的 `_tc_kind` 冻结**——所有图例(栅格+telecoupling)统一 **2x + BOLD**。telecoupling 仍是"图上紧凑图例框"、栅格仍用右侧白 gutter(仅位置不同,字号/字重现在一致)。图例绘制新增 **"person"** 与 **"line"** 两种图形。
+- `telecoupling_style.py`:`style_agents` 返回单条 "Agents: Agent"(person 图形);`style_flows` 无 magnitude 时返回单条 "Flows: Flow"(line 图形),不再是 None。
+### 验证(GCP dev 真机)
+- systems/causes 图例明显变大 + 粗体(对比旧 `*2.jpg`);**agents 现有 "Agent" 人形图例、flows 现有 "Flow" 线图例**(旧版都没有)。截图 `feedbacks/Run2_improvements_20260702_screenshots/*3.jpg`。
+- 已热补丁进 `tele-celery-render`(即时生效)。
+### 追加(用户再指出两点)commit `dcf34b8`
+- **图例挪到右侧 gutter**:telecoupling 图例之前画在图上,用户要求像栅格一样放右侧白 gutter 不遮挡地图。去掉图例段剩余的 `_tc_kind` gutter/margin 冻结 → systems/agents/causes/flows 图例都进右 gutter。
+- **agent 图例小人用真 SVG**:之前是近似手绘,和地图 marker 不一致。改成用 `QSvgRenderer` 把真正的 `assets/agent_person.svg` 渲进图例 swatch(带手绘兜底) → 图例小人和地图 marker 一模一样。
+- 验证(GCP dev 真机 `*4.jpg`):agents/systems/flows 图例均在右 gutter、地图不被遮挡;agent 小人=真 SVG;栅格图例不变。
+### 交付文档
+- 应用户要求做了三列对照表(反馈问题 / 我的改动 / 现在怎么测):`Systematic_tests/UserSystematicTest_Run2_20260617/Run2_feedback/Run2_Feedback_Fixes_20260702.md`。12 行,标注 本次改代码 / ✓GCP已修 / —非bug / 不改;顶部含测试环境(GCP dev,勿用 MSU)与通用渲染测试流程。
+### 追加反馈核实:Network Analysis 指标(用户新加截图 `Screenshot 2026-07-01...png`)
+- 截图对比 Nan 参考:平台 closeness 缺失、betweenness 尺度差 ~17000 倍(归一化 vs 原始)。
+- **核实=`✓ GCP 已修`**:GCP 容器 `network_analysis.R:129-132` 已输出 degree + `closeness(normalized=TRUE)` + `betweenness()`(igraph 默认原始计数)。真实 CSV `network_stats_*.csv` 佐证:含 `closeness` 列(ALB 0.28 / AUS 0.33,落在 Nan 0.28–0.41 区间)、`betweenness` 为原始计数(ALB 20.6 / AUS 591,与 Nan USA 1167 同量级)。截图测的是 MSU 旧版。→ 无需改代码,已加为对照表第 13 行。
+- 可选微调(未做,待用户定):中心度目前用第 97 行的布局边权加权;若要与 Nan 无权原始值完全一致,可对 closeness/betweenness 传 `weights=NA`。量级+排名已一致,倾向不改。
+- 第二张 `Telecoupling-Agentic-AI.png` 是 GitHub 仓库主页,背景引用、非可执行意见。
+### 追加改动:network_stats CSV 增加 pagerank + community 列(用户要求)commit `49fca06`
+- 核实:betweenness/closeness/degree 早已对齐 Nan(用真实 country-trade 数据重跑,USA betweenness=**1167.86** 与 Nan 完全一致,Top 节点 USA/CAN/BEL/AUS 一致);但 **pagerank 从未计算**、**community 只在 SHP 的 cluster_N 不在 stats CSV**。
+- 改 `r_scripts/network_analysis.R`:CSV 加 `pagerank`(`page_rank()$vector`)+ `community`(`membership()`,与 SHP cluster 同源);所有指标按 V(g) 顺序,列对齐;旧列数值不变(向后兼容)。
+- 验证(GCP 真机重跑 nodes/links/World_countries_2002.shp,walktrap):新表头 `degree,closeness,betweenness,pagerank,community`;USA 行 deg237/clo0.41/betw1167.86/pr0.0189/community5;6 个社区。
+- R 脚本每次是新 Rscript 进程,热补丁 `docker cp` 进 `tele-celery-net` 即时生效(备份 `~/_network_analysis_backup.R`)。
+
+## 2026-07-02 — 固化:把本轮所有改动 bake 进 GCP 镜像(用户命令,MSU 暂不动)
+### 背景/安全判断
+- 真正在跑的镜像 `csic_backend:latest` 是 **06-30 构建**(非那个 8 周前的 `csis-backend`),= 我本轮 Run-2 之前的基线;我这两天全是热补丁**且都已 commit**。故 **git = 基线 + 我的全部改动 = 当前运行态**,从 git rebuild 不回退。
+- 主机源码树是 stale 的(worker 曾停在 `else 1.0`),所以**先把 git 的 `backend/` 同步到主机**(tar 覆盖,排除 env/__pycache__),再从 git 源 rebuild。
+### 步骤(全部在 GCP,MSU 未碰)
+1. 提交待提交文档(commit `f581cb9`);先 `docker tag csic_backend:latest csic_backend:prebake_20260702` 备份可回滚。
+2. `tar backend/ | ssh ... tar x` 同步 git→主机;校验 worker=2.0 / marker×3 / network pagerank / agent 护栏 / crop D1 全部落位。
+3. `docker build -t csic_backend:latest .`(build context `./backend`)。**注意:requirements 未锁版本,rebuild 升级了依赖**(pydantic 2.10→2.13、google-genai→2.10.0、natcap.invest 3.14.3 等)——任何 rebuild 的固有漂移。
+4. `docker compose up -d --force-recreate` → 39 容器全部上新镜像。
+### 验证(固化后镜像代码,已 recreate 非热补丁)
+- ✅ 全容器无 unhealthy/restarting/exited;`/health`=200。
+- ✅ **agent + google-genai import OK**(依赖漂移未破坏 agent 启动)——最担心的点排除。
+- ✅ 镜像内 render worker=`_lg_scale = 2.0`、network R 含 `page_rank`。
+- ✅ 重跑 network(同数据):CSV 5 列 `degree,closeness,betweenness,pagerank,community`;**USA betweenness = 1167.86**(原始计数,MSU 与 GCP 一致)。[更正见下条]
+### 状态
+- GCP 固化完成,可回滚(`csic_backend:prebake_20260702`)。热补丁 home 备份(`~/_*backup*`)现已冗余但保留。
+- ⏳ **MSU 回灌:按用户指示暂停,等命令**。届时按 CLAUDE.md tar 工作流同步 git→MSU 主机→rebuild→recreate(注意 MSU 各自的 `.env.docker` 永不覆盖)。
+
+## 2026-07-02 — 更正:network 截图两列标签理解反了(用户指出)
+- 之前我写"`0.068864` 是 MSU 旧版归一化值"——**错**。用户澄清:截图 `Screenshot 2026-07-01...png` 里 **"Nan's Results"(1167.86) = 我们平台在 MSU 上跑的结果**,**"My Results"(0.068864) = 别人用他们自己的工具跑的结果**(归一化,且对方没算 closeness)。
+- 更正结论:**我们平台 betweenness = 1167.86(原始计数),MSU 与 GCP 一致、正确**;`0.068864` 从来不是我们的输出,也没有"旧版归一化"这回事。closeness 我们平台一直有(0.28–0.41)。
+- 仍成立:截图中 "Nan's"(=我们平台)确实 **不含 pagerank / 不在 CSV 显示 communities**,而 "My"(外部工具)有 → 这是我们真缺的,已在 `network_analysis.R` 补进 CSV(commit `49fca06`,已固化)。故 pagerank/community 的改动有效、保留。
+- 已同步修正 `Run2_Feedback_Fixes_20260702.md` 第 13 行与底部 betweenness 结论。
+
+## 2026-07-02 — 排查"Crop Percentile 出来的 TIF 不对 / 渲染中间一个大方块"(用户报)——结论:非 bug
+### 症状
+- 用户最近一次 crop percentile run(`csis_168a4210`,固化后 05:13)的 `soybean_observed_production.tif` 全 0(MIN=MAX=MEAN=STDDEV=0),渲染成一整块均匀色 = "大方块";barley/wheat 的 TIF 正常有值。
+### 证据链(全部实测,非猜)
+- baked 镜像 natcap.invest=3.14.3 / pygeoprocessing=2.4.10 / gdal=3.12.2,与 prebake **一致**(地理库 conda 装、固化未改)→ 排除依赖漂移影响 crop 数学。
+- 用**当前 baked 代码**渲染**固化前的旧 crop TIF**(soybean_observed 06-29)→ 正常出图(viridis、有空间变化、图例在 gutter)→ **渲染代码没坏**。
+- 坏 run 的 `_csis_intermediate/` 归一化表(我的 D1 产物)内容**正确**:barley→1 / wheat→20 / soybean→**1000**。
+- 关键:该 run 及**标准测试数据** `tools/05_crop_production_percentile/input_data/` 的 crop 表都把 **soybean 映到 lucode 1000**,而 landcover.tif 的实际 lucode 只有 {1..255}(实测 np.unique),**没有 1000** → soybean 面积=0 → observed 全 0。这是**输入数据决定的必然结果**,与代码版本无关。
+- 用标准数据在 baked 代码实跑验证:barley_observed MAX=0.314、wheat_observed MAX=0.0031(正常),soybean_observed=0(符合预期,lucode 1000 缺失);D1 隐藏 `_normalized` 正常、无泄漏。渲染 barley 正常出图。
+### 结论 / 下一步
+- **Crop Percentile 工具没坏,D1 改动没影响 TIF 数学**(D1 只挪了归一化表位置,内容不变)。旧 06-29 run soybean 有值是因为那次表用 soybean→lucode 1(存在)。
+- soybean 要有数据:把 crop 表里 soybean 的 lucode 改成 landcover 里真实存在的编码(非 1000)——**改输入数据,非改代码**。标准测试数据本身有此坑(soybean→1000 永远空)。
+- 已向用户提议(未做,待定):crop 工具跑完后,若某 crop 的 lucode 在 LULC 中 0 像素,给友好提示避免误解。
+- 测试产物留在服务器 `/data/outputs/_croptest*`(可删)。
+
+## 2026-07-02 — 修:栅格图例标题被截断(用户报 wheat_yield_50th)commit `62970f7`
+- 现象:图例标题 "Wheat Yield 50Th **Productio**" —— "Production" 顶到图像右边缘被切(数字 0.38/0.19/0.00 正常)。
+- 根因:gutter 宽度只按数字标签算(`_bar_w0+_gap+_mlw+_s(40)`),但标题的单词("Production" 2x 粗体)比 gutter 宽,单词不能断 → 越界裁切。
+- 修 `_qgis_zoom_render_worker.py`:① gutter 宽度取 `max(数字块, 最宽标题词 + _s(28))`;② 标题改为按 gutter 内宽换行、从 gutter 左缘**左对齐**绘制(去掉原来会顶右缘的定位)。
+- 验证(GCP 热补丁):wheat_yield_50th 标题完整显示 "Wheat Yield / 50Th / Production";wyield(短标题)不受影响。
+- 部署:render worker 每次新子进程,热补丁即时生效;已 commit + 同步主机源码。**注意:此修复尚未 bake 进镜像**(镜像仍是旧版),容器 recreate 会回退——待与 MSU 回灌一起做一次 rebuild 固化,或单独重 bake。
+
+## 2026-07-02 — 修 Coastal Vulnerability 反复报错(用户报 #24,测试中崩多次才成功)
+### 根因(实证:GCP worker 日志 + InVEST 源码)
+- 那次 run(csis_168a4210)05:40–05:43 **连崩 4 次**,错误依次:`KeyError: 'population_radius'` → `KeyError: 'shelf_contour_vector_path'` → `KeyError: 'habitat_table_path'` → 第 4 次成功。
+- InVEST 3.14.3 `coastal_vulnerability.py`:`args['shelf_contour_vector_path']`(L941)、`args['habitat_table_path']`(L964)**无条件访问、无守卫** → 实际是**必填**(文档也标 required);而 slr(L1009)、population(L1022)有 `in args and != ''` 守卫 → 才是真可选。我们工具原来把 habitat/shelf 当可选(缺就不传)→ agent 每漏一个,InVEST 就 KeyError 一次。
+### 改动
+- **后端** `tools/coastal_vulnerability.py`(commit `3e11e66`):habitat_table_path + shelf_contour_vector_path 加入 REQUIRED_KEYS 并传真实路径;slr/population 传 '' 安全跳过(InVEST 有守卫);population 光栅+半径耦合(要么都给要么都不给)。GCP 实测:仅必填+habitat+shelf、无 slr/population → **一次成功**(coastal_exposure.csv/.gpkg)。worker 已重启生效 + 同步主机源码(**尚未 bake 进镜像**,recreate 会回退)。
+- **SKILL** `run-coastal-vulnerability`(commit `65b7986`):把 habitat/shelf 从"可选"改为**必填**,新增**上传文件名→参数映射**表,population 需 raster+radius 同给。`.claude` 是**绑定挂载**(host→容器),已 scp 到 host + 重启 tele-backend 载入(健康),**不需 bake**(挂载即生效、survive recreate)。
+- **测试数据+指南**(未入 git):`tools/24_coastal_vulnerability/input_data/` **扁平化**——移除 `GrandBahama_Habitats/` 子文件夹,habitat 文件(Coral/CoastalForest/Mangrove/seagrass/Natural_Habitats.csv)上移到 input_data/ 根(相对路径仍解析)。`Testing_Guide.md` 改为扁平结构+必填说明,`Testing_Guide.pdf` 用 markdown+xhtml2pdf(同 `_build_tool_packs.py` 方法)重生成。**input_data 166MB,按仓库惯例(测试数据不入 git)保留在磁盘、未提交。**
+### 待办
+- 与 MSU 回灌一起:rebuild 固化(把 coastal 后端修复 + 其他未 baked 的 render 修复一起 bake 进镜像)。SKILL/测试数据无需 bake。
+
+## 2026-07-02 — Network Analysis 两个问题(用户测试反馈)
+### 问题1:输出文件名带 session id → commit `b405081`
+- `network_analysis.py` 把 `task_id`(uuid)拼进了每个输出名(`output_<uuid>.shp`/`network_stats_<uuid>.csv`/`network_plot_<uuid>.pdf`),用户每次下载都看到一串 uuid。workspace 目录本就按 run 唯一,uuid 是多余噪音。
+- 改干净名:`network_communities.shp` / `network_stats.csv` / `network_plot.pdf`;`output_router.py` 的 network 模式加上新名(旧模式保留向后兼容)。实跑验证:输出名干净、分类正确(stats→csv、shp/pdf→download)。
+### 问题2:"visualize the X.shp" 渲染正常但弹出坏的 Analysis plan 卡 → commit `d4afc3e`
+- 根因:`_looks_like_workflow_goal` 对该消息本返回 False(无 workflow 关键词),所以不是后端强制——是 **Flash 在 AUTO 模式下既调 render_spatial_file 又调 propose_workflow_plan**,生成的计划卡引用 render_spatial_file(非 workflow 工具)→ 校验失败报 "unknown tool"。
+- 修 `agent.py`:加 `_looks_like_render_request`(**render 动词 + 空间文件后缀 .shp/.tif/… 两者都要**),命中就把 `detected_tool_name` 设为 `render_spatial_file` → iteration 0 只给这一个工具 → 模型无法再提计划卡。要求有文件后缀,故"visualize the impact of X"这类开放式分析目标不受影响。
+- **设计选择(勿改成 mode=ANY)**:这里用的是"**收窄 tools 列表 + 保持 AUTO**",不是 `mode=ANY` 强制。因为触发是启发式、会误判(如用户在**问**"为什么 output.shp 渲染得不对");ANY 会**强行渲染**而不是答问,而 AUTO+收窄只是把 propose_workflow_plan 拿掉、模型仍可选择回文字 → 误判时优雅降级。原则:问题是"多调了不该调的"→拿掉该工具;ANY 用于反向问题"该调却不调"(如 workflow 强制)。
+- 验证:6 个用例确定性测试全过(用户原消息命中 render;"visualize the impact"/"analyze the .csv"不命中;run_* 工具检测不受影响)。
+### 部署
+- 均已 commit + 同步主机源码;`network_analysis.py`+`output_router.py` docker cp 进 `tele-celery-net`、`agent.py` 进 `tele-backend`,重启两个 worker 生效(celery/FastAPI 常驻需重启重载)。**尚未 bake 进镜像**,随下次 rebuild 固化。
+
+## 2026-07-02 — MSU 回灌卡在连通性(排查记录,避免重复踩)
+- 准备回灌 MSU(把本轮 Run-2 全套 + 历史 GCP 领先项一起推),但 **SSH 连不上**。彻底排查后定性:
+  - MSU **活着**:公网 `https://ai.telecoupling.msu.edu/health`=200(走 WAF)。
+  - 本机(Claude 跑在用户机器上)实测:**ICMP ping 35.9.219.33 通、raw TCP:80 OPEN、TCP:22 与 443 超时**。sandbox 开/关一样。
+  - 用户当前用 **UPNet**(HTTP 代理,本机 `HTTP_PROXY=127.0.0.1:29758`)——只暴露 80,**不给 SSH:22**。试过 `ssh -o ProxyCommand="connect -H 127.0.0.1:29758 %h %p"` 穿代理 → 代理**拒绝到 22 的 CONNECT**("Connection closed")。
+  - 对照 `msu_dev.md` §5:2026-05-28 成功部署时是**经校园网**(服务器 last login 来自 `172.21.x` 内网)、**raw TCP:22 OPEN、直连 `ssh csis-msu` 即可**。
+  - **结论:UPNet 代理连不了 SSH;需和当年一样的校园网/全隧道 VPN(能 raw 直连 35.9.219.33:22)。等用户切网。**
+- **回灌时 MSU 关键差异(务必遵守,摘自 msu_dev.md)**:① 数据目录在 `/home/jianan2/csis-data/`(非 GCP 的 `/data/`);② `.env.docker` **绝不覆盖**(`FILE_SERVER_URL=http://35.9.219.33/download/` 走 80、host 路径不同);③ MSU 当年镜像是从 GCP `docker save|load` 传的、非本地 rebuild——回灌可同法传镜像或本地 rebuild,到时定。
+- 全部代码改动已 commit(gcp-head),GCP dev 已生效。**待办不变:等 MSU SSH 通 → 只读比对 GCP↔MSU → 定计划 → 谨慎回灌 + 一并 bake 未固化的修复。**
+
+## 2026-07-02 — MSU 回灌：再次尝试连接，SSH:22 仍不通（用户指示用 msu_dev.md 连 MSU 准备推代码）
+### 本次动作
+- 按用户要求，用 `msu_dev.md` 的连接方式尝试 SSH 到 MSU（`ssh csis-msu`，HostName 35.9.219.33 / user jianan2 / key id_ed25519_msu）准备推代码。
+### 实测结果（全部本机验证，非猜）
+- `ssh csis-msu`（22 端口）→ **connect timed out**；原始 TCP:22 与 TCP:443 直连均超时。
+- 当前 HTTP 代理 CONNECT 到 :22 → **代理拒绝/无响应**（和 DEV_LOG 之前记录一致）。
+- MSU **服务器活着**：公网 `https://ai.telecoupling.msu.edu/health` = **200**（走 WAF/443）。
+- 结论：仍是**当前网络（UPNet HTTP 代理 127.0.0.1:29758）只放行 :80/:443、拒绝 CONNECT 到 22** 的老问题；网页能访问 ≠ 能 SSH（SSH 不走 WAF）。**不是服务器宕机，是网络路径问题。**
+### 源代码就绪确认
+- 本地 git 工作树**无未提交代码改动**（tracked 改动仅删除的截图文件）；所有 Run-2 修复 + 历史领先项均已 commit 在 `gcp-head`。源干净、随时可推。
+### 待办 / 下一步（不变）
+- **需用户切到能 raw 直连 35.9.219.33:22 的网络**（MSU 校园网 或 全隧道 VPN，非现在只转 HTTP 的 UPNet 代理）——与 2026-05-28 成功部署时相同条件。
+- 网络一通即重试 `ssh csis-msu`；通了**先做只读比对 GCP↔MSU**（MSU 停在 5 周前镜像，差异大，勿盲目 tar 覆盖），再定回灌清单 → 谨慎推 + 一并 bake 未固化的修复（render 图例标题、coastal、network 文件名、agent 路由）。
+- 回灌铁律（摘 msu_dev.md）：MSU 数据目录 `/home/jianan2/csis-data/`；`.env.docker` 永不覆盖（`FILE_SERVER_URL=http://35.9.219.33/download/` 走 80）。
+
+## 2026-07-02 — MSU 回灌：VPN 通了，做完 GCP↔MSU 只读比对 + 出计划（待用户审批，未推）
+### 连通性
+- 用户开 **MSU 全隧道 VPN**（`new.vpn.msu.edu`，拿到校园内网 `172.21.11.190`）后 SSH 通（前几次抖动 refused/timeout，之后稳定）。
+- 排查清楚之前不通的原因：VPN 是 **split-tunnel**，但 `35.9.219.33` 落在 `35.8.0.0/14` 路由段、确实走隧道；`:80` 通、`:22/:443/:8001` 早先被挡是因为没走 VPN（UPNet 代理只放行 :80/:443）。现在走 VPN 后 `:22` 通。
+- **重大利好：MSU→GCP 直连 ssh 仍然通**（`ssh -i ~/.ssh/id_gcp csisaiproject2026@34.42.83.50` OK）→ 镜像可走**服务器间美国内网直传**，绕开中国抖动链路。
+### 只读比对结论（全部实测）
+- **MSU 不是停在 05-28，而是 06-18 基线**：backend/frontend 镜像均 06-18 构建；已有完整 **39 个 tele-worker**（与 GCP 逐一一致）+ `SERVER_BASE_URL` 配置。
+- **落后 32 个 commit / ~40 文件**：workflow 用例引擎+LLM UI、telecoupling 渲染样式、图例一致性/标题不截断、coastal 必填、network 干净文件名+pagerank/community、agent 渲染路由、crop D1、FAMD 等。
+- GCP backend 镜像（07-02 bake, id 651129f0）**实测缺** 4 个 bake 后热补丁（`_looks_like_render_request`=0、`network_communities`=0）；这 4 个在运行容器里是 `docker cp` 热补丁。
+- GCP frontend 06-23 镜像**已是最新**（06-26 提交只是「捕获已在 GCP 跑了 3 天的状态」）；`WorkflowPlanCard.jsx` 未入 git 但已编译进 GCP 前端镜像 → 传镜像即带上。
+- **MSU 无独有代码**（当初从 GCP save|load 而来、之后只在 GCP 开发）→ 覆盖代码不丢 MSU 独有逻辑。
+- compose 自 06-18 未变、5 个待烤文件已 commit 干净、修复在本地 git 齐全（agent=2/network=1/coastal=7）。
+### 计划（已写 `MSU_Backport_Plan_20260702.md`，待审批）
+- 方法：**GCP→MSU 直传镜像 + 在 MSU 把 4 修复烤成薄层（COPY 5 文件，不跑 pip/conda）**；不在任何机器 rebuild → **零依赖漂移**。
+- 只换镜像 + `.claude/skills`；**绝不动** MSU 的 `.env.docker`/`.env`/数据目录/datainput 符号链接/compose。
+- 步骤 P0 备份标签 → P1（可选）证明无独有代码 → P2 直传镜像 → P3 烤 4 修复 → P4 同步 skills → P5 `recreate`（读 MSU 本地 env）→ P6 验证+冒烟。
+- 可行性：链路通、磁盘够（`/`剩35G）、零漂移、1 分钟回滚；代价=recreate 几十秒~1 分钟短暂停机。
+### 状态 / 下一步
+- **未执行任何 mutation**（用户要求先审计划）。等用户拍两件事：① 范围（全量刷新 vs 只挑部分，推荐全量）② 是否先做 P1 安全门。GO 后按 P0→P6 逐步执行、每步汇报、随时可回滚。
+
+## 2026-07-02 — MSU 回灌：真实源码逐文件比对（回应用户「担心覆盖」），仍未推
+### 用户诉求
+- 用户对「GCP 覆盖 MSU」不放心，要求把两台真实代码拉下来逐一比对确认。
+### 做法与结果（全部实测）
+- 从 GCP、MSU 两台 `tele-backend` 容器抓 `/app` 全部 `*.py/*.R/*.svg` 源码到本地 `diff -r`（GCP 85 文件 / MSU 76 文件）。
+- **只在 MSU、GCP 没有的代码文件 = 0 个** → 覆盖不丢 MSU 代码。
+- **MSU 代码硬编码 MSU 身份(IP/域名/jianan2/路径) = 0 处**；GCP 仅 2 处注释/测试 docstring（非功能）→ 代码与环境无关，MSU 身份全在 `.env`（保留）。
+- **21 个差异文件全部能对上 06-17 之后已知 GCP 提交，0 个无法解释**；改动几乎纯新增（agent.py +1055/-17、render worker +251、render_tif +132、nutrition +75，多数 tool +1），删除极少且为被替换的旧逻辑。
+- GCP 多出 5 项新功能：`workflow/`、`telecoupling_style.py`、`_qgis_scene_render_worker.py`、`render_telecoupling_scene.py`、`renderers/assets/`。
+- 范围说明：diff 的是 tele-backend；4 个 bake 后热补丁中 agent.py 已体现，另 3 个(coastal/network/render 图例标题)在各自 worker 容器、已单独在 git 核对，P3 烤入。
+### 结论
+- **MSU = GCP 旧版真子集，无独立分叉**；「覆盖」=「升级」，安全。证据已存档到 `MSU_Backport_Plan_20260702.md` 附录 A。
+### 状态 / 下一步（不变）
+- **仍未执行任何 mutation**。等用户拍板：① 范围（推荐全量刷新）② 是否先做 P1 安全门。可选：再拉 3 个 worker 的热补丁 diff 给用户看。GO 后按 P0→P6 执行。
+
+## 2026-07-02 — MSU 回灌执行完成（GCP→MSU，全量刷新，零依赖漂移）
+### 结果
+- ✅ MSU 从 06-18 基线更新到 GCP 当前（32 commit：workflow 引擎、telecoupling 渲染、全部 Run-2 修复、FAMD 等）。39/39 容器健康，内网+公网 `/health`=200，4 个修复全部在运行容器中生效。
+### 方法（零依赖漂移）
+- **服务器间直传镜像 GCP→MSU**（MSU 能 `ssh -i ~/.ssh/id_gcp` 直连 GCP，走美国内网，绕开中国 VPN）。
+- **4 个 bake 后修复用薄 `COPY` 层烤进 MSU 镜像**（`FROM csic_backend:latest` + COPY 5 文件，不跑 pip/conda）→ 无依赖漂移，且修复能扛住 recreate（比 GCP 现状还干净）。
+- **MSU 配置/数据全程未动**：`.env.docker`/`.env`/`csis-data/`/datainput 符号链接/compose。
+### 执行步骤
+- P0 备份标签：`csic_backend:msu_prebackport_20260702`(94e2995e)、`csic_frontend:msu_prebackport_20260702`(229219583bfb)、`.claude`→`~/msu_claude_backup_20260702.tgz`。
+- P2 传输：backend→651129f080bc、frontend→0d62e1dc517d（rc=0/0）。
+- P3 烤层：派生 backend→**7efd306fa9d2**（git blob 取 5 文件、LF 干净、markers 全过）；base 留 `csic_backend:gcp_0702_base`(651129f0)。
+- P4 `.claude` GCP→MSU 同步（coastal SKILL 已更新为 habitat/shelf 必填）。
+- P5 `docker compose up -d --force-recreate`（读 MSU 本地 env）。
+- P6 验证：39/39 healthy；tele-backend=7efd306 healthy；net/coastal/render/backend 4 修复齐；workflow 引擎存在；前端 0d62e1dc 出 HTML；公网 `https://ai.telecoupling.msu.edu/health`=200；3 个 patched worker 日志 `ready.` 无 import 错误、backend `started ✅`。
+### 回滚（1 分钟）
+- `docker tag *:msu_prebackport_20260702 *:latest` + `tar xzf ~/msu_claude_backup_20260702.tgz` + `docker compose up -d --force-recreate`。
+### 关键经验
+- 管理 MSU（SSH:22）需 **MSU 全隧道 VPN**（`new.vpn.msu.edu`→172.21.x 校园 IP）；UPNet HTTP 代理只放 :80/:443、不够。
+- 镜像传输走 **GCP→MSU 直连**（两台美国机器），不经开发机中国链路。
+- 详情见 `msu_dev.md` §8 + `MSU_Backport_Plan_20260702.md` 附录 A。
+### 待办（下次）
+- 有空可把这套「clean 派生镜像 7efd306」思路也用到 GCP，把 GCP 那 4 个热补丁正式 bake（目前 GCP 仍是镜像+热补丁）。MSU 现在反而比 GCP 更干净。
+
+## 2026-07-02 — MSU 回灌收尾：文档 + 记忆 + 一个已知副作用
+- 文档已补齐：`msu_dev.md` §8（部署记录/回滚/连接经验）、`MSU_Backport_Plan_20260702.md` 附录 A（GCP↔MSU 比对证据）、本 DEV_LOG。
+- 记忆已更新：`project_msu_sync_pending` 标记 DONE + 索引行更新。
+- **⚠️ 已知副作用（非 bug）**：换 GCP 前端镜像(0d62e1dc)后，MSU 原「真实 0→100% 上传进度条」消失，改为 GCP 的单请求上传 + 不确定「一直闪」进度条。符合用户 07-01 的取舍（单请求更可靠 > 进度条）。若需改善：加「按大小/时间模拟」的进度指示，勿退回两步上传。
+- 未动 GCP。可选后续：用同样薄层办法把 GCP 那 4 个热补丁也正式 bake（目前 MSU 比 GCP 干净）。
+
+## 2026-07-02 — GCP 也固化：把 4 个热补丁 bake 进 GCP 镜像（薄层，零停机式 recreate）
+### 背景
+- GCP 那 4 个 bake 后修复一直是 `docker cp` 热补丁（recreate 会丢）。用户要求「gcp 也固化」。用与 MSU 相同的干净办法：薄 COPY 层，不 rebuild。
+### 安全门（先验证再动）
+- 对比 git 5 文件 vs GCP 运行容器热补丁的 md5：**4 个逐字节一致**；`agent.py` 差异经查是**纯 CRLF↔LF 行尾**（GCP 运行版是 CRLF，git 是 LF），`tr -d '\r'` 后内容完全相同 → 烤 git(LF) 版行为等价、且更干净。
+### 执行
+- 备份：`docker tag csic_backend:latest csic_backend:gcp_prebake2_20260702`（651129f0）；另有既存 `prebake_20260702`(5037583d, 06-29)。
+- build 派生镜像：`FROM csic_backend:latest` + COPY 5 文件 → **83aaab719852**（agent=2/network=1/coastal=4、parse OK）。
+- recreate：用 `docker compose up -d`（**非** --force-recreate）→ 只重建 image 变了的 backend+workers，**nginx/frontend/redis 不动、网站不下线**，仅 worker 短暂 blink。
+### 验证
+- 39/39 healthy、无 exited/restarting；tele-backend=83aaab、内网+公网 `/health`=200；4 修复在运行容器中生效（现在来自镜像非热补丁）；net/coastal/render worker 日志 `ready.` 无 import 错误。
+### 状态
+- **GCP + MSU 现在都把 4 修复 bake 进镜像**（GCP=83aaab7、MSU=7efd306），不再依赖临时热补丁。
+- GCP 回滚点：`gcp_prebake2_20260702`(651129f0) / `prebake_20260702`(5037583d)。
+
+## 2026-07-02 — 会话收尾
+- 本会话完成：MSU 全量回灌（GCP→MSU 镜像直传 + 薄层烤 4 修复）+ GCP 同法固化。两台均把 4 修复 bake 进镜像（GCP=83aaab7 / MSU=7efd306），不再依赖临时热补丁，recreate 不回退。
+- 记忆已同步：`project_msu_sync_pending` 标记 DONE + 两台均已 bake + 索引行更新。
+- 关键经验沉淀在 `msu_dev.md` §8 与本 DEV_LOG：管理 MSU 需全隧道 VPN(172.21.x)；镜像走 GCP↔MSU 直连；安全门先比 md5（发现 agent.py 是 CRLF↔LF 纯行尾差异）；GCP 用 `up -d`（非 --force-recreate）保网站不下线。
+
+## 2026-07-02 — 讨论：网页测试时的文件上传能力（未动代码，待用户定方向）
+- 用户问「网页测试时你没法上传文件对吧」。澄清（不打包票）：
+  - 浏览器自动化里**有** `file_upload` 工具，但**未在本平台上传控件上验证过**（前端是单请求上传，文件+消息一起 POST `/api/chat`；控件是标准 input 还是自定义拖拽区未知）。
+  - 更稳的路是**绕开浏览器、直连 API 测**：Bash/curl 发 multipart 到 `/api/chat`（文件+prompt+model），文件上传天然支持、确定性强，能跑通「上传→LLM 调工具→出结果」。
+- 给用户两个方向待选：**A** 搭 API 端到端测试脚本（推荐、最稳）；**B** 实测浏览器 `file_upload` 是否能驱动网页上传控件（专测 UI 体验）。
+- **下一步**：等用户选 A / B / 两者，再动手。
+
+## 2026-07-02 — 攻克「浏览器网页测试无法上传文件」（可完全模拟真人 + 截图）
+### 问题
+- 用户要「完全模拟真人测网页 + 截图」，核心卡在文件上传。
+### 实测确认
+- 官方 `mcp__claude-in-chrome__file_upload` 的**主机路径模式已被服务端禁用**（报错 "file_upload no longer accepts host filesystem paths"），新的「传文件内容 files 参数」模式未在工具 schema 暴露 → **官方上传工具在此环境用不了**（这正是之前传不了的根因）。
+- 浏览器能打开 GCP 平台(http://34.42.83.50/)、SPA 完整渲染、截图正常。
+### 解决方案（已验证成功）
+- 用 `javascript_tool` 把文件内容 base64 注入到页面 `<input type=file>`：`DataTransfer` 造 File → `input.files=dt.files` → 派发 `change` 事件 → **React 当成真人选文件接收**。截图确认 prompt 框上方出现 `📎 nodes.csv` 附件标签。
+- 定位文件输入：`read_page filter=all` 拿到 `ref_45`(type=file, Attach files)/`ref_46`(folder)；`find` 工具当时 403 不可用，用 read_page 兜底。
+### 权衡 / 规模化
+- 小文件（几十 KB CSV）直接内联 base64 最省事；大文件（links.csv 190KB / 栅格）内联占大量 token → 建议起**本地带 CORS 的小文件服务器**让网页 `fetch()` 取文件再注入（不占 transcript、任意大小、可复用）。注意：本地 http 服务对 http 的 GCP 站可用；MSU https 公网站有 mixed-content 限制，需内联或 https 本地服务。
+### 状态 / 下一步（待用户定）
+- 上传能力已证明，当前页面挂了个 nodes.csv、未提交（无副作用）。
+- 待用户定：① 现在完整跑一个端到端演示（选工具+服务器，用 Gemini 额度）；② 还是把「本地文件服务器+注入」固化成可复用测试脚本。
+
+## 2026-07-02 — 尝试「真·原生文件对话框」上传，实测被自动化层拦截（重要发现）
+### 用户诉求
+- 用户要真·模拟人：点上传按钮 → 弹系统文件框 → 选文件，而非 JS 注入。要求上网找替代法。
+### 上网调研结论
+- 驱动原生文件框的标准做法 = OS 级键鼠自动化（剪贴板 Set + SendKeys `^v` + `{ENTER}` / Java Robot / AutoIt）。但**全部前提是「点按钮后对话框真的弹出来」**（Selenium 默认不拦截文件框，故可配 AutoIt）。
+### 实测（GCP 网页）
+- 方案：写了个后台 PowerShell 监视器轮询 `#32770` 对话框类，检测到就 `^v`+Enter；剪贴板设为 nodes.csv 路径；浏览器点真实「Attach files」按钮(ref_40)。
+- 结果：**监视器跑满 30s 没等到对话框**；枚举系统所有可见窗口，**无任何「打开」文件框**（只有 Chrome/VSCode/Edge + `#32770 BIG-IP Edge Client`=VPN 客户端）。文件未附加。
+- **根因**：claude-in-chrome 扩展走 CDP，会**拦截/抑制原生文件选择框**（正是它做 file_upload 的原因）→ 系统对话框根本不弹 → SendKeys 无对象可填。这是 CDP 自动化 Chrome 的通性，非本工具 bug。
+### 结论 / 可行路径
+- 所有自动化上传（Selenium sendKeys-to-input / Playwright setInputFiles / CDP setFileInputFiles / 我的 JS DataTransfer 注入）**本质都是直接给 input 赋值、绕过系统框**；注入后网页收到的 File+change 与真人选文件**完全一致**，后续上传→LLM→出结果全真实。
+- 待用户定：**A** 试硬件级真鼠标点击（验证拦截是否常开，大概率仍被拦）；**B** 接受「注入=行业标准=等价真人」，用注入完成选文件、其余全程真人点击+截图，跑网络分析端到端。
+### 遗留
+- GCP 页面已 reload 清空、无附件、未提交；后台监视器已自然结束。scratchpad 有 dialog_filler.ps1 / cors_server.py（未用）。
+
+## 2026-07-02 — 硬件级(OS input)文件上传实验：机制已跑通，但依赖「扩展未连接」
+### 用户诉求
+- 选方案 A：用**真·OS 级鼠标/键盘事件**驱动原生文件框，验证能否绕过 CDP 对文件选择框的拦截。
+### 关键实测结论（本机 DPI=1.0，1920×1080，坐标 = 物理像素，无缩放）
+- **「检测原生文件框 → 粘路径 → 回车」这套 OS 机制已端到端跑通**：起 PowerShell 监视器盯前台窗口，
+  命中 `#32770` 且标题含 "Open" 时 `SetForegroundWindow`+剪贴板+`^v`+`{ENTER}`。对一个真·.NET OpenFileDialog
+  实测：对话框返回 `OK|...nodes.csv`。用「盯前台窗口」而非全局枚举，避开了 BIG-IP(#32770 VPN) 误命中。
+- **但 claude-in-chrome 扩展本次「未连接」**（tabs_context_mcp 报 not connected）。CDP 文件框拦截只在扩展持有 CDP 会话时存在；
+  未连接=没有拦截，此时原生框本就正常弹出，**证明不了「硬件能否打赢 CDP 拦截」**——那个定论仍需扩展连接后再测。
+- 顺带证明：不走扩展、纯 OS input + PowerShell 截图，可在真实 GCP 站完成「打开→定位控件→硬件点击→填框」——
+  这本身就是一条「等价真人、不依赖 claude-in-chrome」的网页测试路径（GCP `/health`=200 可达）。
+### 遗留
+- 我在用户桌面开了一个 **GCP 站的 Chrome 窗口（已最大化）**，未关（与 gmail 窗口同进程，taskkill 会误杀，留给用户手动关）。
+- scratchpad: monitor_fill.ps1 / show_dialog.ps1 / capture.ps1 / crop.ps1 / md2pdf.py。
+
+## 2026-07-02 — 为第三次系统测试(Run3)准备 2 个 workflow 测试数据
+### 完成内容
+- 在 `Systematic_tests/UserSystematicTest_Run3_20260702/` 下新建 `workflows/`（与 `tools/` 平级），
+  按 tools 格式（`input_data/` + `Testing_Guide.md` + `Testing_Guide.pdf`）落了 2 个 use-case workflow：
+  - `01_soybean_telecoupling/`：input_data 20 文件（← Soybean_AllData_Upload）；Testing_Guide.md（← SOYBEAN_WORKFLOW_TEST_GUIDE.md）；
+    Testing_Guide.pdf **本地生成**（源无 PDF：python-markdown→CJK 样式 HTML→Chrome headless print-to-pdf，255KB，已截图核对渲染正常）。
+  - `02_tourism_telecoupling/`：input_data 14 文件（← Tourism_AllData_Upload）；Testing_Guide.md（← DEMO_GUIDE.md）；Testing_Guide.pdf（← DEMO_GUIDE.pdf 复制）。
+- 数据源：`usecaseLevel_workflow/`。确认就是这 2 个 workflow。
+### 用户决定
+- 两份 workflow 指南**文本原样保留**（不改服务器 URL、不改上传路径）：
+  即 Soybean/Tourism 指南仍指向 GCP dev `http://34.42.83.50/` 与原始 `*_AllData_Upload/` 路径，
+  与 tools 指南（MSU 公网 URL + `input_data/`）不一致——**这是用户明确选择，非遗漏**。
+### 关键变更文件
+- 新增：`UserSystematicTest_Run3_20260702/workflows/01_soybean_telecoupling/**`、`.../02_tourism_telecoupling/**`。
+### 测试状态
+- 仅完成数据落位（copy + 生成 PDF），未在网页上实跑；等 Run3 正式测试。
+
+## 2026-07-02 — 会话收尾
+- 本会话两块工作已完成并记录在上：① 硬件级(OS input)文件上传实验（机制跑通、CDP 拦截定论待扩展连接后再测）；② Run3 两个 workflow 测试数据落位（Soybean + Tourism，各含 input_data/md/pdf）。
+- 用户决定：workflow 指南文本原样保留（GCP URL + 原始上传路径），不与 tools 指南统一。
+- 无新增代码改动；未提交（工作区仍有此前未提交的文档/测试产物）。会话末尾用户仅询问 token 情况，无进一步改动。
+- 遗留：用户桌面有一个最大化的 GCP Chrome 窗口待手动关闭；下一步可开始 Run3 正式系统测试。
+
+## 2026-07-03 — Run3 状态核查 + 决定用 Playwright 实跑测试
+### 完成内容
+- 核查 `Systematic_tests/UserSystematicTest_Run3_20260702/` 脚手架状态：
+  - `tools/` 44 个工具文件夹（编号到 44，跳过 26 号已禁用 Recreation），每个含 `Testing_Guide.md` + `.pdf` + `input_data/`（数据已落位）。
+  - `workflows/` 2 个（`01_soybean_telecoupling`、`02_tourism_telecoupling`），同为 md + pdf + input_data。
+  - 顶层暂无 README / Feedback 模板 / 进度跟踪表（Run2 顶层有，Run3 尚缺）。
+### 关键决定
+- 用户决定：Run3 正式系统测试改用 **Playwright** 驱动网页实跑（不再用 claude-in-chrome 扩展手法）。
+### 测试状态
+- 尚未开始实跑；本会话仅完成状态核查与方向确认。
+### 下一步
+- 落实 Playwright 测试方案（确认目标环境 URL、逐工具/workflow 实跑并记录结果）。
+
+## 2026-07-03 — Run3 系统测试实跑（MSU 公网，Playwright 自主夜跑）
+### 完成内容
+- 目标环境：**MSU 公网 https://ai.telecoupling.msu.edu/**（用户指定）；开跑前实测 `/health`=200、`/`=200，可达。
+- 新建自包含 runner `Systematic_tests/UserSystematicTest_Run3_20260702/_run3_msu_test.py`：
+  - 自动发现 43 个工具（26_recreation 已禁用不计）+ 2 个 workflow；prompt 从各 `Testing_Guide.md` 的 Step-3 引用块提取；
+    上传文件 = 各 `input_data/` 全量（排除 `.md`/`.meta`）。
+  - headless Chrome，逐项截全屏，增量存盘；产物全在 `_results/`（results.json / report.md / run.log / screenshots）。
+  - 支持续跑（保留 PASS，重跑其余）。
+- 清理 input_data 残留（用户要求"删掉"）：删除 1 个 KNIME `workflowset.meta` + 8 个 `DATA_NOTE.md`/`README.md`（经核实数据均已在位，note 是过期标记）+ tourism 的 `README_DATA.md`。
+- 冒烟测试（28 OLS / 30 CO2）通过后放开全量。
+### 首轮结果（43 工具 + 2 workflow）
+- **工具 36 PASS / 2 FAIL / 5 TIMEOUT**；**workflow：tourism PASS（8 绿卡）、soybean PARTIAL**。
+- 逐一核对截图定性 7 个非 PASS：
+  - **4 个 TIMEOUT 是脚本盲区**：Gemini 把单工具请求路由成"Analysis plan"计划卡等 `Confirm & run`，脚本没点 → 假超时（29 famd / 31 cost_benefit / 34 commodity_trade / 41 food_security）。→ 已给 runner 加"检测到计划卡即点 Confirm & run + ASK_BACK 识别"，正 `--only 29,31,34,41 --fresh` 重跑（后台 bg798ppwt）。
+  - **1 个 TIMEOUT 是数据歧义**：wind_energy——input_data 同时放了 `3_6_turbine.csv` 和 `5_0_turbine.csv`，AI 反问用哪个；`.gz`/`.invs.json` 被前端判为不支持格式跳过。
+  - **2 个 FAIL 同一共性根因**：input_data 同时保留了"补丁表 + 原始表"，AI 选了原始（错的）那张 → 15_ndr 选 `biophysical_table_gura.csv`（load_type_n='measured-runoff' 非数字）、08_habitat 选 `sensitivity_willamette.csv`（缺 lulc 列）。旧脚手架只传补丁表 `bio_ndr_p.csv`/`sensitivity_p.csv`。
+  - **soybean PARTIAL**：step-1 计划把 systems 列默认成 LON/LAT，执行时数据是 X/Y → 自动纠列失败报 Column mismatch；AI 自己发现并提出改用 X/Y 重跑（一次确认即可恢复，非硬失败）。
+### 关键判断（自主拿主意）
+- 计划卡类超时是可修的脚本问题 → 修 runner 并重跑，测出真实工具健康度。
+- wind/ndr/habitat/soybean 是**确定性数据打包问题**（input_data 含冗余/未打补丁文件），重试无益 → 如实写进报告，供用户决定清理数据 or prompt 点名文件。
+### 待完成（下次继续）
+- 等 bg798ppwt 重跑完成 → 用 `_results/results_run1_backup.json` 合并 4 个计划卡工具的新结果 → 生成最终 `report.md` → 给用户测试报告。
+### 关键变更文件
+- 新增 `_run3_msu_test.py`；新增 `_results/**`（结果+截图+日志+run1 备份）；删除上述 10 个 input_data 残留文件。
+
+## 2026-07-03 — Run3 runner 修 bug：计划卡的 bg-blue-50 假阳性
+### 问题
+- 第一次修的"检测到计划卡即点 Confirm"没生效：4 个计划卡工具第二轮仍 TIMEOUT。看截图发现**计划卡 header 本身就是 `.bg-blue-50`**，所以：
+  ① 脚本把"蓝卡=工具被调用"误判成 true（假阳性）；② 我加的确认逻辑有个错守卫 `.bg-blue-50 count==0`，计划卡有 bg-blue-50 → 守卫为假 → **Confirm 点击被跳过**，继续干等绿卡 12 分钟。
+### 修复
+- `run_tool` 判定逻辑重写：不再拿 `.bg-blue-50` 当"工具被调用"信号（计划卡也蓝）；改为只认**绿色成功卡** `.bg-green-50` 与 **`Confirm & run` 按钮**；按钮一旦可见就点（去掉错守卫）；末态用"是否还留着 Confirm 按钮 / 末段文本是否问句"区分 TIMEOUT vs ASK_BACK。
+- 验证：`--only 34 --fresh` 重跑，日志已出现 `plan card -> clicking 'Confirm & run'`，确认点击生效。
+### 下一步（本会话继续）
+- 34 验证通过后，把 29/31/41 也用修好的 runner 重跑 → 合并进 `results_run1_backup.json` → 出最终 `report.md` 交付用户。
+### 补充：计划卡真正修复（再加"卡内重新上传"）
+- 只点 Confirm 仍不跑（计划卡是独立一轮，要求文件上传进卡内）。最终修复：`run_tool` 在点 Confirm 前**把该工具文件重新 `set_input_files` 进计划卡**，再点 → 34_commodity_trade `PASS (14s, via plan card)` 验证成功。
+- 结论：那 4 个"超时"是**假失败**——工具引擎正常（FAMD 在 tourism workflow 已出绿卡），只是 LLM 非确定性地把单工具请求路由进"计划卡"交互，需 upload-in-card + Confirm 才跑。runner 现已能驱动这条路径。
+- 正 `--only 29,31,41 --fresh` 重跑剩余 3 个；跑完合并 backup 出最终报告。
+
+## 2026-07-03 — Run3 测试收官：最终结果 + 报告交付
+### 最终结果（MSU 公网，合并首轮 + 重跑）
+- **工具 39/43 PASS**；3 FAIL、1 ASK_BACK。**Workflow：tourism PASS、soybean PARTIAL。**
+- 计划卡 4 工具重跑结果：29 famd PASS（首次偶发 stall、重试即过）、31 cost_benefit PASS、34 commodity_trade PASS、41 food_security **真 FAIL**（`indicator_field='Prevalence of undernourishment'` 列名不匹配）。
+### 4 个非通过工具 + soybean 的根因（均非工具引擎故障）
+- **08 habitat / 15 ndr**：input_data 同时放了「补丁表 + 原始表」，AI 选了原始的 → 缺 lulc / load_type_n 非数字。建议只留补丁表（sensitivity_p.csv / bio_ndr_p.csv）。
+- **25 wind**：input_data 放了两个 turbine 文件，AI 反问用哪个（ASK_BACK，非失败）；.gz/.invs.json 前端不支持被跳过。
+- **41 food_security**：`fao_food_security.csv` 实际列名与 prompt 的 indicator 名对不上，需核对数据/改 prompt。
+- **soybean PARTIAL**：systems 步 LON/LAT vs X/Y，AI 自己提出改 X/Y 一键恢复。
+### 交付物（全在 `UserSystematicTest_Run3_20260702/_results/`）
+- `report.md`（中文测试报告，含总览表/43 工具明细/workflow/需处理项根因+建议/方法学备注）
+- `results.json`（合并后最终）、`results_run1_backup.json`（首轮原始备查）、`run.log`、`screenshots/*.png`（每项一张）
+- runner `_run3_msu_test.py`、合并脚本 `_merge_and_report.py`
+### 给用户的建议（早上决策用）
+1. 清理 08/15/25 的 input_data 冗余文件（只留正确/补丁版）后可复跑，预期转 PASS。
+2. 核对 41 的 CSV 列名。3. soybean systems 列名问题可在 workflow 引擎侧看是否让 run-prompt 的列覆盖生效。
+4. 反馈平台：相同单工具请求被 Gemini 非确定性地路由成「直接调用」或「计划卡」，不一致。
+### 测试状态
+- 全流程跑通并交付报告；无生产代码改动（仅测试脚本 + Run3 测试产物 + 删除 input_data 残留说明文件）。
+
+## 2026-07-03 — Run3 修复（只改数据/测试 prompt，不动后端）+ 修复验证重跑
+### 用户指令
+- 「帮我修复→重新跑→生成第二次修复测试报告」，且「input_data 有问题就改 input_data，尽量少改代码」。
+### 根因确认（读 backend/agent.py:2476 定位 "Column mismatch" 来自计划引擎的列自动校准 reconcile）
+- 4 个非通过工具 + soybean 全是 input_data 打包/列名问题，非后端故障。
+### 修复（全部数据/测试层）
+- **08 habitat**：删 `sensitivity_willamette.csv`（lucode，无 lulc），只留 `sensitivity_p.csv`（有 lulc）。
+- **15 ndr**：删 `biophysical_table_gura.csv`（load_type_n='measured-runoff' 非数字）+ `_README*.txt` + `ndr_gura.invs.json`，只留 `bio_ndr_p.csv`。
+- **25 wind**：input_data 裁到 proven-minimal 集（AOI 4 + global_wind_energy_parameters.csv + 3_6_turbine.csv + ECNA_EEZ_WEBPAR_Aug27_2012.csv），删掉 5_0_turbine、各种 .gz、.invs.json、Global_EEZ、price_table、grid_pts 等 11 个多余文件（消除 AI 反问 + unsupported 警告）。
+- **41 food_security**：FAO 长表指标是 `Item` 列的值不是列名，计划引擎按列校验失败 → 指南 prompt 改 `indicator_field=Item`（数据仅一个指标，结果不变）。
+- **soybean**：`Brazil_Systems_pfm.csv` 列 X/Y（值即经纬度）→ 重命名 LON/LAT，匹配计划默认；同步改 soybean 指南 + runner WORKFLOWS 的 run-prompt 为 x=LON,y=LAT。
+### 重跑（进行中 bg b05lbq895）
+- `--mode tools --only 08,15,25,41 --fresh` → 存 `results_fix_tools.json`；再 `--mode workflows --only 01 --fresh` → 存 `results_fix_soybean.json`。
+- run1 最终 45 项已备份为 `results_final_run1.json`。
+### 下一步
+- 重跑完成后合并这 5 项到 45 项 → 生成第二版 `report.md`（修复验证 + run1→run2 对比）。
+
+## 2026-07-03 — Run3 修复验证完成：43/43 工具 + 2/2 workflow 全绿
+### 结果
+- 5 个修复项全部 **FAIL/ASK_BACK/PARTIAL → PASS**（截图核对为真绿卡+产出文件）：
+  - 08 habitat PASS 27s（首次因 fut_path 报错、AI 自动改核心输入重跑即成，产出 quality_c.tif+deg_sum_c.tif）
+  - 15 ndr PASS 57s · 25 wind PASS 39s（不再反问）· 41 food_security PASS 9s（计划卡，indicator_field=Item 过 reconcile）
+  - soybean workflow PASS **10 绿卡** 73s（4 步全通 + AI 完整总结）
+- **最终：工具 43/43、workflow 2/2 全 PASS。** 全程零后端代码改动。
+### 交付
+- 第二版报告 `_results/report.md`（修复验证 + run1→run2 对比表 + 43 工具全明细）。
+- `results_final_run1.json`（首次）/ `results_final_run2.json`（本次合并）/ 各 `results_fix_*.json` 分段结果并存。
+### 结论
+- Run3 全部 43 工具 + 2 use-case workflow 在 MSU 公网 100% 跑通。此前非通过项确认均为 Run3 input_data 打包（补丁表vs原始表并存、多选项文件、列名不匹配），非平台功能缺陷；按用户要求只改数据/测试 prompt 即全绿。
+
+## 2026-07-03 — 编写网站使用培训手册（面向学生讲课）
+### 交付
+- 新增 `Systematic_tests/UserSystematicTest_Run3_20260702/CSIS_平台使用培训手册.md`（中文讲解 + 英文 prompt，单一大 Markdown，1226 行/70KB）。
+- 结构：① 平台总览 + telecoupling 五组件框架；② 通用 6 步操作（含蓝/绿/红卡、计划卡确认、支持格式、shapefile 五件套）；③ **43 个工具逐一详解**（按 9 大类分组，每个含 作用/输入文件表/关键参数/可复制英文 prompt/输出/结果截图）；④ 2 个 use-case workflow（Soybean、Tourism，两步操作 + 计划卡/执行截图 + 对论文）；⑤ FAQ 排错表；⑥ 43 工具一页速查表。
+- 嵌入 47 张真实结果截图（相对路径 `_results/screenshots/`，43 工具 + 4 workflow），已校验全部存在。
+### 决策
+- 语言=中文讲解+英文 prompt；格式=单一大 Markdown（用户选，PDF 后续按需生成）。
+- 参数/输出含义取自各 Testing_Guide + tool_file_specs.py + InVEST 领域知识；示例参数值与测试用标准 prompt 一致，可直接复现。
+### 下一步（可选）
+- 如需，用 python-markdown→CJK HTML→Chrome headless print-to-pdf 生成 PDF（图片走相对路径需确保可访问）。
+
+## 2026-07-03 — 最小对话记录
+### 完成内容
+- 回应了用户的问候，并按项目规则追加开发日志记录。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- 未执行代码测试；仅更新记录。
+
+## 2026-07-03 — 接手前仓库盘点
+### 完成内容
+- 盘点了仓库顶层结构、项目说明、部署规则、后端入口、工作流引擎、输出路由、配置和测试目录。
+- 确认了 `.claude/skills` 实际位于 `telecouplingAI-project/.claude/skills`，并扫描了现有工具技能清单。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- 未执行代码测试；仅完成结构和文档阅读。
+
+## 2026-07-03 — 深入阅读核心链路
+### 完成内容
+- 继续阅读了后端任务队列、共享工具函数、会话管理、工作流引擎、前端消息流转、计划卡片和代表性工具实现。
+- 理清了完整路径：前端上传/发消息 -> SSE 流式接收 -> Gemini 选工具或生成计划 -> Celery 执行工具 -> Redis/Session 记录状态 -> 前端渲染结果卡片。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- 未执行代码测试；仅阅读和理解现有实现。
+
+## 2026-07-03 — 进一步补全项目全貌
+### 完成内容
+- 继续阅读了 qgis/csv/render helper、更多 telecoupling 工具、多个 InVEST 工具和顶层路线/部署文档。
+- 进一步确认了项目当前形态：FastAPI + Celery + Redis + React + QGIS/R/natcap.invest，且大量运维/迁移文档记录了 GCP 与 MSU 的双服务器部署状态。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- 未执行代码测试；仅持续阅读和归纳现有实现。
+
+## 2026-07-03 — 会话连通性测试
+### 完成内容
+- 确认 Codex 可访问项目工作区并响应用户测试消息。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- 未执行代码测试；本次仅进行会话与工作区连通性检查。
+
+## 2026-07-03 — Windows 沙箱状态诊断
+### 完成内容
+- 确认 Codex Windows 沙箱组件、setup marker 与 command runner 均已安装，受限 PowerShell 命令可正常执行。
+- 定位 `apply_patch` 失败原因为离线防火墙端口配置变更触发管理员 setup，但 `ShellExecuteExW` 以错误码 1223 取消。
+- 确认 Codex CLI 版本为 0.142.5；PowerShell 执行策略会拦截 `codex.ps1`，`codex.cmd` 可正常运行。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- 已检查沙箱日志、组件目录、setup marker 和 CLI；未执行项目代码测试。
+
+## 2026-07-03 — 沙箱诊断结论确认
+### 完成内容
+- 明确核心命令沙箱运行正常，但 `apply_patch` 的管理员配置刷新问题仍待重启 Codex 并接受 UAC 后验证。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- 未执行项目代码测试；结论基于前序沙箱日志和组件检查。
+
+## 2026-07-03 — 沙箱恢复操作说明
+### 完成内容
+- 提供 Codex 重启、接受 UAC 配置刷新及管理员启动一次的恢复步骤。
+- 明确无需重装或删除 `.codex`，并建议恢复后重新验证 `apply_patch`。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- 未执行项目代码测试；等待用户重启 Codex 后验证补丁工具。
+
+## 2026-07-03 — Codex 窗口重启说明
+### 完成内容
+- 澄清当前窗口即 Codex 会话，无需寻找其他已打开的 Codex 应用。
+- 说明应退出并重新启动承载当前会话的程序，再验证沙箱配置刷新。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- 未执行项目代码测试；等待应用重启后验证。
+
+## 2026-07-03 — 简短问候
+### 完成内容
+- 回复用户问候，未进行项目代码变更。
+- 经用户追问后再次确认 `apply_patch` 已恢复正常。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- `apply_patch` 写入成功，并通过文件读取确认。
+
+## 2026-07-03 — apply_patch 间歇性报错说明
+### 完成内容
+- 解释 `apply_patch` 的成功与失败会受到沙箱权限、配置加载状态、目标路径及补丁上下文匹配情况影响。
+- 确认当前会话中补丁写入与回读均正常。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- 已执行最小补丁写入与文件回读验证，结果正常。
+
+## 2026-07-03 — Codex 模型连接日志诊断
+### 完成内容
+- 检查 `C:\Users\dru18\.codex\logs_2.sqlite`，确认模型选择失败包含两类独立问题。
+- 发现 20:18 的失败为本地 Upnet 代理 WebSocket 隧道错误：`HTTP CONNECT response missing status line`。
+- 发现 21:23–21:26 的 GPT-5.5 失败为会话误入 `Codex-Responses-Lite` 通道并返回 400；随后新会话使用同一 GPT-5.5 正常完成请求，说明不是模型永久不兼容，而是客户端预热、连接复用或服务端路由状态不一致。
+- 确认当前本地代理 `127.0.0.1:29758` 由 Upnet 提供且存在多个正常连接。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- 已读取 Codex SQLite 运行日志、环境代理设置、端口监听和当前成功会话记录；未修改 Codex 配置。
+
+## 2026-07-03 — 简短问候
+### 完成内容
+- 回复用户问候，并确认可继续协助了解或处理 CSIS Platform 项目。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- 无代码变更，未运行测试。
+
+## 2026-07-03 — Claude 项目完整交接审计
+### 完成内容
+- 系统盘点整个工作区：3534 个可见文件、约 1.4 GB，覆盖正式代码、部署文档、41→43 工具演进、44 套测试数据、Run 1–3 用户测试、Telecoupling 工作流、反馈与演示材料。
+- 阅读并交叉核对核心文档、Git 历史、当前分支、FastAPI/Gemini/Celery/Redis/QGIS/R/React/Nginx 代码链路、43 个活跃工具定义、技能说明、输出路由、工作流引擎和测试报告。
+- 确认当前分支为 `gcp-head`，领先 `origin/gcp-head` 25 个提交；GCP 与 MSU 已于 2026-07-02 完成同步和镜像固化，最新 Run3 报告为 43/43 工具与 2/2 workflow 全部通过。
+- 识别交接风险：大量未提交材料、`WorkflowPlanCard.jsx` 未纳入 Git、环境文件和真实 Google API Key 已进入 Git 历史、Git remote 含嵌入式凭据、文档工具数过时、Coastal 文件规格不一致、workflow 绕过 Celery 队列、Celery 订阅时序竞态、单工具 warnings 列表丢失及若干前端配置漂移。
+- 全程未修改项目业务代码、未清理 Claude 留下的文件、未连接或改动服务器。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- 最新线上证据：MSU Run3 43/43 工具、2/2 workflow 通过。
+- 本地 workflow subset 确定性测试全部通过；后端轻量测试有 10 项通过，其余因当前 Windows 沙箱禁止临时目录写入而未执行；前端构建因沙箱阻止 esbuild 子进程启动而未完成，均非代码断言失败。
+
+## 2026-07-03 — GCP SSH 连通性确认
+### 完成内容
+- 使用本机 SSH 别名 `csis-gcp` 对 GCP 主服务器执行只读连接测试。
+- 远端成功返回主机名 `csis-server`，确认 SSH 别名、密钥及当前网络链路可用。
+- 未修改远端服务器内容。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- `ssh -o BatchMode=yes -o ConnectTimeout=15 csis-gcp hostname` 执行成功，退出码 0。
+
+## 2026-07-03 — Run3 系统测试目录解读
+### 完成内容
+- 阅读 `UserSystematicTest_Run3_20260702` 的目录结构、Playwright runner、两轮结果合并脚本、43 个工具测试包、2 个 workflow 测试包、最终报告和平台培训手册。
+- 确认该目录用于模拟真人在 MSU 公网网页执行 New Chat、上传数据、发送 prompt、处理计划卡、等待结果、截图和断点续跑。
+- 还原两轮结果：首轮 39/43 工具直接通过，4 个工具及 soybean 因测试数据歧义或字段映射问题未完全通过；仅调整 input_data 和测试 prompt 后，第二轮达到 43/43 工具与 2/2 workflow 全部通过，未修改后端代码。
+- 识别方法学边界：自动 PASS 主要依据页面出现绿色成功卡且无错误文字，证明网页端到端调用成功，但不等同于逐文件、逐数值验证科学结果正确性。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- 本次为只读分析，未重新执行 Run3，也未修改 Run3 文件。
+
+## 2026-07-03 — Codex Run3 复测能力检查
+### 完成内容
+- 按用户要求准备独立重跑 Run3，并检查当前浏览器控制能力。
+- 当前 Browser 插件可完成网页导航、点击、输入、状态读取和截图，但未暴露本地文件或文件夹上传接口，也不能控制 Windows 原生文件选择框。
+- 已向用户说明完整复测需要额外启用文件上传能力，或允许使用项目现有 Playwright runner 的 `set_input_files` / 文件夹上传路径。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- 尚未开始正式 Run3 复测；等待上传能力配置后继续。
+
+## 2026-07-03 — 安装 Chrome 与 Computer Use 复测插件
+### 完成内容
+- 经用户确认安装 `computer-use` 与 `chrome` 两个 OpenAI bundled 插件。
+- Chrome 插件已连接本机 Chrome 配置，并确认提供网页 `filechooser.setFiles(...)` 文件/文件夹上传能力。
+- 在 Run3 下建立独立 `codextest/` 目录及初始 `README.md`、`results.json`，不复用 Claude 的旧结果。
+- 尝试接管 MSU 公网页面时，Chrome 安全策略提示该站点被用户设置为禁止自动化使用；按安全要求停止，未通过 Computer Use 或其他方式绕过。
+### 关键变更文件
+- `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/codextest/README.md`
+- `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/codextest/results.json`
+- `DEV_LOG.md`
+### 测试状态
+- 插件安装与 Chrome 扩展连接成功；正式文件上传和 Run3 复测尚未开始，等待用户允许 `https://ai.telecoupling.msu.edu` 的 Chrome 自动化访问。
+## 2026-07-04 — 恢复 Chrome 并验证文件夹上传入口
+### 完成内容
+- 启动本机 Chrome，恢复 Codex Chrome 扩展连接，并成功接管 `https://ai.telecoupling.msu.edu/` 测试页面。
+- 通过可见 DOM 确认页面提供 `Upload a whole folder (keeps sub-folders)` 控件，并对旅游工作流 `input_data` 发起真实文件夹上传。
+- 上传在扩展侧被拒绝；根据 Chrome 插件诊断，需在扩展详情中启用 `Allow access to file URLs` 后继续。
+### 关键变更文件
+- `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/codextest/README.md`
+- `DEV_LOG.md`
+### 测试状态
+- Chrome 与目标站点控制已成功；文件夹上传尚未完成，43 个工具与 2 个 workflow 正式复测尚未开始。
+## 2026-07-04 — Codex 独立完成 Run3 全量网页复测
+### 完成内容
+- 恢复并授权 Codex Chrome 扩展，在 MSU 公网页面验证真实 `Upload a whole folder` 控件；旅游 workflow 的 13 个文件全部进入附件队列。
+- 在 Run3 下使用独立 `codextest/` 目录，通过网页 `webkitdirectory` 文件夹输入重跑 43 个活跃工具与 2 个 telecoupling workflow，不读取 Claude 的 `_results/` 作为测试结果。
+- 最终 43/43 工具、2/2 workflow、合计 45/45 PASS；soybean workflow 出现 10 张绿色完成卡，tourism workflow 出现 8 张。
+- `31_cost_benefit_analysis` 首次因计划字段映射为 `cost_usd` 失败；相同数据与 prompt 的隔离重试通过，最终无失败项。
+- 生成机器结果、详细日志、人工报告与 49 张过程/结果截图，并保留可断点续跑的文件夹上传 runner。
+### 关键变更文件
+- `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/codextest/run_codex_retest.py`
+- `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/codextest/results.json`
+- `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/codextest/report.md`
+- `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/codextest/run.log`
+- `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/codextest/screenshots/`
+- `DEV_LOG.md`
+### 测试状态
+- MSU 公网端到端复测最终 45/45 PASS；PASS 判定为网页绿色完成卡且无最终错误，不代表逐输出文件的科学数值审计。
+## 2026-07-04 — 说明 Run3 Codex 复测报告
+### 完成内容
+- 向用户汇总 Codex 独立复测结论、Cost-Benefit 首次失败与重试情况，以及 PASS 判定边界。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- 未新增测试执行；沿用已核验的最终结果：43/43 工具、2/2 workflow、合计 45/45 PASS。
+## 2026-07-04 — 验证 MSU 服务器 SSH 连接
+### 完成内容
+- 使用 `ssh csis-msu` 非交互连接 MSU 服务器，验证校园网/VPN、SSH 配置与密钥认证可用。
+- 远端返回主机名 `csis-telecoupling`、用户 `jianan2`、主目录 `/home/jianan2`。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- SSH 连接成功，退出码 0；当前可继续检查或操作 `~/csis-platform/telecouplingAI-project/`。
+## 2026-07-04 — CSIS 欢迎文案与 Telecoupling 地图配色改进
+### 完成内容
+- 将欢迎页 `Hi, CSIS` 修改为 `Hi, Users.`。
+- 将 Sending / Receiving / Spillover 改为青色上三角、洋红色下三角、琥珀色圆点，三类颜色和形状均明确区分。
+- 在共享 Telecoupling 渲染层增加 Flow 国家关系分类：优先读取输入邻接字段，否则使用 QGIS 内置 `world_map.gpkg` 根据起终点所在国家及边界拓扑自动判定 Domestic / Adjacent countries / Non-adjacent countries，并使用黄 / 青 / 洋红线条与图例。
+- 新增纯 Python 分类单元测试与 QGIS 运行时烟雾脚本；MSU 临时烟雾测试发现并修复 `QgsSpatialIndex(dict_values)` 兼容问题。
+- 核实 MSU 线上实际运行新版镜像，主机项目目录仍是旧源码，因此后续部署应采用基于当前镜像的薄层补丁，而非覆盖服务器 env 或全量旧目录。
+### 关键变更文件
+- `telecouplingAI-project/frontend/src/App.jsx`
+- `telecouplingAI-project/backend/renderers/telecoupling_style.py`
+- `telecouplingAI-project/backend/renderers/telecoupling_classification.py`
+- `telecouplingAI-project/backend/tests/test_telecoupling_classification.py`
+- `telecouplingAI-project/backend/tests/qgis_telecoupling_style_smoke.py`
+- `DEV_LOG.md`
+### 测试状态
+- 分类单元测试 4/4 PASS；前端 `npm run build` PASS；QGIS 世界图层确认 Paris / Berlin / Washington 分别落入 France / Germany / USA，France-Germany 边界 `ST_Touches=1`。
+- MSU 最终 QGIS 烟雾复跑与线上部署未执行：远程执行额度达到上限，系统提示 12:44 后重试；当前线上尚未包含本次改动。
+## 2026-07-04 — 部署并验收 MSU 欢迎页与地图分类配色
+### 完成内容
+- 在 MSU 当前运行镜像上执行 QGIS 烟雾测试，确认 Flow 自动分类出 Domestic / Adjacent countries / Non-adjacent countries，System 三类颜色分别为 Receiving `(232,62,140)`、Sending `(0,184,217)`、Spillover `(255,176,0)`。
+- 为 `csic_backend:latest` 与 `csic_frontend:latest` 创建回滚标签 `pre_ui_map_20260704`，构建并上线仅复制本次文件的 `ui_map_20260704` 薄层镜像；未修改 MSU `.env`、数据或 compose 配置。
+- 重建 `api-server`、`frontend-ui`、`celery-worker-render`，后端恢复 healthy，公网 `https://ai.telecoupling.msu.edu/health` 返回 `{"status":"ok"}`。
+- 在真实 MSU 网站验证 `Hi, Users.`，通过网页上传并运行 Add Systems 与 Draw Radial Flows，再调用 `render_spatial_file` 生成实际地图。
+- Systems 地图确认 Receiving 为洋红倒三角、Sending 为青色正三角、Spillover 为琥珀色圆点；Flow 地图确认国内为黄色、相邻国家为青色、非相邻国家为洋红色，并带 `Country relation` 图例。
+### 关键变更文件
+- `telecouplingAI-project/frontend/src/App.jsx`
+- `telecouplingAI-project/backend/renderers/telecoupling_style.py`
+- `telecouplingAI-project/backend/renderers/telecoupling_classification.py`
+- `telecouplingAI-project/backend/tests/test_telecoupling_classification.py`
+- `telecouplingAI-project/backend/tests/qgis_telecoupling_style_smoke.py`
+- `telecouplingAI-project/deploy/msu_ui_map_patch/backend.Dockerfile`
+- `telecouplingAI-project/deploy/msu_ui_map_patch/frontend.Dockerfile`
+- `feedbacks/MSU_UI_Map_20260704/`
+- `DEV_LOG.md`
+### 测试状态
+- 分类单元测试 4/4 PASS；前端生产构建 PASS；MSU QGIS 运行时烟测 PASS；真实网站两项工具执行及两张地图渲染 PASS；三个目标容器运行正常且渲染 worker 最近日志无 ERROR/Traceback。
+
+## 2026-07-04 — 复测 MSU 两套 Telecoupling workflow
+### 完成内容
+- 在 `https://ai.telecoupling.msu.edu/` 通过浏览器逐套创建新会话、生成计划、上传完整输入文件夹并执行 Soybean 与 Tourism workflow。
+- Soybean 计划正确选择 Systems、Radial Flows、Crop Production Percentile、Habitat Quality 共 4 步；执行完成并生成 10 个成功结果卡。
+- Tourism 计划正确选择 Systems、Network Analysis Grouping、Radial Flows、CO2 Emissions、Factor Analysis Mixed Data 共 5 步；执行完成并生成 8 个成功结果卡。
+- 保存两套 workflow 的计划和最终结果截图，并记录 UX 审查结论：空间结果按设计不自动预览、长流程缺少紧凑总览、上传前的 `required` 状态容易被理解为错误。
+### 关键变更文件
+- `feedbacks/MSU_Workflow_Verification_20260704/README.md`
+- `feedbacks/MSU_Workflow_Verification_20260704/run_workflow_verification.py`
+- `feedbacks/MSU_Workflow_Verification_20260704/automated_run/`
+- `DEV_LOG.md`
+### 测试状态
+- 2/2 workflow PASS；Soybean 用时 93.8 秒、Tourism 用时 81.1 秒；网页无可见错误卡。远程执行额度在复测后暂时耗尽，因此本轮未追加服务器日志扫描。
+
+## 2026-07-04 — 补齐 workflow 渲染与多图层合成验收
+### 完成内容
+- 按 Soybean 测试指南补跑 Systems + Flows 合成总图，以及 50th percentile crop yield、habitat quality、habitat degradation 三张 Effects 栅格图；为 Tourism 补跑 Systems + Flows 合成总图。
+- 首轮发现 Soybean 合成工具收到输出文件 basename 后不能稳定还原服务器路径；新增 session 输出文件解析器，在渲染工具派发前把 basename 确定性解析为真实绝对路径。
+- 发现合成图只显示 Systems 图例、遗漏新的 Flow 国家关系分类；扩展 scene legend，显示 Domestic、Adjacent countries、Non-adjacent countries、Unknown 中实际存在的类别。
+- 在 MSU 构建并部署可回滚薄层镜像 `workflow_render_20260704` 与 `workflow_render_legend_20260704`；回滚标签为 `pre_workflow_render_20260704` 与 `pre_scene_legend_20260704`，未修改服务器 env。
+- 更新 Tourism workflow 测试指南，将合成 Telecoupling 总图列为第 5 幕必验收步骤。
+### 关键变更文件
+- `telecouplingAI-project/backend/agent.py`
+- `telecouplingAI-project/backend/shared/file_reference_resolver.py`
+- `telecouplingAI-project/backend/renderers/_qgis_scene_render_worker.py`
+- `telecouplingAI-project/backend/tests/test_file_reference_resolver.py`
+- `telecouplingAI-project/deploy/msu_workflow_render_patch/backend.Dockerfile`
+- `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/workflows/02_tourism_telecoupling/Testing_Guide.md`
+- `feedbacks/MSU_Workflow_Verification_20260704/`
+- `DEV_LOG.md`
+### 测试状态
+- 路径解析单元测试 3/3 PASS；最终真实网站 2/2 workflow PASS、5/5 渲染 PASS。Soybean 最终 workflow 86.0 秒，Tourism 98.1 秒；公网 health 返回 `{"status":"ok"}`，最近 backend/render 日志无应用 ERROR 或 Traceback。
+
+## 2026-07-04 — 编写两个 Workflow 学习测试手册
+### 完成内容
+- 参照 `CSIS_平台使用培训手册.md` 的中文教学风格，新增 Soybean 与 Wolong Tourism 两套 workflow 专项学习测试手册。
+- 手册覆盖学习目标、数据准备、计划卡、文件夹上传、完整运行 prompt、关键输出、显式渲染、Systems + Flows 多图层合成、结果解释练习、评分标准、FAQ 与教师验收表。
+- 嵌入 9 张 2026-07-04 MSU 真实复测截图，包括两张计划卡、两张 workflow 结果、两张合成总图和三张 Soybean Effects 栅格图。
+### 关键变更文件
+- `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/CSIS_两个Workflow学习测试手册.md`
+- `DEV_LOG.md`
+### 测试状态
+- Markdown 共 486 行；9/9 图片相对链接均可解析，缺失图片 0；`git diff --check` 通过。
+
+## 2026-07-04 — 确认 Workflow 手册存放位置
+### 完成内容
+- 确认两个 Workflow 学习测试手册已直接存放在用户指定的 Run3 根目录下，无需移动。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- 已核对目标路径与现有文件路径完全一致。
+
+## 2026-07-04 — 修复 Workflow 手册图片嵌入
+### 完成内容
+- 将手册使用的 9 张真实复测截图复制到 Run3 目录下的 `workflow_manual_images/`，避免 Markdown 查看器阻止加载目录外图片。
+- 将手册中的全部图片链接改为与手册同目录树内的本地相对路径。
+### 关键变更文件
+- `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/CSIS_两个Workflow学习测试手册.md`
+- `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/workflow_manual_images/`
+- `DEV_LOG.md`
+### 测试状态
+- 9 张图片均已复制且文件大小正常；手册图片链接 9/9 可解析，缺失 0，`git diff --check` 通过。

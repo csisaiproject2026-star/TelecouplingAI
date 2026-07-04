@@ -120,17 +120,23 @@ async def run_crop_regression(
     workspace_dir, folder_name = generate_output_dir("crop_production_regression", session_id)
     progress_callback(10, "Created output directory")
 
+    # Normalized copies of the user's tables are INTERNAL InVEST inputs, not
+    # results. Write them into _csis_intermediate/ (in output_router.SKIP_DIRS)
+    # so they never show up in the user-facing output list (Run-2 feedback,
+    # Nick). InVEST still reads them by absolute path; it never touches this dir.
     progress_callback(15, "Normalizing crop names in input tables...")
+    _intermediate_dir = os.path.join(workspace_dir, "_csis_intermediate")
+    os.makedirs(_intermediate_dir, exist_ok=True)
     fert_path = _rewrite_crop_csv(
         params["fertilization_rate_table_path"],
         supported,
-        workspace_dir,
+        _intermediate_dir,
         f"fertilization_normalized_{task_id}.csv",
     )
     lulc_crop_path = _rewrite_crop_csv(
         params["landcover_to_crop_table_path"],
         supported,
-        workspace_dir,
+        _intermediate_dir,
         f"landcover_to_crop_normalized_{task_id}.csv",
     )
 

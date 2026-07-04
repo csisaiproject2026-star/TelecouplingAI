@@ -19,6 +19,10 @@ SKIP_DIRS = {
     "intermediate",           # CBC Main
     "taskgraph_cache",        # Most InVEST models
     "_work_tokens",           # DelineateIt and other pygeoprocessing-based models
+    "_csis_intermediate",     # OUR internal pre-processed inputs (e.g. normalized
+                              # crop tables) — InVEST never manages this dir, so it
+                              # is safe to keep tool-generated input copies here and
+                              # out of the user-facing output list (Run-2: Nick).
 }
 
 PATTERNS: dict[str, dict[str, list[str]]] = {
@@ -48,9 +52,9 @@ PATTERNS: dict[str, dict[str, list[str]]] = {
                 "aggregate_results_*.csv", "aggregate_results.csv"],
     },
     "network_analysis": {
-        "qgis": ["output_*.shp"],
-        "csv": ["network_stats_*.csv"],
-        "download": ["network_plot_*.pdf"],
+        "qgis": ["network_communities.shp", "output_*.shp"],
+        "csv": ["network_stats.csv", "network_stats_*.csv"],
+        "download": ["network_plot.pdf", "network_plot_*.pdf"],
     },
     "carbon": {
         "qgis": ["tot_c_cur*.tif", "tot_c_fut*.tif", "tot_c_redd*.tif",

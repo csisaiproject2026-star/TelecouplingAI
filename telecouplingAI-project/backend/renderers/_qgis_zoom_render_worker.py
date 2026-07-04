@@ -309,23 +309,47 @@ if _legend is not None:
 
         img = Image.open(p["output_path"]).convert("RGBA")
         iw, ih = img.size
-        draw = ImageDraw.Draw(img)
 
-        # Telecoupling layers get a larger legend; every other file keeps the
-        # original size (scale == 1.0 -> all literals below reproduce the old
-        # values exactly, so non-telecoupling output is byte-for-byte unchanged).
-        _lg_scale = 1.7 if _tc_kind else 1.0
+        # EVERY legend — generic InVEST rasters AND telecoupling
+        # systems/agents/causes/flows — now uses the SAME big, readable overlay:
+        # 2x scale + BOLD BLACK DejaVuSans. (The telecoupling branch used to be
+        # frozen at 1.7x regular face, which made its legend visibly smaller and
+        # lighter than the raster legend; user asked for consistency.) Generic
+        # rasters still get a dedicated white gutter (below); telecoupling keeps
+        # its compact legend box drawn over the map — same font size + weight.
+        _lg_scale = 2.0
 
         def _s(x):
             return int(round(x * _lg_scale))
 
         _fs, _fs_s = _s(14), _s(12)
+        # The system dejavu dir is empty in this image (PIL was silently falling
+        # back to the tiny bitmap default), so pull DejaVuSans-Bold from
+        # matplotlib's bundled fonts — BOLD for every legend now.
         try:
-            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", _fs)
-            font_small = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", _fs_s)
+            import matplotlib as _mpl
+            _MPL_TTF = os.path.join(_mpl.get_data_path(), "fonts", "ttf")
         except Exception:
-            font = ImageFont.load_default()
-            font_small = font
+            _MPL_TTF = ("/opt/conda/envs/TeleCouplingAI/lib/python3.12/"
+                        "site-packages/matplotlib/mpl-data/fonts/ttf")
+
+        _font_paths = [
+            os.path.join(_MPL_TTF, "DejaVuSans-Bold.ttf"),
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+            os.path.join(_MPL_TTF, "DejaVuSans.ttf"),
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        ]
+
+        def _load_font(size):
+            for _fp in _font_paths:
+                try:
+                    return ImageFont.truetype(_fp, size)
+                except Exception:
+                    continue
+            return ImageFont.load_default()
+
+        font = _load_font(_fs)
+        font_small = _load_font(_fs_s)
 
         def _fmt(v):
             av = abs(v) if isinstance(v, (int, float)) else 0
@@ -341,18 +365,93 @@ if _legend is not None:
                 draw.text((x + dx, y + dy), text, fill=(255, 255, 255, 230), font=fnt)
             draw.text((x, y), text, fill=(0, 0, 0, 255), font=fnt)
 
+        # Human-readable title for raster color bars. Run-2 testers said the bar
+        # had "no title/units", only 3 bare numbers. We derive a label from the
+        # source filename (always safe — just reformatting the real name) and
+        # append a unit ONLY for a small high-confidence set of InVEST outputs
+        # (otherwise no unit, so we never assert a wrong one).
+        import re as _re
+        _RASTER_UNITS = [
+            ("wyield", "mm"), ("quickflow", "mm"), ("baseflow", "mm"),
+            ("sed_export", "t"), ("sed_retention", "t"),
+            # NDR nutrient exports (surface/subsurface/total, N or P) are kg/yr
+            ("surface_export", "kg/yr"), ("subsurface_export", "kg/yr"),
+            ("total_export", "kg/yr"), ("n_export", "kg/yr"), ("p_export", "kg/yr"),
+            ("filled_dem", "m"),
+        ]
+
+        def _raster_title(fp):
+            base = os.path.splitext(os.path.basename(fp))[0]
+            unit = next((u for key, u in _RASTER_UNITS if key in base.lower()), "")
+            # drop a trailing session/uuid hex chunk if the filename carries one
+            base = _re.sub(r"[_-][0-9a-f]{6,}(-[0-9a-f]+)*$", "", base)
+            label = base.replace("_", " ").replace("-", " ").strip().title()
+            if len(label) > 30:
+                label = label[:29] + "…"
+            return f"{label} ({unit})" if unit else label
+
         kind = _legend.get("kind") if isinstance(_legend, dict) else None
+
+        # EVERY legend gets a white gutter on the RIGHT so the 2x legend never
+        # overlaps the map/data — telecoupling included now (user: put the legend
+        # on the right like the raster, don't cover the map). Sized to the widest
+        # of {title, bar+gap+widest number} or the fixed categorical panel width.
+        if True:
+            _gap = _s(6)
+            _bar_w0 = _s(24)
+            if raster_legend is not None or kind == "graduated":
+                _vmin, _vmax = _legend["min"], _legend["max"]
+                _lbls = [_fmt(_vmax), _fmt((_vmin + _vmax) / 2), _fmt(_vmin)]
+                try:
+                    _mlw = max(font.getlength(t) for t in _lbls)
+                except Exception:
+                    _mlw = _fs * 5
+                _num_gutter = int(_bar_w0 + _gap + _mlw + _s(40))
+                # A raster title (filename-derived) can contain a single word
+                # wider than the number block (e.g. "Production"); words can't
+                # break, so size the gutter to the WIDEST title word too — else
+                # the title clips off the right edge.
+                _title_word_w = 0
+                if "field" not in _legend:
+                    try:
+                        _title_word_w = max(
+                            (font.getlength(w) for w in _raster_title(p["file_path"]).split()),
+                            default=0)
+                    except Exception:
+                        _title_word_w = 0
+                _gutter = max(_num_gutter, int(_title_word_w + _s(28)))
+            elif kind == "categorical":
+                _gutter = _s(200) + _s(28)
+            else:
+                _gutter = 0
+            if _gutter > 0:
+                _canvas = Image.new("RGBA", (iw + _gutter, ih), (250, 250, 250, 255))
+                _canvas.paste(img, (0, 0))
+                img = _canvas
+                iw += _gutter
+
+        draw = ImageDraw.Draw(img)
 
         if raster_legend is not None or kind == "graduated":
             # Continuous color bar
             bar_w = _s(24)
             bar_h = int(ih * 0.55)
-            margin_r = _s(70)
-            bar_x = iw - margin_r
-            bar_y = (ih - bar_h) // 2
 
             ramp = _legend["ramp"]
             vmin, vmax = _legend["min"], _legend["max"]
+
+            # Size the right margin to the widest numeric label so the bigger 2x
+            # fonts never clip off the right edge (telecoupling flow legends live
+            # in the gutter like everything else now).
+            _gap = _s(6)
+            _labels = [_fmt(vmax), _fmt((vmin + vmax) / 2), _fmt(vmin)]
+            try:
+                _max_lw = max(draw.textlength(t, font=font) for t in _labels)
+            except Exception:
+                _max_lw = _fs * 4
+            margin_r = int(bar_w + _gap + _max_lw + _s(10))
+            bar_x = iw - margin_r
+            bar_y = (ih - bar_h) // 2
 
             bar = Image.new("RGBA", (bar_w, bar_h))
             bar_draw = ImageDraw.Draw(bar)
@@ -365,7 +464,7 @@ if _legend is not None:
                                outline=(0, 0, 0, 220), width=1)
             img.paste(bar, (bar_x, bar_y), bar)
 
-            text_x = bar_x + bar_w + _s(6)
+            text_x = bar_x + bar_w + _gap
             for ly, text in [
                 (bar_y,                       _fmt(vmax)),
                 (bar_y + bar_h // 2 - _s(7),  _fmt((vmin + vmax) / 2)),
@@ -373,7 +472,34 @@ if _legend is not None:
             ]:
                 _halo_text((text_x, ly), text, font)
             if "field" in _legend:
+                # graduated vector: keep the field-name header above the bar
                 _halo_text((bar_x - 4, bar_y - _s(22)), _legend["field"], font_small)
+            else:
+                # raster: no field name -> filename-derived title, wrapped to the
+                # gutter INTERIOR and drawn LEFT-aligned from the gutter's left
+                # edge. The gutter was sized above to fit the widest title word,
+                # so no word can clip off the right edge.
+                _title = _raster_title(p["file_path"])
+                _tx = iw - _gutter + _s(10)        # gutter left edge + pad
+                _avail = _gutter - _s(18)
+                _lines, _cur = [], ""
+                for _wd in _title.split():
+                    _cand = (_cur + " " + _wd).strip()
+                    try:
+                        _fit = draw.textlength(_cand, font=font) <= _avail
+                    except Exception:
+                        _fit = len(_cand) * _fs * 0.5 <= _avail
+                    if _fit or not _cur:
+                        _cur = _cand
+                    else:
+                        _lines.append(_cur)
+                        _cur = _wd
+                if _cur:
+                    _lines.append(_cur)
+                _ty = _s(10)
+                for _ln in _lines:
+                    _halo_text((_tx, _ty), _ln, font)
+                    _ty += _fs + _s(6)
 
         elif kind == "categorical":
             # Stacked swatches + labels in the upper-right
@@ -424,6 +550,45 @@ if _legend is not None:
                              (_cy + (_R if k % 2 == 0 else _R * 0.42) * _m.sin(-_m.pi / 2 + k * _m.pi / 5)))
                             for k in range(10)]
                     _d.polygon(_pts, fill=(r, g, b, 255), outline=(0, 0, 0, 220))
+                elif gshape == "person":
+                    # Render the ACTUAL agent SVG so the legend glyph matches the
+                    # map marker exactly. Fall back to a drawn silhouette if the
+                    # SVG can't be rasterized.
+                    _person_ok = False
+                    try:
+                        from qgis.PyQt.QtSvg import QSvgRenderer as _QSvg
+                        from qgis.PyQt.QtGui import QImage as _QI, QPainter as _QP
+                        from qgis.PyQt.QtCore import QRectF as _QR, Qt as _Qt
+                        _svgp = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                             "assets", "agent_person.svg")
+                        if os.path.isfile(_svgp):
+                            _qi = _QI(sw, sw, _QI.Format_ARGB32)
+                            _qi.fill(_Qt.transparent)
+                            _qp = _QP(_qi)
+                            _QSvg(_svgp).render(_qp, _QR(0, 0, float(sw), float(sw)))
+                            _qp.end()
+                            _pic = Image.frombytes("RGBA", (sw, sw),
+                                                   _qi.bits().asstring(sw * sw * 4),
+                                                   "raw", "BGRA")
+                            img.paste(_pic, (int(x0), int(y0)), _pic)
+                            _person_ok = True
+                    except Exception:
+                        _person_ok = False
+                    if not _person_ok:
+                        _cx = (x0 + x1) / 2
+                        _hr = sw * 0.17
+                        _hy = y0 + sw * 0.24
+                        _d.ellipse([(_cx - _hr, _hy - _hr), (_cx + _hr, _hy + _hr)],
+                                   fill=(r, g, b, 255), outline=(0, 0, 0, 220))
+                        _by = _hy + _hr
+                        _d.polygon([(_cx - sw * 0.30, y1), (_cx + sw * 0.30, y1),
+                                    (_cx + sw * 0.15, _by), (_cx - sw * 0.15, _by)],
+                                   fill=(r, g, b, 255), outline=(0, 0, 0, 220))
+                elif gshape == "line":
+                    # thick colored line for flows
+                    _ly = (y0 + y1) // 2
+                    _d.line([(x0, _ly), (x1, _ly)], fill=(r, g, b, 255),
+                            width=max(2, sw // 4))
                 else:  # rect — generic categorical, unchanged
                     _d.rectangle([(x0, y0), (x1, y1)],
                                  fill=(r, g, b, 230), outline=(0, 0, 0, 200), width=1)
