@@ -6318,3 +6318,21 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - `DEV_LOG.md`
 ### 测试状态
 - 9 张图片均已复制且文件大小正常；手册图片链接 9/9 可解析，缺失 0，`git diff --check` 通过。
+
+## 2026-07-04 — 对齐 GitHub、GCP 与 MSU 运行源码
+### 完成内容
+- 以远端 `gcp-head` 为基线建立干净分支 `codex/msu-aligned-20260704`，仅纳入经审计的运行源码、代码测试、部署 Dockerfile 与项目记忆文档。
+- 明确排除测试数据、反馈、截图、生成结果、日志和本地培训手册图片；未使用 `git add .`。
+- 只读核对 MSU 当前容器源码与前端产物，确认新分支可复现 MSU 最新运行版本；整个过程未重启、重建、重建容器、重打标签或写入 MSU。
+- 在 GCP 创建前后端回滚标签，上传精简源码包且保持 `.env` 与 `.env.docker` 哈希不变，构建候选镜像并切换所有 GCP 服务。
+- 确认 GCP 实际 compose 根目录为 `~/csis-platform/telecouplingAI-project/`，并记录到项目记忆。
+### 关键变更文件
+- `AGENTS.md`
+- `PROJECT_MEMORY.md`
+- `DEV_LOG.md`
+- `telecouplingAI-project/backend/`
+- `telecouplingAI-project/frontend/src/`
+- `telecouplingAI-project/deploy/`
+### 测试状态
+- 本地聚焦单元测试 7/7 PASS；前端生产构建 PASS；GCP 候选镜像 QGIS 冒烟测试 PASS。
+- GCP 全部 compose 服务运行，backend/Redis healthy；公网 `/health` 返回 `{"status":"ok"}`，线上 bundle 包含 `Hi, Users`，部署后五分钟日志无 `Traceback`、`ERROR` 或未处理异常。

@@ -110,3 +110,13 @@
   - `backend/tests/test_file_reference_resolver.py`
   - `backend/tests/qgis_telecoupling_style_smoke.py`
 - Local commit containing the main change set: `24c0210` (`feat: persist telecoupling map styles and workflow rendering`).
+
+## GCP/MSU alignment checkpoint (2026-07-04)
+
+- The authoritative clean alignment branch is `codex/msu-aligned-20260704`, created directly from remote `gcp-head` and containing only audited source, tests, deployment Dockerfiles, and project memory/docs.
+- Clean alignment commit before final deployment notes: `23d2b77`. No test datasets, feedback, screenshots, generated results/logs, or workflow-manual image assets are present in this branch.
+- The actual GCP compose root is `~/csis-platform/telecouplingAI-project/`.
+- GCP rollback tags created before deployment: `csic_backend:pre_msu_align_20260704` and `csic_frontend:pre_msu_align_20260704`.
+- GCP candidate tags: `csic_backend:msu_aligned_20260704` and `csic_frontend:msu_aligned_20260704`; both were promoted to `latest` after validation.
+- GCP post-deployment checks: all compose services running, backend and Redis healthy, public `/health` returned `{"status":"ok"}`, deployed bundle contained `Hi, Users`, QGIS classification smoke passed, and the first five minutes of logs contained no `Traceback`, `ERROR`, or unhandled exception matches.
+- MSU was not restarted, rebuilt, recreated, retagged, or written to during this alignment.
