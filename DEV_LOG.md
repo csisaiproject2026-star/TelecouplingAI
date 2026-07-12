@@ -6996,3 +6996,24 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 ### ????
 - PASS?`git push origin codex/msu-latest-20260704` ???GitHub ????? PR ???
 - ???????? PR???????????????
+
+## 2026-07-12 — 生产源码基准审计与同步准备
+### 完成内容
+- 全面扫描根目录 `DEV_LOG.md`、`PROJECT_MEMORY.md`、`AGENTS.md`、`ROADMAP.md`、各测试报告、Git 分支、MSU/GCP 备份目录、主机源码、运行容器、固化镜像和外置 User Guide 资产。
+- 确认历史日期分支 `codex/msu-latest-20260704` 的最新提交 `b3d1ebb` 已包含 2026-07-12 的全部固化记录；当前工作分支已快进到该生产基准。
+- 内容级核对确认：Git 正式源码与 GCP 主机源码一致；MSU/GCP 当前业务代码、44 个 Skill、前端有效 bundle 和 232 个 User Guide 文件一致。
+- 识别出 MSU 主机后端源码仍有 36 个旧版/缺失的 Git 跟踪文件。运行容器内容正确，但未来从旧主机源码重建存在回退风险。
+- 新增只读漂移审计工具和生产清单，统一检查 Git、两台主机、关键运行容器、前端和 User Guide 资产。
+- 将 GCP 已验证的前端缓存规则同步到 MSU nginx：首页使用 `Cache-Control: no-cache`，哈希 JS/CSS 使用一年 immutable 缓存。
+### 关键变更文件
+- `PROJECT_MEMORY.md`
+- `DEV_LOG.md`
+- `telecouplingAI-project/deploy/README.md`
+- `telecouplingAI-project/deploy/audit_production_drift.py`
+- `telecouplingAI-project/deploy/production_inventory.json`
+- MSU：`~/csis-platform/telecouplingAI-project/nginx/nginx.conf`
+### 测试状态
+- PASS：MSU nginx 配置检查通过并完成 reload；公网首页返回 `Cache-Control: no-cache`，有效 JS 返回 `Cache-Control: public, max-age=31536000, immutable`。
+- PASS：MSU `/health` 返回 `{"status":"ok"}`。
+- PASS：同步前只读审计准确报告 MSU 36 项主机源码漂移及 GCP 少量部署辅助文件缺失。
+- 未执行：未重启、未 recreate、未替换任何业务容器。

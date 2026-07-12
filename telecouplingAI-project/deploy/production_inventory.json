@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "canonical_branch": "production",
+  "reconciled_from_commit": "b3d1ebb54769847afe4d368a6de2454426e8f3cc",
+  "observed_at": "2026-07-12T22:15:00+08:00",
+  "servers": {
+    "msu": {
+      "ssh_host": "csis-msu",
+      "project_root": "/home/jianan2/csis-platform/telecouplingAI-project",
+      "public_url": "https://ai.telecoupling.msu.edu/",
+      "user_guides_root": "/home/jianan2/csis-data/outputs/user-guides",
+      "active_images": {
+        "tele-backend": "sha256:5eabb7f78d44d52d390c97c15dc210a366082ae7a74b9e51aa6ecbecb1029112",
+        "tele-frontend": "sha256:d70792753fcb5a0d30a7e048908c2d74f0c9b9ed7395a7441a05821d491334d3",
+        "tele-celery-render": "sha256:49157df5b22ab7c8c61ab7b2d3cbc7fdea6e4a7916913f8effb86a7cc98c9763"
+      },
+      "solidified_latest_images": {
+        "csic_backend:latest": "sha256:2f25a2a38cd49a01d65f502dcd5b88486b94329f044474721dc8d6feab227338",
+        "csic_frontend:latest": "sha256:610a7cc8bf6e4e91d56cace74c1d86e046b6afc5828a7e9d82db80b1b87aa083"
+      }
+    },
+    "gcp": {
+      "ssh_host": "csis-gcp",
+      "project_root": "/home/csisaiproject2026/csis-platform/telecouplingAI-project",
+      "public_url": "http://34.42.83.50/",
+      "user_guides_root": "/data/outputs/user-guides",
+      "active_images": {
+        "tele-backend": "sha256:bea2d85c6bb8fdc670eb5a21af339ad8c58732856bb372350ddf38bdcc705a3f",
+        "tele-frontend": "sha256:ca01d7a134206dc5fdb4198cb9c860c65fbd5066ba694ace34a69a640c95279a",
+        "tele-celery-render": "sha256:bea2d85c6bb8fdc670eb5a21af339ad8c58732856bb372350ddf38bdcc705a3f"
+      },
+      "solidified_latest_images": {
+        "csic_backend:latest": "sha256:3bf4f155586dafd2ac14f892145690ea7d8acf3ae2283036011c4d05ddcf8bca",
+        "csic_frontend:latest": "sha256:49391c6602d3892a02707812f2e74d33127660e70e200b19b8cee72335bfde5f"
+      }
+    }
+  },
+  "server_specific_exclusions": [
+    ".env",
+    ".env.docker",
+    "backend/.env",
+    "nginx/certs/server.crt",
+    "nginx/certs/server.key",
+    "outputs/",
+    "uploads/",
+    "data/",
+    "datainput_for_demo/",
+    "Systematic_tests/",
+    "UserGuide/"
+  ]
+}
