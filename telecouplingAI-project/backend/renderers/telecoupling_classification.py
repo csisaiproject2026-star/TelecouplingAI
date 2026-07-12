@@ -3,16 +3,15 @@ from __future__ import annotations
 
 
 SYSTEM_STYLES = {
-    "sending": ((0, 184, 217), "triangle", "11", "0", "triangle_up"),
-    "receiving": ((232, 62, 140), "triangle", "11", "180", "triangle_down"),
-    "spillover": ((255, 176, 0), "circle", "9", "0", "circle"),
+    "sending": ((0, 184, 217), "triangle", "5.5", "0", "triangle_up"),
+    "receiving": ((232, 62, 140), "triangle", "5.5", "180", "triangle_down"),
+    "spillover": ((255, 176, 0), "circle", "4.5", "0", "circle"),
 }
 
 FLOW_RELATION_STYLES = {
     "Domestic": (255, 209, 102),
     "Adjacent countries": (0, 213, 255),
     "Non-adjacent countries": (255, 59, 141),
-    "Unknown": (230, 230, 230),
 }
 
 FLOW_RELATION_FIELDS = (
@@ -54,7 +53,7 @@ def normalize_flow_relation(value):
         return "Adjacent countries" if value else "Non-adjacent countries"
     text = str(value or "").strip().lower().replace("_", "-")
     if not text:
-        return "Unknown"
+        return "Non-adjacent countries"
     if text in {"domestic", "same", "same-country", "internal", "within-country"}:
         return "Domestic"
     if text in {"1", "true", "yes", "y"}:
@@ -65,12 +64,12 @@ def normalize_flow_relation(value):
         return "Non-adjacent countries"
     if any(token in text for token in ("adjacent", "neighbour", "neighbor", "border")):
         return "Adjacent countries"
-    return "Unknown"
+    return "Non-adjacent countries"
 
 
 def country_relation(origin_id, destination_id, touches=False, distance=None):
     if origin_id is None or destination_id is None:
-        return "Unknown"
+        return "Non-adjacent countries"
     if origin_id == destination_id:
         return "Domestic"
     if touches or (distance is not None and 0 <= distance <= 0.02):

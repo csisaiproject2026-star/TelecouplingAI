@@ -41,6 +41,22 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 _GEMINI_SEMAPHORE = asyncio.Semaphore(3)
+_CJK_TEXT_RE = re.compile(r"[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\u3040-\u30ff\uac00-\ud7af]")
+_THINKING_ENGLISH_FALLBACK = "Processing the request and preparing the next step.\n"
+
+
+def _sanitize_visible_thinking_text(text: str) -> str:
+    if not text:
+        return ""
+    if not _CJK_TEXT_RE.search(text):
+        return text
+    safe_lines = [
+        line
+        for line in text.splitlines(keepends=True)
+        if not _CJK_TEXT_RE.search(line)
+    ]
+    safe_text = "".join(safe_lines)
+    return "" if _CJK_TEXT_RE.search(safe_text) else safe_text
 
 async def _generate_with_retry(client, model_name: str, contents, config, max_retries: int = 4):
     """Call generate_content with semaphore + exponential backoff on 429/503."""
@@ -90,6 +106,7 @@ async def _generate_streaming(client, model_name: str, contents, config, emit,
         async with _GEMINI_SEMAPHORE:
             try:
                 collected = []
+                thinking_fallback_sent = False
                 maybe = client.aio.models.generate_content_stream(
                     model=model_name, contents=contents, config=config,
                 )
@@ -108,7 +125,15 @@ async def _generate_streaming(client, model_name: str, contents, config, emit,
                             collected.append(part)
                         elif part.text:
                             if getattr(part, "thought", False):
-                                await _maybe_await(emit({"type": "thinking", "content": part.text}))
+                                visible_thinking = _sanitize_visible_thinking_text(part.text)
+                                if visible_thinking:
+                                    await _maybe_await(emit({"type": "thinking", "content": visible_thinking}))
+                                elif not thinking_fallback_sent:
+                                    await _maybe_await(emit({
+                                        "type": "thinking",
+                                        "content": _THINKING_ENGLISH_FALLBACK,
+                                    }))
+                                    thinking_fallback_sent = True
                             else:
                                 await _maybe_await(emit({"type": "text_chunk", "content": part.text}))
                             collected.append(part)
@@ -2030,7 +2055,10 @@ async def run_agent(
         "## Language (IMPORTANT)\n"
         "Always respond in ENGLISH — all explanations, summaries, and plan descriptions — "
         "regardless of the language the user writes in. Switch to another language ONLY if "
-        "the user explicitly asks you to (e.g. \"请用中文回答\" / \"reply in Chinese\").\n\n"
+        "the user explicitly asks you to (for example, \"reply in Chinese\").\n"
+        "Visible thought summaries shown in the Thought process UI must ALWAYS be English only. "
+        "Never use Chinese, Japanese, or Korean characters in visible thought summaries, even when "
+        "the user writes in another language.\n\n"
         + _BASE_SYSTEM_INSTRUCTION
         + "\n\n" + WORKFLOW_PROMPT
         + "\n\n" + CAPABILITY_CATALOG

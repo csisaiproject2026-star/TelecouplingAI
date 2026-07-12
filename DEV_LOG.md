@@ -6318,3 +6318,668 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - `DEV_LOG.md`
 ### 测试状态
 - 9 张图片均已复制且文件大小正常；手册图片链接 9/9 可解析，缺失 0，`git diff --check` 通过。
+
+## 2026-07-11 — 01_network_analysis 用户指南包
+### 完成内容
+- 按顺序完成第一个工具 `01_network_analysis` 的网站操作确认，核对了历史 Run3 记录里该工具的标准流程：上传文件夹、发送提示词、等待 Analysis Plan 卡、再点 `Confirm & run 1 step`。
+- 在工具目录下新建 `updateforuserguide/`，并将 `input_data/Network Analysis Grouping/` 的样例文件复制到 `updateforuserguide/sample data/Network Analysis Grouping/`。
+- 编写了面向用户的 `user guide.md`，说明用途、所需文件、操作步骤、输入含义、预期输出与使用建议。
+- 生成了对应的 `user guide.pdf`，并完成逐页渲染检查，确认版面正常。
+### 关键变更文件
+- `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/tools/01_network_analysis/updateforuserguide/user guide.md`
+- `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/tools/01_network_analysis/updateforuserguide/user guide.pdf`
+- `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/tools/01_network_analysis/updateforuserguide/sample data/Network Analysis Grouping/`
+### 测试状态
+- 网站端第一个工具已验证完成并成功返回结果文件：`network_communities.shp/.shx/.dbf/.prj`、`network_stats.csv`、`network_plot.pdf`。
+- PDF 渲染与视觉检查通过；暂未开始第二个工具，等待你确认后继续。
+## 2026-07-11 — Network Analysis 复跑成功
+### 完成内容
+- 按用户要求重新复跑第一个 tool（Network Analysis Grouping）的实际执行链路。
+- 使用与测试数据一致的输入，直接调用 `run_network_analysis`，成功生成网络分析输出文件。
+- 期间再次确认本机浏览器自动化仍受 `spawn EPERM` / 远程调试口不可用影响，无法稳定复现新的网页 tool card 截图；当前 guide 仍沿用已存在的历史截图资源。
+### 关键变更文件
+- 无新增代码文件；本次主要是运行验证与日志补充。
+### 测试状态
+- 成功：`network_communities.dbf`, `network_communities.prj`, `network_communities.shp`, `network_communities.shx`, `network_plot.pdf`, `network_stats.csv`
+
+## 2026-07-11 — 浏览器自动化故障建议
+### 完成内容
+- 根据另一个 chat 窗口反馈的 `browserType.launch: spawn EPERM` 与 CDP 端口不可连接问题，整理了排查与替代执行建议。
+- 明确该问题属于本地浏览器进程启动/权限/沙箱链路问题，不代表 CSIS 网站或后端 tool 执行失败。
+- 建议优先使用 Codex 的 Chrome/Computer Use 插件能力或人工预启动带 remote debugging 的 Chrome，再让自动化连接已有浏览器。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- 本次未重新运行网站 workflow；仅提供故障处置建议。
+
+## 2026-07-11 — Playwright 历史成功记录澄清
+### 完成内容
+- 回答用户关于“之前是否用 Playwright 成功测试过”的确认问题。
+- 查阅 `DEV_LOG.md` 与 `PROJECT_MEMORY.md`，确认历史上曾多次用 Playwright/headless Chrome 对 GCP 与 MSU 网页完成工具上传、执行等待、截图与报告归档。
+- 说明当前另一个 chat 的 `spawn EPERM` 属于该会话本地浏览器启动权限问题，不推翻历史 Playwright 方案可用性。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- 本次未重新运行 Playwright；仅核对历史日志并给出处置建议。
+
+## 2026-07-11 — EPERM 与历史 Playwright 成功测试关系说明
+### 完成内容
+- 确认历史成功的 Playwright 测试并未被 `spawn EPERM` 拦截；当时脚本可以正常 `chromium.launch(channel="chrome")`。
+- 核对当前项目脚本入口：`run_browser_test.py` 与 Run3 `_run3_msu_test.py` 都使用 Playwright 启动本机 Chrome。
+- 说明近期出现的 `spawn EPERM` 是当前/另一个会话的本地浏览器启动权限问题，不是历史测试当时遇到的问题。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- 未重新运行浏览器测试；仅做日志与脚本核对。
+
+## 2026-07-11 — 解释另一个窗口无法 Playwright 网页测试
+### 完成内容
+- 向用户解释：另一个 chat 的失败原因很可能是会话级工具/权限差异，而不是 CSIS 网站或 Playwright 方案本身失效。
+- 明确区分三种测试层级：后端直接调用 tool、Playwright 页面端到端测试、Chrome/Computer Use 接管真实浏览器测试。
+- 建议另一个窗口若目标是网页测试，不应把后端直接调用等同于网页点击测试；应请求浏览器启动权限或切换到已暴露的 Chrome/Computer Use 工具。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- 本次未运行新的 tool；仅提供故障分析与执行建议。
+
+## 2026-07-11 — 浏览器工具入口缺失原因说明
+### 完成内容
+- 解释另一个 chat 声称“没有 Chrome/Computer Use/浏览器控制入口”的原因：不同 chat 会话可见工具与插件权限可能不同。
+- 说明 `DevToolsActivePort` 未生成通常代表 Chrome 没有成功以远程调试模式启动，常见原因包括沙箱/权限拦截、默认 profile 复用、策略禁用 remote debugging 或 GUI 启动失败。
+- 给出转发给另一个窗口的最小排查清单：先确认工具是否暴露，再使用 Chrome/Computer Use；若无浏览器工具则只能声明网页端到端未完成。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- 本次未重新执行网页测试；仅做原因分析与操作建议。
+
+## 2026-07-11 — Playwright 复测 MSU Tool 1
+### 完成内容
+- 使用项目现有 Run3 Playwright runner 对 MSU 公网页面 `https://ai.telecoupling.msu.edu/` 执行 tool 1 网页端到端复测。
+- 命令为 `python _run3_msu_test.py --mode tools --only 01 --fresh`，本会话中 Playwright 成功启动/控制 Chrome，未出现 `spawn EPERM`。
+- 网页流程完成：打开 MSU 页面、上传 `01_network_analysis` 输入文件、发送 prompt、等待绿色工具结果卡、保存截图与报告。
+### 关键变更文件
+- `DEV_LOG.md`
+- `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/_results/results.json`
+- `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/_results/report.md`
+- `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/_results/screenshots/01_network_analysis.png`
+### 测试状态
+- PASS：`01_network_analysis`，耗时 19.5 秒；截图显示绿色 `Completed 100%`，结果文件包含 `network_communities.shp/.shx/.dbf/.prj`、`network_stats.csv`、`network_plot.pdf`。
+- 页面提示 `World_countries_2002.zip` 文件类型被跳过，但 shapefile 组件已上传且工具成功完成，因此不影响本次结果。
+
+## 2026-07-11 — 另一个会话浏览器权限排查建议
+### 完成内容
+- 为用户整理了排查另一个 chat 会话无法执行 Playwright/Chrome 网页端到端测试的步骤。
+- 建议按工具入口、沙箱审批、Playwright 启动、Chrome CDP、Codex 插件暴露状态五层逐项确认。
+- 明确当前本会话已证明同一项目 runner 可成功控制 Chrome 测试 MSU tool 1，因此另一个窗口的问题更可能是会话权限或工具暴露差异。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- 本次未新增测试；使用已完成的 MSU tool 1 Playwright PASS 结果作为对照依据。
+
+## 2026-07-11 — 剩余单工具用户指南流程审计与 03 样板完成
+### 完成内容
+- 阅读 `PROJECT_MEMORY.md` 与 `CSIS_单工具网页测试标准流程.md`，确认剩余单工具工作必须按 live MSU 网页端到端测试执行，不能以后端 direct run 替代。
+- 审计 `tools/` 下 `updateforuserguide/` 状态：01 已有 md/zip/截图但缺 `user guide.pdf`；02 完整；03 之后基本未创建对应用户指南包。
+- 使用 Playwright 在 MSU 公网页面复跑 `03_coastal_blue_carbon`，主 tool 绿色完成 PASS，并补发 `Render carbon-stock-at-2010.tif as an image.`，`render_spatial_file` 绿色完成 PASS。
+- 新增 `_run3_single_tool_followup.py`，用于“单工具主测试 + follow-up 渲染 + 截图 + sample data 复制 + manifest”这类剩余工具工作。
+- 为 `03_coastal_blue_carbon` 创建完整 `updateforuserguide/` 包：sample data、sample data.zip、user guide.md、user guide.pdf、screenshots、web_test_manifest.json、PDF QA render。
+- 新增 `CSIS_剩余单工具用户指南完成计划.md`，列出 01–44 当前完成状态和后续逐工具执行命令。
+- 更新 `PROJECT_MEMORY.md`，记录 03 作为剩余工具样板与 follow-up 脚本位置。
+### 关键变更文件
+- `PROJECT_MEMORY.md`
+- `DEV_LOG.md`
+- `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/_run3_single_tool_followup.py`
+- `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/CSIS_剩余单工具用户指南完成计划.md`
+- `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/tools/03_coastal_blue_carbon/updateforuserguide/`
+### 测试状态
+- PASS：`03_coastal_blue_carbon` 主网页测试，MSU 公网页面，绿色完成卡，结果为多个 `.tif` 输出。
+- PASS：`render_spatial_file` follow-up，成功渲染 `carbon-stock-at-2010.tif`，截图显示地图、色带图例和绿色完成卡。
+- PASS：`user guide.pdf` 生成并用 Poppler 渲染为 3 页 PNG，页面可读；Poppler 仅输出字体 warning，不影响渲染文件生成。
+
+## 2026-07-11 — 43 个单工具网页测试与用户指南包全部完成
+### 完成内容
+- 按 `CSIS_单工具网页测试标准流程.md` 完成 Run3 目录下全部 43 个 active single tools 的网页端到端测试证据整理与 `updateforuserguide/` 打包。
+- 新增并使用 `_run3_single_tool_followup.py`、`_generate_tool_guide_package.py`、`_complete_tool_range.py` 批量完成主工具网页复测、空间输出 follow-up 渲染、截图保存、sample data 打包、`user guide.md`、`user guide.pdf` 与 PDF QA render。
+- 补齐 `01_network_analysis` 缺失的 `user guide.pdf`，并规范早期 01/02/03 的 `web_test_manifest.json` 状态。
+- 处理特殊工具：`08_habitat_quality` 只上传 guide 指定的 10 个 current-scenario 文件后 PASS；`30_co2_emissions` 用直接工具式 prompt 跑通；`31_cost_benefit_analysis` 用二轮参数确认跑通；`34_commodity_trade` 用函数式 prompt + 明确渲染字段跑通；`40_add_media_flows` 用 `mentions` 作为 magnitude 字段完成渲染。
+- 新增 `CSIS_单工具用户指南完成总报告.md`，并更新 `CSIS_剩余单工具用户指南完成计划.md` 与 `PROJECT_MEMORY.md`，记录 43/43 已完成，避免后续重复跑。
+### 关键变更文件
+- `PROJECT_MEMORY.md`
+- `DEV_LOG.md`
+- `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/_run3_single_tool_followup.py`
+- `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/_generate_tool_guide_package.py`
+- `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/_complete_tool_range.py`
+- `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/CSIS_单工具用户指南完成总报告.md`
+- `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/CSIS_剩余单工具用户指南完成计划.md`
+- `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/tools/*/updateforuserguide/`
+### 测试状态
+- 最终审计：active tools 43；missing required package items 0；non-PASS manifests 0；spatial/render follow-up screenshots 34。
+- 所有工具均已有 `sample data/`、`sample data.zip`、`user guide.md`、`user guide.pdf`、`screenshots/tool_result_card.png`、`web_test_manifest.json`。
+- PDF QA render 已生成；Poppler 对部分 PDF 输出 `Symbol` / `ArialUnicode` 字体 warning，但页面 PNG 正常生成。
+
+## 2026-07-11 — 单工具网页测试标准流程文档
+### 完成内容
+- 根据本次 Run3 tool 1 的实际测试过程，整理了单工具网页端到端测试的标准说明。
+- 明确了网页测试与后端直跑的区别、上传样本数据、等待工具卡完成、以及“看到 100% 后继续等到绿色条真正稳定再截图”的规则。
+- 补充了推荐命令、通过标准、常见误区和后续证据归档建议，便于后续复测和写 user guide 时直接引用。
+### 关键变更文件
+- `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/CSIS_单工具网页测试标准流程.md`
+### 测试状态
+- 文档已生成；本次未新增运行测试，沿用此前已完成的 Run3 tool 1 PASS 结果作为依据。
+
+## 2026-07-11 — 单工具测试标准补充空间渲染规则
+### 完成内容
+- 在单工具网页测试标准流程中补充了空间输出规则：如果 tool 产出 `shp` / `tif`，需要使用平台渲染工具先出图，再把渲染图纳入测试留证和 user guide 参考。
+- 强调原始空间文件仍需保留为下载件，但“看结果”这一步应以渲染图为准，而不是仅看原始文件是否生成。
+### 关键变更文件
+- `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/CSIS_单工具网页测试标准流程.md`
+### 测试状态
+- 文档更新完成；未新增运行测试。
+
+## 2026-07-11 — updateforuserguide 打包上传规则补充
+### 完成内容
+- 在单工具网页测试标准流程中补充了 `sample data` 的压缩包上传规则。
+- 明确后续上传服务器时，建议将 `sample data/` 单独打包成 zip，并与 `user guide.pdf` 一起作为主要交付件。
+- 补充了 zip 命名、保留目录结构、剔除无关大文件等整理原则。
+### 关键变更文件
+- `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/CSIS_单工具网页测试标准流程.md`
+### 测试状态
+- 文档更新完成；未新增运行测试。
+
+## 2026-07-11 — tool 1 重新跑通并重建 updateforuserguide
+### 完成内容
+- 按照当前单工具网页测试标准，重新执行了 `01_network_analysis` 的 Run3 网页测试，并确认本次仍然 PASS。
+- 从零重建了 `tools/01_network_analysis/updateforuserguide/`，补齐 `sample data/`、`screenshots/`、`sample data.zip`、`user guide.md`、`user guide.pdf`。
+- 将真实运行得到的 tool card 截图和渲染后的网络图纳入 `screenshots/`，并把 `network_plot.pdf` 渲染成图片后作为视觉结果参考。
+### 关键变更文件
+- `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/tools/01_network_analysis/updateforuserguide/user guide.md`
+- `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/tools/01_network_analysis/updateforuserguide/user guide.pdf`
+- `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/tools/01_network_analysis/updateforuserguide/sample data.zip`
+- `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/tools/01_network_analysis/updateforuserguide/screenshots/tool_result_card.png`
+- `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/tools/01_network_analysis/updateforuserguide/screenshots/network_plot_render.png`
+### 测试状态
+- PASS：`python _run3_msu_test.py --mode tools --only 01 --fresh`，tool 1 成功完成并生成结果文件。
+
+## 2026-07-11 — tool 2 说明收紧到四个主段落
+### 完成内容
+- 按用户最新要求，将 `02_coastal_blue_carbon_preprocessor` 的 user guide 收紧为四个主段落：`What this tool does`、`What is included in sample data/`、`How to run the tool on the website`、`How to read the outputs`。
+- 保留了真实网页结果截图 `tool-card.png`，并把输出文件名更新为与最新 Run3 结果一致的版本。
+- 重新打包了标准命名的 `sample data.zip`，便于后续服务器上传。
+### 关键变更文件
+- `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/tools/02_coastal_blue_carbon_preprocessor/updateforuserguide/user guide.md`
+- `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/tools/02_coastal_blue_carbon_preprocessor/updateforuserguide/sample data.zip`
+### 测试状态
+- Run3 `02_coastal_blue_carbon_preprocessor` 已于本次会话中 PASS；本轮未生成 PDF，按用户要求停止在 Markdown 与压缩包整理阶段。
+
+## 2026-07-11 — 核对 08 habitat quality 样本包
+### 完成内容
+- 核对 `08_habitat_quality/updateforuserguide/sample data/` 与 `sample data.zip` 的最终文件清单，确认第一次失败时误上传的 future/baseline 文件没有进入最终样本包。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- 已核对：最终样本包仅包含 10 个 current-scenario 文件。
+
+## 2026-07-11 — 确认 08 habitat quality 样本可运行
+### 完成内容
+- 向用户确认：最终 `08_habitat_quality` 的 `sample data/` 全部文件即为可成功运行该工具所需的 current-scenario 输入集合。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- 结论基于此前网页复测 PASS 与最终样本包核对结果。
+
+## 2026-07-11 — 确认 30 co2 emissions 样本可运行
+### 完成内容
+- 核对 `30_co2_emissions/updateforuserguide/sample data/` 与 `web_test_manifest.json`，确认最终样本包只包含 `co2_data.csv`，网页测试状态为 PASS。
+- 确认运行时需要使用指南里的明确参数：`animal_count_field=animals`、`length_km_field=distance_km`、`capacity_per_trip=50`、`co2_per_km_per_trip=2.6`。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- 已核对：`30_co2_emissions` live webpage manifest 为 PASS，输出 `co2_emissions_results.csv` 与 `co2_emissions_summary.csv`。
+
+## 2026-07-11 — 解释 30 co2 emissions 测试现象
+### 完成内容
+- 向用户说明 `30_co2_emissions` 测试中的特殊情况：默认表述先触发 workflow plan 路径并一度卡住，改用更直接、参数明确的 CO2 prompt 后成功完成。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- 最终网页测试为 PASS，结果文件为 `co2_emissions_results.csv` 与 `co2_emissions_summary.csv`。
+
+## 2026-07-11 — 回答 30 co2 emissions 最终 prompt
+### 完成内容
+- 核对并告知用户 `30_co2_emissions` 用户指南中保存的最终成功 prompt。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- 已从 `user guide.md` 与 `web_test_manifest.json` 交叉确认。
+
+## 2026-07-11 — 解释 31 cost benefit analysis 测试现象
+### 完成内容
+- 核对 `31_cost_benefit_analysis` 的测试 manifest，确认首次 plan-card 路径在等待执行结果时超时，随后通过第二条明确参数确认消息触发成功运行。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- 最终网页测试为 PASS，输出 `cba_results.csv` 与 `cba_summary.csv`。
+
+## 2026-07-11 — 31 cost benefit analysis 改为单工具卡直跑
+### 完成内容
+- 按用户要求复测 `31_cost_benefit_analysis`，确认旧 prompt 会触发 workflow planner，不符合“一次执行 tool 且必须是 tool card”的标准。
+- 找到可直跑的 prompt：`Calculate net returns from the uploaded projects.csv and economic_data.csv. Join them by key_field=project_id. Use cost_field=cost_usd and revenue_field=revenue_usd. Return the CSV result files.`
+- 用真实 MSU 网页重测成功，manifest 显示 `status=PASS`、`via_plan=false`，页面直接生成 `run_cost_benefit_analysis` tool card。
+- 更新 `Testing_Guide.md`、正式 `updateforuserguide` 截图/manifest/user guide/PDF，并同步修正总报告与 `PROJECT_MEMORY.md` 的特殊情况记录。
+### 关键变更文件
+- `PROJECT_MEMORY.md`
+- `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/CSIS_单工具用户指南完成总报告.md`
+- `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/tools/31_cost_benefit_analysis/Testing_Guide.md`
+- `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/tools/31_cost_benefit_analysis/updateforuserguide/user guide.md`
+- `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/tools/31_cost_benefit_analysis/updateforuserguide/user guide.pdf`
+- `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/tools/31_cost_benefit_analysis/updateforuserguide/web_test_manifest.json`
+- `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/tools/31_cost_benefit_analysis/updateforuserguide/screenshots/tool_result_card.png`
+### 测试状态
+- PASS：真实 MSU 网页端到端复测通过，`via_plan=false`，输出 `cba_results.csv` 与 `cba_summary.csv`；PDF QA render 生成 2 页。
+
+## 2026-07-11 — 34 commodity trade 对齐单工具卡提示词
+### 完成内容
+- 核对 `34_commodity_trade` 正式 manifest，确认网页测试为 `PASS`、`via_plan=false`，直接生成 `run_commodity_trade` tool card，并通过 follow-up 渲染 `commodity_trade_flows.shp`。
+- 将 `Testing_Guide.md` 与 `updateforuserguide/user guide.md` 的运行提示词对齐为已验证的 function-style prompt，避免自然语言里的 `analysis` 触发 workflow planner。
+- 清理 `web_test_manifest.json` 的输出文件清单，仅保留真实结果文件，并重新生成 `user guide.pdf` 与 PDF QA render。
+### 关键变更文件
+- `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/tools/34_commodity_trade/Testing_Guide.md`
+- `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/tools/34_commodity_trade/updateforuserguide/user guide.md`
+- `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/tools/34_commodity_trade/updateforuserguide/user guide.pdf`
+- `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/tools/34_commodity_trade/updateforuserguide/web_test_manifest.json`
+### 测试状态
+- 已核对：`status=PASS`、`via_plan=false`、正式 screenshot/PDF 存在，PDF QA render 生成 2 页。
+
+## 2026-07-11 — 解释 via_plan=false 不是强制作弊
+### 完成内容
+- 向用户说明 `via_plan=false` 是网页测试脚本根据页面是否出现/点击 workflow plan card 推断出的运行路径标记，不是人为把结果强制改成 false。
+- 说明 function-style prompt 的作用是避免触发 planner，让网页真实直接生成单工具 card；这符合单工具测试标准，但不是底层强制调用后端。
+- 同时承认该标记依赖 DOM/正文证据，若需要更强证据，应进行 headed 复测或录屏留证。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- 本轮为解释性核对，未重新运行网页测试。
+
+## 2026-07-11 — 解释 40 add media flows 测试现象
+### 完成内容
+- 核对 `40_add_media_flows` 的正式 manifest、总报告与 user guide，确认主工具运行成功且 `via_plan=false`。
+- 向用户说明测试中的问题发生在渲染 follow-up：第一次泛化渲染请求没有指定用于线宽/颜色的数值字段，系统反问应使用哪个 magnitude field。
+- 最终通过明确指定 `mentions` 字段完成渲染：`Render media_flows.shp as an image using mentions as the magnitude field for line color and width.`
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- 已核对：主工具 PASS，渲染 follow-up PASS，输出 `media_flows.geojson`、`media_flows.shp`、`media_mention_frequency.csv`。
+
+## 2026-07-11 — 统一 43 个单工具 User Guide 格式
+### 完成内容
+- 按用户要求将所有 `updateforuserguide/user guide.md` 统一成真正面向下载用户的 user guide，而不是测试报告。
+- 移除了用户手册中的 `Test status`、`Main live webpage run`、`PASS`、`Recommended upload package` 等 QA/维护口吻内容。
+- 重写生成脚本 `_generate_tool_guide_package.py`，统一章节为工具用途、样本数据说明、网站运行步骤、输出解读、可选空间渲染，并为输入/输出文件增加简短说明文字。
+- 批量重生成 43 个工具的 `user guide.md`、`user guide.pdf`、`sample data.zip` 与 PDF QA render；补齐 tool 1 的 `updateforuserguide`、截图与 manifest。
+- 抽查 tool 1、tool 2、08、31、34、40，并用渲染页检查 PDF 布局；记录新的用户手册规则到 `PROJECT_MEMORY.md`。
+### 关键变更文件
+- `PROJECT_MEMORY.md`
+- `DEV_LOG.md`
+- `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/_generate_tool_guide_package.py`
+- `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/tools/*/updateforuserguide/user guide.md`
+- `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/tools/*/updateforuserguide/user guide.pdf`
+- `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/tools/01_network_analysis/updateforuserguide/web_test_manifest.json`
+### 测试状态
+- PASS：43/43 个工具均有 `user guide.md` 与 `user guide.pdf`；禁词审计 `bad_count=0`；43/43 个 PDF QA render 均生成页面 PNG。Poppler 仍输出 Symbol/ArialUnicode 字体警告，但抽查页面无明显裁切或重叠。
+
+## 2026-07-11 — 查看用户提供的 UserGuide 示例包
+### 完成内容
+- 查看 `telecouplingAI-project/UserGuide/01_network_analysis_User_Guide/` 示例包结构，确认包含 `sample data/`、`sample data.zip`、`user guide.md`、`user guide.pdf`、`web_test_manifest.json` 与 `screenshots/`。
+- 核对示例截图，发现除 tool result card 外，还包含 `network_communities_render.png` 与 `network_plot_render.png` 两类可用于用户手册展示的结果图。
+- 注意到示例 `user guide.md` 仍保留 `Recommended upload package` 与 `Test status` 等测试/维护口吻，需与用户先前要求区分：最终面向用户下载版应去掉这些内容，但可借鉴示例的独立 `UserGuide/<tool>_User_Guide/` 包结构和额外结果图组织方式。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- 本轮为示例文件核对，未重新运行网页测试。
+
+## 2026-07-11 — 整理 UserGuide 服务器上传包
+### 完成内容
+- 按用户要求重建 `telecouplingAI-project/UserGuide/`，将 43 个工具的最终用户手册上传包整理到该目录下，每个工具一个 `<NN_tool_name>_User_Guide/` 文件夹。
+- 每个工具文件夹仅保留必要上传文件：`sample data.zip`、`user guide.md`、`user guide.pdf`，以及 Markdown 中实际引用的 `screenshots/` 图片。
+- 清除了示例包中的原始 `sample data/`、`web_test_manifest.json`、`qa_render/`、测试报告/审计临时 manifest 等非上传必要文件。
+- 保留源测试目录中的 `updateforuserguide` 文件，避免丢失测试证据；`UserGuide/` 作为最终服务器上传 staging 目录。
+- 将最终 `UserGuide/` 上传包规则写入 `PROJECT_MEMORY.md`，避免后续把测试 manifest 或原始样本文件夹误上传。
+### 关键变更文件
+- `PROJECT_MEMORY.md`
+- `DEV_LOG.md`
+- `telecouplingAI-project/UserGuide/*_User_Guide/sample data.zip`
+- `telecouplingAI-project/UserGuide/*_User_Guide/user guide.md`
+- `telecouplingAI-project/UserGuide/*_User_Guide/user guide.pdf`
+- `telecouplingAI-project/UserGuide/*_User_Guide/screenshots/*`
+### 测试状态
+- PASS：`UserGuide/` 下 43 个工具文件夹、43 个 `sample data.zip`、43 个 `user guide.md`、43 个 `user guide.pdf`；无 raw `sample data/`、无 `qa_render/`、无 manifest；Markdown 图片引用缺失数为 0。
+
+## 2026-07-11 — 复测并生成两个 Workflow User Guide 上传包
+### 完成内容
+- 按用户要求先真实复测再写文档，使用 MSU 公网 `https://ai.telecoupling.msu.edu/` 重新运行两个 workflow，并保存 plan 与 completed run 截图。
+- Soybean workflow 重新测试完成：4 步 workflow，10 个绿色结果卡，用时约 94 秒，截图为 `wf_01_soybean_telecoupling_1plan.png` 与 `wf_01_soybean_telecoupling_2run.png`。
+- Tourism workflow 重新测试完成：5 步 workflow，8 个绿色结果卡，用时约 508 秒，截图为 `wf_02_tourism_telecoupling_1plan.png` 与 `wf_02_tourism_telecoupling_2run.png`。
+- 新增 `_generate_workflow_user_guides.py`，按 tool 上传包格式为两个 workflow 生成 `sample data.zip`、`user guide.md`、`user guide.pdf` 与必要截图。
+- 将最终 workflow 上传包放入 `telecouplingAI-project/UserGuide/`，仅保留上传必要文件，不包含 raw `sample data/`、manifest、测试报告或 QA render。
+- 更新 `PROJECT_MEMORY.md`，记录 workflow user guide 的 staging 位置与本轮真实复测结果。
+### 关键变更文件
+- `PROJECT_MEMORY.md`
+- `DEV_LOG.md`
+- `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/_generate_workflow_user_guides.py`
+- `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/_results/results.json`
+- `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/_results/report.md`
+- `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/_results/screenshots/wf_01_soybean_telecoupling_1plan.png`
+- `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/_results/screenshots/wf_01_soybean_telecoupling_2run.png`
+- `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/_results/screenshots/wf_02_tourism_telecoupling_1plan.png`
+- `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/_results/screenshots/wf_02_tourism_telecoupling_2run.png`
+- `telecouplingAI-project/UserGuide/Workflow_01_soybean_telecoupling_User_Guide/*`
+- `telecouplingAI-project/UserGuide/Workflow_02_tourism_telecoupling_User_Guide/*`
+### 测试状态
+- PASS：真实网页复测 2/2 workflow 成功；`UserGuide/` 终检为 45 个上传包、45 个 `sample data.zip`、45 个 `user guide.md`、45 个 `user guide.pdf`，无 raw `sample data/`、无 `qa_render/`、无 manifest，Markdown 图片引用缺失数为 0。
+
+## 2026-07-11 — 补充 Workflow User Guide 中间截图与说明
+### 完成内容
+- 按用户要求为两个 workflow guide 在 `Example plan card` 和 `Completed workflow run` 之间新增两类截图：点击 `Confirm & run` 后的确认状态，以及上传文件并发送 run prompt 后开始处理的状态。
+- 新增专项截图脚本 `_capture_workflow_guide_screenshots.py`，用 Playwright 在 MSU 公网页面补采 `wf_*_2confirm.png` 与 `wf_*_3started.png`，并保留原先真实 PASS 的 completed workflow 截图。
+- 更新 `_generate_workflow_user_guides.py`，让 Markdown/PDF 按 `plan_card.png`、`confirmed_steps.png`、`workflow_run_started.png`、`completed_workflow.png` 四个 checkpoint 展示，并补充用户操作说明文字。
+- 重新生成两个 workflow 的 `user guide.md` 与 `user guide.pdf`，抽查 PDF 渲染页面并修复截图标题分页问题。
+- 更新 `PROJECT_MEMORY.md`，记录 workflow user guide 的四截图 checkpoint 规则。
+### 关键变更文件
+- `PROJECT_MEMORY.md`
+- `DEV_LOG.md`
+- `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/_capture_workflow_guide_screenshots.py`
+- `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/_generate_workflow_user_guides.py`
+- `telecouplingAI-project/UserGuide/Workflow_01_soybean_telecoupling_User_Guide/user guide.md`
+- `telecouplingAI-project/UserGuide/Workflow_01_soybean_telecoupling_User_Guide/user guide.pdf`
+- `telecouplingAI-project/UserGuide/Workflow_01_soybean_telecoupling_User_Guide/screenshots/*`
+- `telecouplingAI-project/UserGuide/Workflow_02_tourism_telecoupling_User_Guide/user guide.md`
+- `telecouplingAI-project/UserGuide/Workflow_02_tourism_telecoupling_User_Guide/user guide.pdf`
+- `telecouplingAI-project/UserGuide/Workflow_02_tourism_telecoupling_User_Guide/screenshots/*`
+### 测试状态
+- PASS：两个 workflow guide 均重新生成 PDF；PDF 渲染检查 Soybean 7 页、Tourism 6 页，新增截图页可读且无明显裁切/重叠。
+- PASS：`UserGuide/` 最终审计为 45 个上传包、45 个 `sample data.zip`、45 个 `user guide.md`、45 个 `user guide.pdf`、84 张 PNG；无 raw `sample data/`、无 `qa_render/`、无 manifest，Markdown 图片链接缺失数为 0。
+- 注意：Poppler 仍输出 `Symbol`/`ArialUnicode` 字体替代 warning，与之前一致，不影响页面渲染输出。
+
+## 2026-07-12 — 讨论 User Guide 页面入口方案
+### 完成内容
+- 与用户讨论在 MSU 页面增加 User Guide / Sample Data 入口的实现思路：新增介绍页、提供 tool/workflow 的 sample data 与 PDF 下载链接、保持上传包和源码部署解耦。
+- 初步建议采用 URL-safe 的静态下载资产目录和前端 manifest/card 页面，避免将测试数据或反馈材料误推到 GitHub。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- 本轮为方案讨论，未修改网站代码，未运行网页测试或部署。
+
+## 2026-07-12 — MSU User Guide 入口只读架构审计
+### 完成内容
+- 按用户要求通过 `ssh csis-msu` 只读查看 MSU 服务器代码框架，未修改服务器文件、未重启容器、未部署。
+- 确认 MSU 项目根目录为 `~/csis-platform/telecouplingAI-project/`，包含 `frontend/`、`backend/`、`nginx/`、`Systematic_tests/`、`uploads/`、`outputs/` 等目录。
+- 确认 `frontend-ui` 为独立前端 nginx 容器，前端资源打包进 `csic_frontend:latest` 镜像；`tele-nginx` 将 `/` 代理到 `frontend-ui`，将 `/download/` 代理到 `file-server`。
+- 通过 `docker inspect tele-fileserver` 确认文件服务器将 `/home/jianan2/csis-data/outputs` 挂载为 `/usr/share/nginx/html/download`，因此可用 `/download/user-guides/...` 低风险发布 PDF/zip 资产。
+- 发现 MSU host source `frontend/src/App.jsx` 与运行中前端镜像存在差异：host source 仍显示 `Hi, CSIS`，运行镜像包含 `Hi, Users.`；记录为后续不要直接从 MSU host source rebuild 的风险点。
+- 更新 `PROJECT_MEMORY.md` 记录 User Guide 入口和下载资产的推荐路径。
+### 关键变更文件
+- `PROJECT_MEMORY.md`
+- `DEV_LOG.md`
+### 测试状态
+- PASS：SSH 连接正常；只读查看 compose、nginx、frontend、Docker inspect 和容器状态成功。
+- 未执行：未修改网站代码、未上传 UserGuide 资产、未重启/重建任何 MSU 容器、未做网页端功能测试。
+
+## 2026-07-12 — 同步 MSU 前端 host source
+### 完成内容
+- 解决 MSU 硬盘上的 `frontend/src/App.jsx` 仍为旧 `Hi, CSIS` 的源码漂移问题；本次只同步 host source，不 rebuild、不 restart、不改运行容器。
+- 核对本地最新 `frontend/src/App.jsx`，确认包含 `Hi, Users.` 与 workflow `onPlanConfirm` 逻辑，且本地文件无 git 修改。
+- 在 MSU 创建旧源码备份：`/home/jianan2/csis-platform/frontend-source-backup-20260712-before-sync.tar.gz`。
+- 将本地前端源码/配置小包上传至 MSU：`/home/jianan2/csis-platform/frontend-source-sync-20260712.tar.gz`，并解压覆盖 `~/csis-platform/telecouplingAI-project/frontend/` 的源码与配置文件。
+- 验证 MSU host source 中 `frontend/src/App.jsx` 的 SHA-256 与本地一致，且现在包含 `Hi, Users.`。
+### 关键变更文件
+- `PROJECT_MEMORY.md`
+- `DEV_LOG.md`
+- MSU：`~/csis-platform/telecouplingAI-project/frontend/src/App.jsx`
+- MSU：`~/csis-platform/telecouplingAI-project/frontend/src/`
+- MSU：`~/csis-platform/telecouplingAI-project/frontend/package.json`
+- MSU：`~/csis-platform/telecouplingAI-project/frontend/package-lock.json`
+- MSU：`~/csis-platform/telecouplingAI-project/frontend/Dockerfile`
+- MSU：`~/csis-platform/telecouplingAI-project/frontend/vite.config.js`
+- MSU：`~/csis-platform/telecouplingAI-project/frontend/tailwind.config.js`
+- MSU：`~/csis-platform/telecouplingAI-project/frontend/postcss.config.js`
+- MSU：`~/csis-platform/telecouplingAI-project/frontend/index.html`
+### 测试状态
+- PASS：MSU `frontend/src/App.jsx` SHA-256 = `e1707715932d65b3f1a0811ed9a0acefd832f3643c82663aeee76b07b3f5234a`，与本地一致。
+- PASS：MSU host source 已显示 `Hi, Users.`，并包含 `onPlanConfirm` 相关代码。
+- PASS：`docker compose ps frontend-ui nginx` 显示 `tele-frontend` 与 `tele-nginx` 仍保持运行；本次未重启、未重建、未部署新镜像。
+
+## 2026-07-12 — 缩小 system 渲染符号尺寸
+### 完成内容
+- 按用户要求将 system 渲染中的 Sending/Receiving 三角形和 Spillover 圆点缩小为原来的一半。
+- 将 `system_style()` 中 Sending/Receiving 的 QGIS marker size 从 `11` 调整为 `5.5`，Spillover 从 `9` 调整为 `4.5`。
+- 将无分类字段时的 systems fallback 三角形 size 从 `9` 调整为 `4.5`。
+- 增加纯分类测试断言，防止后续误把 system symbol size 改回过大。
+- 更新 `PROJECT_MEMORY.md` 记录新的 system 渲染尺寸。
+### 关键变更文件
+- `PROJECT_MEMORY.md`
+- `DEV_LOG.md`
+- `telecouplingAI-project/backend/renderers/telecoupling_classification.py`
+- `telecouplingAI-project/backend/renderers/telecoupling_style.py`
+- `telecouplingAI-project/backend/tests/test_telecoupling_classification.py`
+### 测试状态
+- PASS：`python -m pytest backend/tests/test_telecoupling_classification.py -q -p no:cacheprovider`，4 passed。
+- 未执行：未部署到 MSU/GCP，未重启容器，未重新跑网页渲染截图。
+
+## 2026-07-12 — flow 渲染线宽减半热更新
+### 完成内容
+- 按用户要求将 flow 渲染线条宽度改为原来的一半，并明确本次只热更新、不进行 Docker 镜像固化。
+- 修改 categorical country-relation flow 宽度 `2.8 -> 1.4`，graduated magnitude 宽度 `[0.6, 1.5, 2.8, 4.2] -> [0.3, 0.75, 1.4, 2.1]`，uniform fallback 宽度 `1.8 -> 0.9`。
+- 将更新后的 `telecoupling_style.py` 同步到 MSU 和 GCP host source，并用 `docker cp` 热替换两个服务器运行中的 `tele-celery-render` 容器，只重启 render worker。
+- 将“先热改测试，用户明确要求后才固化”的规则写入 `PROJECT_MEMORY.md`，避免后续重复误操作。
+### 关键变更文件
+- `PROJECT_MEMORY.md`
+- `DEV_LOG.md`
+- `telecouplingAI-project/backend/renderers/telecoupling_style.py`
+### 测试状态
+- PASS：`python -m pytest backend/tests/test_telecoupling_classification.py -q -p no:cacheprovider`，4 passed。
+- PASS：MSU `tele-celery-render` 内 `/app/renderers/telecoupling_style.py` SHA-256 = `b16b79910b413f820faf289e8ed448fc630e5d66d3186cdae3bd29d67f9a671e`，worker ready。
+- PASS：GCP `tele-celery-render` 内 `/app/renderers/telecoupling_style.py` SHA-256 = `b16b79910b413f820faf289e8ed448fc630e5d66d3186cdae3bd29d67f9a671e`，worker ready。
+- 未执行：没有 build、没有 `docker commit`、没有 retag `latest`、没有 force-recreate。
+
+## 2026-07-12 — scene legend 字号对齐热更新
+### 完成内容
+- 按用户要求将 `render_telecoupling_scene` 的 legend 字号调整为与 `render_spatial_file` 一致。
+- 将 scene legend 从固定 `44/38` 改为与 spatial renderer 相同的 2x 规则：graduated 数值 `28px`，legend 标题和分类项 `24px`。
+- 将 scene legend 字体加载逻辑对齐为优先使用 DejaVuSans-Bold，缺失时回退到普通 DejaVuSans 或 PIL 默认字体。
+- 将更新后的 `_qgis_scene_render_worker.py` 同步到 MSU 和 GCP host source，并用 `docker cp` 热替换两个服务器运行中的 `tele-celery-render` 容器，只重启 render worker。
+### 关键变更文件
+- `PROJECT_MEMORY.md`
+- `DEV_LOG.md`
+- `telecouplingAI-project/backend/renderers/_qgis_scene_render_worker.py`
+### 测试状态
+- PASS：AST/compile 语法检查通过（不写入 pyc）。
+- PASS：`python -m pytest backend/tests/test_telecoupling_classification.py -q -p no:cacheprovider`，4 passed。
+- PASS：MSU `tele-celery-render` 内 `/app/renderers/_qgis_scene_render_worker.py` SHA-256 = `d8feb9be686da133ef5d251feb06a1179c82bc97e7b64499252ffe734a1087c5`，worker ready。
+- PASS：GCP `tele-celery-render` 内 `/app/renderers/_qgis_scene_render_worker.py` SHA-256 = `d8feb9be686da133ef5d251feb06a1179c82bc97e7b64499252ffe734a1087c5`，worker ready。
+- 未执行：没有 build、没有 `docker commit`、没有 retag `latest`、没有 force-recreate。
+
+## 2026-07-12 — visible thought-process language rule
+### Completed
+- Added a project-level communication rule requiring visible AI thinking/progress/status text to stay English-only.
+- Clarified that final user-facing replies may remain Chinese by default unless the user requests otherwise.
+### Key files
+- `PROJECT_MEMORY.md`
+- `DEV_LOG.md`
+### Test status
+- Not applicable: documentation/memory update only.
+
+## 2026-07-12 — CSIS website Thought process English-only guard
+### 完成内容
+- 澄清需求：Codex 对话/UI 继续使用中文；需要避免中文的是 CSIS 网站用户可见的 `Thought process` / thinking-process 面板。
+- 在 `backend/agent.py` 增加 SSE `thinking` 事件过滤：如果模型 thought chunk 含 CJK 字符，则不直接发送该中文内容；必要时只发送一次英文 fallback：`Processing the request and preparing the next step.`。
+- 在 `frontend/src/App.jsx` 增加前端兜底过滤：接收和渲染 thinking block 前再次过滤 CJK 文本，防止任何直接 SSE 泄漏进入 UI。
+- 更新运行时 system instruction，明确网站 `Thought process` 的可见 thought summaries 必须始终 English-only。
+- 热更新 MSU 和 GCP：同步 host source；热替换 `tele-backend:/app/agent.py` 并只重启 `tele-backend`；复制本地 Vite `dist` 到 `tele-frontend:/usr/share/nginx/html/`，未重启或重建前端镜像。
+### 关键变更文件
+- `PROJECT_MEMORY.md`
+- `DEV_LOG.md`
+- `telecouplingAI-project/backend/agent.py`
+- `telecouplingAI-project/frontend/src/App.jsx`
+### 测试状态
+- PASS：`agent.py` AST/compile 语法检查通过（不写入 pyc）。
+- PASS：`npm run build` 通过；首次 sandbox 内因 esbuild `spawn EPERM` 失败，提权重跑后成功。
+- PASS：MSU/GCP `tele-backend:/app/agent.py` SHA-256 = `1912162ec8b1ac6205daf0d0f6db53b3ebf3af41151553a36981e67200b8063c`。
+- PASS：MSU/GCP `tele-frontend:/usr/share/nginx/html/index.html` SHA-256 = `70ed439da7b5ffa0bd9645afc4fcca6cb08451f7a0651e1df14bb741643e2215`，active JS bundle contains the CJK guard regex.
+- PASS：MSU/GCP `/health` 返回 `{"status":"ok"}`，后端重启日志正常。
+- 未执行：没有 Docker build、没有 `docker commit`、没有 retag `latest`、没有 force-recreate。
+
+## 2026-07-12 — 本地 User Guides / Learning Center 原型
+### 完成内容
+- 按用户要求先在本地演示，不推 MSU/GCP、不固化镜像、不上传资源。
+- 在前端增加 `CSIS Learning Center` 本地原型：顶部 `User Guides` 入口和首页欢迎区入口均可打开独立指南页面。
+- 新增搜索、`All / InVEST Model / Telecoupling Tool / Workflow` 过滤，以及 43 个单工具指南和 2 个 workflow 指南卡片。
+- 新增 `frontend/src/userGuides.js` 作为指南 manifest，链接按未来服务器下载路径生成：`/download/user-guides/<folder>/user%20guide.pdf` 和 `/download/user-guides/<folder>/sample%20data.zip`。
+- 启动本地 Vite dev server 用于演示：`http://127.0.0.1:5173/`。
+### 关键变更文件
+- `PROJECT_MEMORY.md`
+- `DEV_LOG.md`
+- `telecouplingAI-project/frontend/src/App.jsx`
+- `telecouplingAI-project/frontend/src/userGuides.js`
+### 测试状态
+- PASS：`npm run build` 通过，Vite 成功构建生产产物。
+- PASS：本地 dev server 已启动，`http://127.0.0.1:5173/` 返回 HTTP 200。
+- 未执行：没有部署到 MSU/GCP，没有 Docker build，没有 `docker commit`，没有 retag `latest`，没有 force-recreate。
+
+## 2026-07-12 — 修正 Learning Center 标题与本地下载
+### 完成内容
+- 修正指南标题生成规则，避免把普通短词全部大写；`ADD Media Flows` 已改为 `Add Media Flows`，`Add Agents` 等同类标题也保持正常大小写。
+- 修复本地演示下载不可用问题：Vite 原本把 `/download` 代理到 `127.0.0.1:8000`，导致 `/download/user-guides/...` 被代理到未启动的后端。
+- 在 `frontend/vite.config.js` 增加 dev-only middleware，让 `/download/user-guides/...` 直接从本地 `UserGuide/` 目录读取 PDF/zip。
+- 移除临时创建的 `frontend/public/download/user-guides` junction，并清理 `dist/download`，避免把约 126MB 的 user guide 资源复制进前端构建产物。
+### 关键变更文件
+- `PROJECT_MEMORY.md`
+- `DEV_LOG.md`
+- `telecouplingAI-project/frontend/src/userGuides.js`
+- `telecouplingAI-project/frontend/vite.config.js`
+### 测试状态
+- PASS：`Add Media Flows` 标题通过 Node 读取 manifest 验证正确。
+- PASS：本地 `http://127.0.0.1:5173/download/user-guides/40_add_media_flows_User_Guide/user%20guide.pdf` 返回 HTTP 200，Content-Length `706874`。
+- PASS：本地 `http://127.0.0.1:5173/download/user-guides/40_add_media_flows_User_Guide/sample%20data.zip` 返回 HTTP 200，Content-Length `878`。
+- PASS：`npm run build` 通过，且 `dist/download` 未生成，未夹带大体积指南资源。
+- 未执行：没有部署到 MSU/GCP，没有 Docker build，没有 `docker commit`，没有 retag `latest`，没有 force-recreate。
+
+## 2026-07-12 — Learning Center 每项专属说明
+### 完成内容
+- 为 Learning Center 中 43 个单工具和 2 个 workflow 增加逐项一句话说明，替代通用的 `A hands-on guide...` 模板文字。
+- `Add Media Flows` 等卡片继续使用正常标题大小写，同时说明文字更贴合具体工具用途。
+- 更新 fallback 文案，避免未来新增指南时再次出现原来的通用模板句。
+### 关键变更文件
+- `PROJECT_MEMORY.md`
+- `DEV_LOG.md`
+- `telecouplingAI-project/frontend/src/userGuides.js`
+### 测试状态
+- PASS：Node 读取 `USER_GUIDES` 验证共有 45 项，且 `hands-on guide` 通用描述出现次数为 0。
+- PASS：`npm run build` 通过。
+- PASS：本地 dev server `http://127.0.0.1:5173/` 返回 HTTP 200，`Add Media Flows` sample data 下载链接仍返回 HTTP 200。
+- PASS：确认 `dist/download` 未生成，未夹带大体积指南资源。
+- 未执行：没有部署到 MSU/GCP，没有 Docker build，没有 `docker commit`，没有 retag `latest`，没有 force-recreate。
+
+## 2026-07-12 — UserGuide sample data zip 重命名
+### 完成内容
+- 按用户要求将 `telecouplingAI-project/UserGuide/` 下 45 个子文件夹中的 `sample data.zip` 批量重命名为带工具/Workflow 名称的文件名。
+- 示例：`40_add_media_flows_User_Guide/sample data.zip` 改为 `40_add_media_flows_User_Guide/Add Media Flows sample data.zip`。
+- 更新 `frontend/src/userGuides.js`，新增 `sampleDataFilename`，Learning Center 的 sample data 下载链接现在指向新文件名。
+- 同步修正项目记忆，记录 sample zip 命名规则。
+### 关键变更文件
+- `PROJECT_MEMORY.md`
+- `DEV_LOG.md`
+- `telecouplingAI-project/UserGuide/*/* sample data.zip`
+- `telecouplingAI-project/frontend/src/userGuides.js`
+### 测试状态
+- PASS：45 个旧 `sample data.zip` 全部重命名，旧文件剩余数量为 0。
+- PASS：manifest 指向的 45 个新 sample zip 文件全部存在，缺失数量为 0。
+- PASS：本地下载链接抽样验证返回 HTTP 200：`Add Media Flows sample data.zip`、`Network Analysis sample data.zip`、`Soybean Telecoupling Workflow sample data.zip`。
+- PASS：`npm run build` 通过。
+- PASS：确认 `dist/download` 未生成，未夹带大体积指南资源。
+- 未执行：没有部署到 MSU/GCP，没有 Docker build，没有 `docker commit`，没有 retag `latest`，没有 force-recreate。
+
+## 2026-07-12 — User Guides Learning Center 热部署到 MSU/GCP
+### 完成内容
+- 将本地 `telecouplingAI-project/UserGuide/` 指南资源打包并上传到两台服务器，资源保存在 Docker 镜像外的 host 数据目录。
+- MSU 资源目录：`/home/jianan2/csis-data/outputs/user-guides/`；GCP 资源目录：`/data/outputs/user-guides/`。
+- 替换前先将服务器已有 `user-guides` 目录移动到 `~/csis-platform/backups/20260712_user_guides_publish/` 下备份，没有删除旧备份。
+- 同步前端源码到两台服务器 host source：`frontend/src/App.jsx`、`frontend/src/userGuides.js`、`frontend/vite.config.js`。
+- 本地构建前端并将 `dist` 热复制到两台服务器运行中的 `tele-frontend:/usr/share/nginx/html/`，未重建镜像。
+### 关键变更文件/目录
+- `PROJECT_MEMORY.md`
+- `DEV_LOG.md`
+- `telecouplingAI-project/UserGuide/`
+- `telecouplingAI-project/frontend/src/App.jsx`
+- `telecouplingAI-project/frontend/src/userGuides.js`
+- `telecouplingAI-project/frontend/vite.config.js`
+- MSU：`/home/jianan2/csis-data/outputs/user-guides/`
+- GCP：`/data/outputs/user-guides/`
+### 测试状态
+- PASS：本地 `npm run build` 通过，生成 `index-eMc05GKF.js` 和 `index-CF4IKKvX.css`。
+- PASS：MSU/GCP 上传包字节数与本地一致：`user-guides-20260712.tar.gz` = `129064938`，`frontend-dist-20260712.tar.gz` = `107146`。
+- PASS：MSU/GCP 服务器端 `/download/user-guides/40_add_media_flows_User_Guide/user%20guide.pdf` 返回 HTTP 200，Content-Length `706874`。
+- PASS：MSU/GCP 服务器端 `/download/user-guides/40_add_media_flows_User_Guide/Add%20Media%20Flows%20sample%20data.zip` 返回 HTTP 200，Content-Length `878`。
+- PASS：MSU/GCP 公网首页均引用新 bundle `index-eMc05GKF.js`。
+- PASS：MSU/GCP `user-guides` 目录均有 135 个文件，旧 `sample data.zip` 文件名数量为 0。
+- PASS：MSU/GCP `frontend-ui`、`nginx`、`file-server` 容器均保持 Up。
+- 未执行：没有 Docker build、没有 `docker commit`、没有 retag `latest`、没有 force-recreate；本次为热部署，尚未固化镜像。
+
+
+## 2026-07-12 ? Documentation ??? workflow PDF ????
+### ????
+- ?????/???????? `User Guides` / `Guide PDF` ????? `Documentation`??? Learning Center ??????
+- ???? workflow ? PDF ??????????? `user guide.pdf`?????????`Soybean_Telecoupling_AI_Driven_User_Guide.pdf` ? `Tourism_Telecoupling_User_Guide.pdf`?
+- ????????????? source ? dist ? MSU/GCP ? host source ????? `tele-frontend` ?????????????? Docker ???
+### ??????
+- `PROJECT_MEMORY.md`
+- `DEV_LOG.md`
+- `telecouplingAI-project/frontend/src/App.jsx`
+- `telecouplingAI-project/frontend/src/userGuides.js`
+- MSU?`~/csis-platform/telecouplingAI-project/frontend/src/` ? `tele-frontend:/usr/share/nginx/html/`
+- GCP?`~/csis-platform/telecouplingAI-project/frontend/src/` ? `tele-frontend:/usr/share/nginx/html/`
+### ????
+- PASS??? `npm run build` ????? `index-Dd8CHY4p.js`?
+- PASS?MSU `https://ai.telecoupling.msu.edu/` ????? bundle?? bundle ?? `Documentation`?`Soybean_Telecoupling_AI_Driven_User_Guide.pdf`?`Tourism_Telecoupling_User_Guide.pdf`?
+- PASS?GCP `http://34.42.83.50/` ????? bundle?? bundle ?? `Documentation`?`Soybean_Telecoupling_AI_Driven_User_Guide.pdf`?`Tourism_Telecoupling_User_Guide.pdf`?
+- PASS?MSU/GCP ?? workflow PDF URL ??? HTTP 200?Soybean PDF Content-Length `3049545`?Tourism PDF Content-Length `1623015`?
+- ?????? Docker build??? `docker commit`??? retag `latest`??? force-recreate?????????
+
+
+## 2026-07-12 ? MSU Documentation ??????
+### ????
+- ?? MSU ???? `https://ai.telecoupling.msu.edu/` ?????? HTML?????? `index-Dd8CHY4p.js`?
+- ????? bundle ??????? `Documentation`?`CSIS Learning Center`?`Soybean_Telecoupling_AI_Driven_User_Guide.pdf`?`Tourism_Telecoupling_User_Guide.pdf`?
+- ???????????? URL `https://ai.telecoupling.msu.edu/?codexnocache=20260712` ???????????????????????????????????
+### ??????
+- `DEV_LOG.md`
+### ????
+- PASS?MSU ?? HTML ?? `index-Dd8CHY4p.js`?
+- PASS?MSU ? JS bundle ?? Documentation ????? workflow ??? PDF ????
+- ????????????? Docker build???????????????
+
+
+## 2026-07-12 ? MSU/GCP ????? GitHub ????
+### ????
+- ?????????????? MSU/GCP??????????????????? retag `csic_frontend:latest`?UserGuide PDF/zip ????????? host `/download/user-guides/` ????????? Docker ???
+- ????? MSU ?? `docker commit` ?????? backend ? pause ? commit ?????? unpause??????????? MSU backend health ??? healthy??????? Docker build?`FROM csic_backend:latest` + `COPY` ?????? + `--pull=false`???????
+- MSU ?????`csic_frontend:solidified_docs_20260712_081939` -> `csic_frontend:latest`?`csic_backend:solidified_thinking_render_20260712_083322` -> `csic_backend:latest`?
+- GCP ?????`csic_frontend:solidified_docs_20260712_121905` -> `csic_frontend:latest`?`csic_backend:solidified_thinking_render_20260712_123245` -> `csic_backend:latest`?
+### ??????
+- `PROJECT_MEMORY.md`
+- `DEV_LOG.md`
+- `telecouplingAI-project/backend/agent.py`
+- `telecouplingAI-project/backend/renderers/telecoupling_style.py`
+- `telecouplingAI-project/backend/renderers/telecoupling_classification.py`
+- `telecouplingAI-project/backend/renderers/_qgis_scene_render_worker.py`
+- `telecouplingAI-project/backend/shared/file_reference_resolver.py`
+- `telecouplingAI-project/frontend/src/App.jsx`
+- `telecouplingAI-project/frontend/src/userGuides.js`
+- `telecouplingAI-project/frontend/vite.config.js`
+### ????
+- PASS?MSU `csic_frontend:latest` ???? `index-Dd8CHY4p.js`?`Documentation` ????? workflow PDF ???
+- PASS?GCP `csic_frontend:latest` ???? `index-Dd8CHY4p.js`?`Documentation` ????? workflow PDF ???
+- PASS?MSU/GCP `csic_backend:latest` ???? thinking English guard?Non-adjacent flow classification?flow line width/style changes?
+- PASS?MSU/GCP ?? `/health` ?? `{"status":"ok"}`?`tele-backend` health ? `healthy`?
+- PASS??? MSU `https://ai.telecoupling.msu.edu/health`????? JS??? workflow PDF ??? HTTP 200?
+- PASS??? GCP `http://34.42.83.50/health`????? JS??? workflow PDF ??? HTTP 200?
+- ???backend ???????? Docker build???????????????????????????????

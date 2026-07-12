@@ -182,7 +182,7 @@ def _flow_relations(src):
 
     countries = _world_countries_layer()
     if countries is None:
-        return ["Unknown"] * len(source_features)
+        return ["Non-adjacent countries"] * len(source_features)
     country_features = {feature.id(): feature for feature in countries.getFeatures()}
     country_index = QgsSpatialIndex()
     for country_feature in country_features.values():
@@ -194,7 +194,7 @@ def _flow_relations(src):
         geometry = feature.geometry()
         points = geometry.asMultiPolyline()[0] if geometry.isMultipart() else geometry.asPolyline()
         if len(points) < 2:
-            relations.append("Unknown")
+            relations.append("Non-adjacent countries")
             continue
         origin = transform.transform(QgsPointXY(points[0]))
         destination = transform.transform(QgsPointXY(points[-1]))
@@ -261,7 +261,7 @@ def style_flows(layer, magnitude_field=None):
         for feature in layer.getFeatures()
         if feature["tc_relation"] not in (None, "")
     }
-    if relation_values - {"Unknown"}:
+    if relation_values:
         categories, entries = [], []
         for label, rgb in FLOW_RELATION_STYLES.items():
             if label not in relation_values:
@@ -269,7 +269,7 @@ def style_flows(layer, magnitude_field=None):
             red, green, blue = rgb
             color = QColor(red, green, blue)
             categories.append(
-                QgsRendererCategory(label, flow_symbol(color, 2.8, color), label)
+                QgsRendererCategory(label, flow_symbol(color, 1.4, color), label)
             )
             entries.append((label, red, green, blue, "line"))
         layer.setRenderer(QgsCategorizedSymbolRenderer("tc_relation", categories))
@@ -289,7 +289,7 @@ def style_flows(layer, magnitude_field=None):
             vmax = (vmin or 0) + 1e-9
         n = 4
         step = (vmax - vmin) / n
-        widths = [0.6, 1.5, 2.8, 4.2]
+        widths = [0.3, 0.75, 1.4, 2.1]
         ranges = []
         for i in range(n):
             lo, hi = vmin + i * step, vmin + (i + 1) * step
@@ -300,7 +300,7 @@ def style_flows(layer, magnitude_field=None):
         legend = {"kind": "graduated", "field": mag, "min": vmin, "max": vmax, "ramp": fr}
     else:
         c = QColor(200, 30, 120)
-        layer.setRenderer(QgsSingleSymbolRenderer(flow_symbol(c, 1.8, c)))
+        layer.setRenderer(QgsSingleSymbolRenderer(flow_symbol(c, 0.9, c)))
         # uniform (no magnitude field) -> one-entry legend so the flow line is
         # explained, instead of no legend at all
         legend = {"kind": "categorical", "field": "Flows",
@@ -325,7 +325,7 @@ def style_systems(layer, category_field=None):
     if not cf:
         ms = QgsMarkerSymbol.createSimple({
             "name": "triangle", "color": "#3fae3f",
-            "size": "9", "outline_color": "black", "outline_width": "0.5"})
+            "size": "4.5", "outline_color": "black", "outline_width": "0.5"})
         layer.setRenderer(QgsSingleSymbolRenderer(ms))
         return layer, None
     vals = sorted({f[cf] for f in layer.getFeatures() if f[cf] is not None}, key=str)

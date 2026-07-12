@@ -3,10 +3,12 @@ import ReactMarkdown from 'react-markdown';
 import {
   MessageSquare, Plus, Send, Paperclip, Settings,
   Trash2, X, Edit2, Menu, Sparkles, Download, Upload,
-  Folder, Archive, Brain, ChevronDown,
+  Folder, Archive, Brain, ChevronDown, BookOpen, Search,
+  FileText, ArrowLeft, Database,
 } from 'lucide-react';
 import { streamChat } from './lib/streaming';
 import { getOrCreateSessionId, resetSessionId } from './lib/session';
+import { USER_GUIDES } from './userGuides';
 import ToolStatusCard from './components/ToolStatusCard';
 import CsvRenderer from './components/CsvRenderer';
 import ChartRenderer from './components/ChartRenderer';
@@ -35,6 +37,18 @@ const SUGGESTED_PROMPTS = [
   { label: "Model crop yield from fertilizer rates (NPK)",          hint: "Crop Regression" },
 ];
 
+const CJK_TEXT_RE = /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\u3040-\u30ff\uac00-\ud7af]/;
+
+function sanitizeVisibleThinkingText(text) {
+  if (!text) return '';
+  if (!CJK_TEXT_RE.test(text)) return text;
+  const safeText = text
+    .split(/\r?\n/)
+    .filter(line => line.trim() && !CJK_TEXT_RE.test(line))
+    .join('\n');
+  return CJK_TEXT_RE.test(safeText) ? '' : safeText;
+}
+
 // ---------------------------------------------------------------------------
 // Message renderer — handles all SSE event types
 // ---------------------------------------------------------------------------
@@ -45,7 +59,7 @@ function ThinkingBlock({ content, done }) {
   const [open, setOpen] = useState(false);
   // Tidy the reasoning: drop fenced/inline code (no raw python), collapse blank
   // runs, trim — so it reads as clean prose rather than a code dump.
-  const clean = (content || '')
+  const clean = sanitizeVisibleThinkingText(content || '')
     .replace(/```[\s\S]*?```/g, '')
     .replace(/`([^`]+)`/g, '$1')
     .replace(/\n{3,}/g, '\n\n')
@@ -208,6 +222,139 @@ function messageToMarkdown(m) {
   return (m.blocks || []).map(blockToMarkdown).filter(Boolean).join('\n\n');
 }
 
+function LearningCenter({ onBack }) {
+  const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState('All');
+  const filters = ['All', 'InVEST Model', 'Telecoupling Tool', 'Workflow'];
+  const visibleGuides = USER_GUIDES.filter(guide => {
+    const matchesFilter = filter === 'All' || guide.type === filter;
+    const haystack = `${guide.title} ${guide.type} ${guide.description}`.toLowerCase();
+    return matchesFilter && haystack.includes(query.trim().toLowerCase());
+  });
+  const counts = USER_GUIDES.reduce((acc, guide) => {
+    acc[guide.type] = (acc[guide.type] || 0) + 1;
+    return acc;
+  }, {});
+
+  return (
+    <div className="max-w-6xl mx-auto pb-16">
+      <button
+        onClick={onBack}
+        className="inline-flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-gray-800 mb-6"
+      >
+        <ArrowLeft size={16} /> Back to chat
+      </button>
+
+      <div className="rounded-[2rem] border border-blue-100 bg-gradient-to-br from-blue-50 via-white to-indigo-50 px-8 py-8 shadow-sm mb-6">
+        <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full bg-white/80 border border-blue-100 px-3 py-1 text-xs font-semibold text-blue-600 mb-4">
+              <BookOpen size={14} /> CSIS Learning Center
+            </div>
+            <h1 className="text-4xl md:text-5xl font-semibold tracking-tight text-gray-900 mb-3">
+              Documentation and sample data
+            </h1>
+            <p className="text-gray-600 max-w-2xl leading-relaxed">
+              Download documentation and its matching sample data, then follow the steps directly in the CSIS chat.
+              The cards below cover single tools and the two end-to-end workflow tutorials.
+            </p>
+          </div>
+          <div className="grid grid-cols-3 gap-3 min-w-[320px]">
+            <div className="rounded-2xl bg-white border border-gray-100 p-4 shadow-sm">
+              <p className="text-2xl font-semibold text-gray-900">{counts['InVEST Model'] || 0}</p>
+              <p className="text-xs text-gray-500">InVEST docs</p>
+            </div>
+            <div className="rounded-2xl bg-white border border-gray-100 p-4 shadow-sm">
+              <p className="text-2xl font-semibold text-gray-900">{counts['Telecoupling Tool'] || 0}</p>
+              <p className="text-xs text-gray-500">Toolbox docs</p>
+            </div>
+            <div className="rounded-2xl bg-white border border-gray-100 p-4 shadow-sm">
+              <p className="text-2xl font-semibold text-gray-900">{counts.Workflow || 0}</p>
+              <p className="text-xs text-gray-500">Workflows</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="sticky top-0 z-10 bg-white/90 backdrop-blur border border-gray-100 rounded-2xl p-3 shadow-sm mb-5">
+        <div className="flex flex-col md:flex-row gap-3">
+          <div className="relative flex-1">
+            <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder="Search a tool, model, or workflow..."
+              className="w-full rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-4 py-2.5 text-sm outline-none focus:border-blue-400 focus:bg-white"
+            />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {filters.map(item => (
+              <button
+                key={item}
+                onClick={() => setFilter(item)}
+                className={`rounded-xl px-3 py-2 text-sm font-medium transition-colors ${
+                  filter === item
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                {item}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        {visibleGuides.map(guide => (
+          <div key={guide.id} className="group rounded-3xl border border-gray-100 bg-white p-5 shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <div>
+                <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                  guide.type === 'Workflow'
+                    ? 'bg-purple-50 text-purple-700'
+                    : guide.type === 'Telecoupling Tool'
+                      ? 'bg-teal-50 text-teal-700'
+                      : 'bg-blue-50 text-blue-700'
+                }`}>
+                  {guide.type === 'Workflow' ? <Sparkles size={12} /> : <BookOpen size={12} />}
+                  {guide.type}
+                </span>
+                <h3 className="mt-3 text-lg font-semibold text-gray-900 leading-snug">{guide.title}</h3>
+              </div>
+              <span className="text-xs text-gray-300 font-mono">{guide.folder.split('_')[0]}</span>
+            </div>
+            <p className="text-sm text-gray-500 leading-relaxed min-h-[3.25rem]">{guide.description}</p>
+            <div className="mt-5 flex flex-col sm:flex-row gap-2">
+              <a
+                href={guide.guideUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-gray-800"
+              >
+                <FileText size={15} /> Documentation
+              </a>
+              <a
+                href={guide.sampleDataUrl}
+                download
+                className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100"
+              >
+                <Database size={15} /> Sample data
+              </a>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {visibleGuides.length === 0 && (
+        <div className="rounded-3xl border border-dashed border-gray-200 bg-gray-50 p-10 text-center text-gray-500">
+          No documentation matches your search yet.
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Main App
 // ---------------------------------------------------------------------------
@@ -245,6 +392,7 @@ function App() {
   const [uploadProgress, setUploadProgress] = useState(null);  // {loaded, total, percent} | null
   const [editingId, setEditingId] = useState(null);
   const [tempTitle, setTempTitle] = useState('');
+  const [activeView, setActiveView] = useState('chat');
 
   const [isDragging, setIsDragging] = useState(false);
 
@@ -301,13 +449,15 @@ function App() {
 
   // Accumulate streamed thinking text into the trailing thinking block.
   const appendThinkingBlock = (chatId, text) => {
+    const safeText = sanitizeVisibleThinkingText(text);
+    if (!safeText) return;
     updateLastAssistantBlock(chatId, last => {
       const blocks = [...(last.blocks || [])];
       const lastBlock = blocks[blocks.length - 1];
       if (lastBlock && lastBlock.type === 'thinking' && !lastBlock.done) {
-        blocks[blocks.length - 1] = { ...lastBlock, content: lastBlock.content + text };
+        blocks[blocks.length - 1] = { ...lastBlock, content: lastBlock.content + safeText };
       } else {
-        blocks.push({ type: 'thinking', content: text, done: false });
+        blocks.push({ type: 'thinking', content: safeText, done: false });
       }
       return { ...last, blocks };
     });
@@ -505,6 +655,7 @@ function App() {
     const newId = Date.now().toString();
     setChats([{ id: newId, title: 'New Chat', messages: [] }, ...chats]);
     setActiveId(newId);
+    setActiveView('chat');
     setIsLoading(false);
   };
 
@@ -588,7 +739,7 @@ function App() {
         <div className="flex-1 overflow-y-auto px-3">
           <p className="text-xs font-semibold text-gray-500 px-4 py-3">Recent</p>
           {chats.map(chat => (
-            <div key={chat.id} onClick={() => { setActiveId(chat.id); setIsLoading(false); }}
+            <div key={chat.id} onClick={() => { setActiveId(chat.id); setActiveView('chat'); setIsLoading(false); }}
               className={`group flex items-center justify-between px-4 py-2 rounded-full cursor-pointer mb-1 transition-all ${activeId === chat.id ? 'bg-[#d3e3fd] text-[#041e49]' : 'hover:bg-[#e6eaf1] text-[#444746]'}`}>
               <div className="flex items-center gap-3 truncate flex-1">
                 <MessageSquare size={16} />
@@ -630,19 +781,34 @@ function App() {
             <p className="text-blue-400 text-sm mt-1">Release to add to your message</p>
           </div>
         )}
-        <div className="flex items-center p-4">
-          <button onClick={() => setIsSidebarOpen(v => !v)} className="p-2 hover:bg-gray-100 rounded-full mr-2">
-            <Menu size={20} />
-          </button>
-          <div className="flex items-center gap-2 font-medium text-gray-700">
-            CSIS <span className="text-xs bg-gray-100 px-1.5 py-0.5 rounded uppercase tracking-wider text-gray-500">
-              {appSettings.selectedModel}
-            </span>
+        <div className="flex items-center justify-between gap-4 p-4">
+          <div className="flex items-center">
+            <button onClick={() => setIsSidebarOpen(v => !v)} className="p-2 hover:bg-gray-100 rounded-full mr-2">
+              <Menu size={20} />
+            </button>
+            <div className="flex items-center gap-2 font-medium text-gray-700">
+              CSIS <span className="text-xs bg-gray-100 px-1.5 py-0.5 rounded uppercase tracking-wider text-gray-500">
+                {appSettings.selectedModel}
+              </span>
+            </div>
           </div>
+          <button
+            onClick={() => setActiveView(activeView === 'guides' ? 'chat' : 'guides')}
+            className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+              activeView === 'guides'
+                ? 'bg-gray-900 text-white hover:bg-gray-800'
+                : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+            }`}
+          >
+            {activeView === 'guides' ? <MessageSquare size={16} /> : <BookOpen size={16} />}
+            {activeView === 'guides' ? 'Back to Chat' : 'Documentation'}
+          </button>
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 md:px-[12%] pt-10">
-          {currentChat.messages.length === 0 ? (
+          {activeView === 'guides' ? (
+            <LearningCenter onBack={() => setActiveView('chat')} />
+          ) : currentChat.messages.length === 0 ? (
             <div className="animate-in fade-in slide-in-from-bottom-6 duration-1000">
               <h1 className="text-6xl font-medium tracking-tight mb-2">
                 <span className="bg-clip-text text-transparent bg-gradient-to-r from-[#4285f4] via-[#9b72cb] to-[#d96570]">
@@ -660,6 +826,21 @@ function App() {
                   </div>
                 ))}
               </div>
+              <button
+                onClick={() => setActiveView('guides')}
+                className="mt-6 flex w-full max-w-2xl items-center justify-between rounded-3xl border border-blue-100 bg-blue-50/70 p-5 text-left hover:bg-blue-50 hover:shadow-sm transition-all"
+              >
+                <span className="flex items-center gap-4">
+                  <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-blue-600 shadow-sm">
+                    <BookOpen size={22} />
+                  </span>
+                  <span>
+                    <span className="block text-sm font-semibold text-blue-700">New: CSIS Learning Center</span>
+                    <span className="block text-sm text-gray-600">Download documentation and sample data for every tool and workflow.</span>
+                  </span>
+                </span>
+                <ChevronDown size={18} className="-rotate-90 text-blue-500" />
+              </button>
             </div>
           ) : (
             <div className="space-y-8 pb-20">
@@ -684,7 +865,7 @@ function App() {
               processing — browser pushed all bytes, server still receiving / inspecting
                            (this is where the MSU WAF spends most of its time)
               Hidden once status === 'done' (server acked, chat phase takes over) */}
-        {uploadProgress && uploadProgress.status !== 'done' && (
+        {activeView === 'chat' && uploadProgress && uploadProgress.status !== 'done' && (
           <div className="px-6 pb-2">
             <div className="max-w-[800px] mx-auto bg-blue-50 border border-blue-200 rounded-2xl px-4 py-3">
               <div className="flex items-center justify-between text-xs text-blue-800 mb-1">
@@ -708,6 +889,7 @@ function App() {
         )}
 
         {/* Input area */}
+        {activeView === 'chat' && (
         <div className="p-6">
           <div className="max-w-[800px] mx-auto bg-[#f0f4f9] rounded-3xl px-5 py-3 flex flex-col gap-2 focus-within:bg-white focus-within:shadow-xl focus-within:ring-1 focus-within:ring-gray-200 transition-all">
             {selectedFiles.length > 0 && (
@@ -748,6 +930,7 @@ function App() {
             </div>
           </div>
         </div>
+        )}
       </div>
 
       {/* Settings Modal */}

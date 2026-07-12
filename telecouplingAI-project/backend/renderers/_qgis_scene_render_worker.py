@@ -204,12 +204,37 @@ try:
         canvas.paste((220, 220, 220), (iw, 0, iw + 2, ih))  # thin divider line
         draw = ImageDraw.Draw(canvas)
 
-        def _font(sz):
-            try:
-                return ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", sz)
-            except Exception:
-                return ImageFont.load_default()
-        F_TITLE, F_ENTRY = _font(44), _font(38)
+        _lg_scale = 2.0
+
+        def _s(x):
+            return int(round(x * _lg_scale))
+
+        _fs, _fs_s = _s(14), _s(12)
+        try:
+            import matplotlib as _mpl
+            _MPL_TTF = os.path.join(_mpl.get_data_path(), "fonts", "ttf")
+        except Exception:
+            _MPL_TTF = ("/opt/conda/envs/TeleCouplingAI/lib/python3.12/"
+                        "site-packages/matplotlib/mpl-data/fonts/ttf")
+
+        _font_paths = [
+            os.path.join(_MPL_TTF, "DejaVuSans-Bold.ttf"),
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+            os.path.join(_MPL_TTF, "DejaVuSans.ttf"),
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        ]
+
+        def _load_font(size):
+            for _fp in _font_paths:
+                try:
+                    return ImageFont.truetype(_fp, size)
+                except Exception:
+                    continue
+            return ImageFont.load_default()
+
+        F_VALUE = _load_font(_fs)
+        F_TITLE = _load_font(_fs_s)
+        F_ENTRY = _load_font(_fs_s)
 
         x0 = iw + 40
         cy = 50
@@ -229,9 +254,9 @@ try:
             bd.rectangle([(0, 0), (bar_w - 1, bar_h - 1)], outline=(0, 0, 0), width=2)
             canvas.paste(bar, (x0, cy))
             tx = x0 + bar_w + 18
-            draw.text((tx, cy - 16), _fmt(vmax), fill=(0, 0, 0), font=F_ENTRY)
-            draw.text((tx, cy + bar_h // 2 - 20), _fmt((vmin + vmax) / 2), fill=(0, 0, 0), font=F_ENTRY)
-            draw.text((tx, cy + bar_h - 26), _fmt(vmin), fill=(0, 0, 0), font=F_ENTRY)
+            draw.text((tx, cy - 16), _fmt(vmax), fill=(0, 0, 0), font=F_VALUE)
+            draw.text((tx, cy + bar_h // 2 - 20), _fmt((vmin + vmax) / 2), fill=(0, 0, 0), font=F_VALUE)
+            draw.text((tx, cy + bar_h - 26), _fmt(vmin), fill=(0, 0, 0), font=F_VALUE)
             cy += bar_h + 60
 
         # --- categorical flows (country relationship) ---
