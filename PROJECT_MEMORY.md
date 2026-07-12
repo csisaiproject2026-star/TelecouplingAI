@@ -171,9 +171,11 @@
 
 - The verified production source baseline is Git commit `b3d1ebb` on the historical branch `codex/msu-latest-20260704`; that branch name is dated, but the commit includes the 2026-07-12 documentation, thinking guard, and map-rendering solidification work.
 - Use the long-lived `production` branch as the canonical deployment source going forward. Create feature branches from `production`; do not develop from the old POC `master`.
-- GCP host source matched the canonical tracked deployment source after normalized line-ending comparison. MSU runtime behavior matched GCP, but its host backend tree retained 36 older/missing tracked files; this is a rebuild risk even though active containers are correct.
+- The 36 older/missing MSU host files and the GCP deployment-helper gaps were reconciled from an explicit tracked-file archive. Both host-source trees now match the canonical deployment source after normalized line-ending comparison.
 - The read-only drift audit is `telecouplingAI-project/deploy/audit_production_drift.py`. Server metadata and observed image identities are in `telecouplingAI-project/deploy/production_inventory.json`.
 - Never synchronize active `.env` files, `.env.docker`, backend environment files, TLS certificates/private keys, outputs, uploads, model data, demo inputs, Systematic test data, or external User Guide assets as part of source reconciliation.
 - MSU and GCP external User Guide trees matched byte-for-byte (232 files). Runtime Skill trees matched byte-for-byte (44 files).
 - MSU nginx received the same cache policy already active on GCP: `index.html`/SPA responses use `Cache-Control: no-cache`, while hashed `/assets/*` files use one-year immutable caching. Backup: `~/csis-platform/backups/20260712_nginx_no_cache/nginx.conf.before`.
 - Source reconciliation does not imply a container deployment. Do not restart, recreate, or retag containers merely to make host source match Git.
+- The post-sync full audit at deployment-source commit `024615e` passed all scopes: 165 host files per server, 75 API/render runtime files per container, 44 Skills, 3 active frontend files, and 232 external User Guide files. Public health checks passed and no business container was restarted or recreated.
+- Reconciliation backups are under MSU `/home/jianan2/csis-platform/backups/20260712_source_reconciliation_a484d7a/` and GCP `/home/csisaiproject2026/csis-platform/backups/20260712_source_reconciliation_a484d7a/`.
