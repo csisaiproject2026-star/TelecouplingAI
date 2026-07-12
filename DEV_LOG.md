@@ -7035,3 +7035,14 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - `DEV_LOG.md`
 ### 测试状态
 - 未执行：本次仅形成生产发布决策，没有 Docker build、容器重启或 recreate。
+
+## 2026-07-12 — 本地仓库结构整理建议
+### 完成内容
+- 确认当前可部署应用应继续以 `telecouplingAI-project/` 为稳定边界；现阶段不移动其 `backend/`、`frontend/`、`nginx/`、`.claude/` 和 `deploy/`，避免破坏 Docker build context、Compose 挂载、Skill 路径及服务器同步规则。
+- 根目录主要结构债务包括：大量 `demo_files/` 跟踪资产、已被 `.gitignore` 覆盖但历史上仍处于跟踪状态的根 `node_modules/`、运行时 Redis 文件 `dump.rdb`、分散的旧报告/实验脚本/历史日志。
+- Git 输出中带双引号的 `demo_files` 项是 `core.quotePath` 对中文文件名的转义显示，不是实际存在异常引号目录。
+- 建议分两阶段整理：第一阶段只做分类、引用扫描、忽略规则和生成物退跟踪；第二阶段才使用 `git mv` 归档文档、实验和测试资产，并逐项更新引用与验证部署。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- 未执行：本次仅做结构检查和整理方案建议，未移动或删除任何项目文件。
