@@ -77,22 +77,22 @@ print(json.dumps(result, sort_keys=True))
 """
 
 REMOTE_FRONTEND_SCRIPT = r"""
-import hashlib, json, re
-from pathlib import Path
-
-root = Path("/usr/share/nginx/html")
-index = root / "index.html"
-result = {}
-if index.is_file():
-    data = index.read_bytes()
-    result["index.html"] = hashlib.sha256(data).hexdigest()
-    text = data.decode("utf-8", errors="replace")
-    for rel in re.findall(r'(?:src|href)="(/assets/[^"]+)"', text):
-        path = root / rel.lstrip("/")
-        result[rel.lstrip("/")] = (
-            hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else None
-        )
-print(json.dumps(result, sort_keys=True))
+root=/usr/share/nginx/html
+index="$root/index.html"
+[ -f "$index" ] || exit 0
+printf 'index.html\t%s\n' "$(sha256sum "$index" | cut -d' ' -f1)"
+grep -oE '(src|href)="/assets/[^"]+"' "$index" |
+    cut -d'"' -f2 |
+    sed 's#^/##' |
+    sort -u |
+    while IFS= read -r rel; do
+        path="$root/$rel"
+        if [ -f "$path" ]; then
+            printf '%s\t%s\n' "$rel" "$(sha256sum "$path" | cut -d' ' -f1)"
+        else
+            printf '%s\t-\n' "$rel"
+        fi
+    done
 """
 
 
@@ -171,6 +171,19 @@ def ssh_python(
         remote_command = f"printf %s {encoded} | base64 -d | python3"
     output = run(["ssh", "-o", "BatchMode=yes", host, remote_command])
     return json.loads(output)
+
+
+def frontend_manifest(host: str, container: str) -> dict[str, str | None]:
+    encoded = base64.b64encode(REMOTE_FRONTEND_SCRIPT.encode("utf-8")).decode("ascii")
+    remote_command = (
+        f"printf %s {encoded} | base64 -d | docker exec -i {container} sh"
+    )
+    output = run(["ssh", "-o", "BatchMode=yes", host, remote_command])
+    result: dict[str, str | None] = {}
+    for line in output.splitlines():
+        path, digest = line.split("\t", maxsplit=1)
+        result[path] = None if digest == "-" else digest
+    return result
 
 
 def compare(
@@ -270,12 +283,7 @@ def main() -> int:
         skills = container_manifest(host, "tele-backend", skill_mappings)
         failures += compare(f"{name} runtime skills", skill_expected, skills)
 
-        frontend_manifests[name] = ssh_python(
-            host,
-            REMOTE_FRONTEND_SCRIPT,
-            {},
-            container="tele-frontend",
-        )
+        frontend_manifests[name] = frontend_manifest(host, "tele-frontend")
         guide_manifests[name] = ssh_python(
             host,
             REMOTE_TREE_SCRIPT,
