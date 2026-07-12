@@ -7093,3 +7093,21 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - PASS：活跃 Python 测试/runner 脚本全部通过语法编译。
 - PASS：MSU/GCP 生产主机源码漂移审计仍为 0。
 - 环境限制：本地完整 pytest 为 69 PASS / 1 SKIP，其余因当前 Windows 环境缺少 `aiofiles`、`natcap.invest` 和 pytest async 插件而失败；没有归档路径相关导入或收集错误。
+
+## 2026-07-12 — GitHub 分支收敛执行（等待默认分支权限）
+### 完成内容
+- 将日志/测试归档后的最终提交 `69ff5c4` 快进推送到 `origin/production`。
+- 删除旧分支前已创建并推送 5 个 annotated archive tags：
+  - `archive/master-20260712` → `029bdef`
+  - `archive/feature-invest-expansion-20260712` → `67c0ef0`
+  - `archive/gcp-head-20260712` → `be8cd64`
+  - `archive/codex-msu-aligned-20260704` → `be8cd64`
+  - `archive/codex-msu-latest-20260704` → `b3d1ebb`
+- 尝试将 GitHub 默认分支从 `feature/invest-expansion` 改为 `production`，但当前 `gh` 登录账号对目标仓库仅有 pull 权限，没有 admin/maintain/push API 权限，REST PATCH 返回 404。
+- 为避免删除当前默认分支或留下半清理状态，尚未删除任何旧远端分支。需仓库管理员先在 GitHub Settings → Branches 中把默认分支改为 `production`，再继续删除。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- PASS：`origin/production` 已指向 `69ff5c4`。
+- PASS：5 个 archive tags 的 peeled commit SHA 均与对应旧分支末端一致。
+- 阻塞：GitHub 默认分支仍为 `feature/invest-expansion`；旧分支删除尚未执行。
