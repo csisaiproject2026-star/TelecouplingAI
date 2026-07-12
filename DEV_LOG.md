@@ -1,3 +1,17 @@
+# CSIS Platform Development Log
+
+> **This is the only canonical project development log.** Append new work to
+> the end of this file; do not create another `DEV_LOG*.md`.
+>
+> Read `PROJECT_MEMORY.md` first for the current stable state and operational
+> rules. Use this file when the detailed work history is needed. The historical
+> digest through 2026-05-16 is archived at
+> `docs/history/development-summary-through-2026-05-16.md`; it is derived from
+> this log and must not receive new entries. Date ordering in older imported
+> sections is not globally strict, so search by date or topic.
+
+---
+
 ## 2026-06-13 — Retry 跑完，推翻"WAF 5 min 超时"假说，根因改判为"后端时间窗抖动 + 4 个 SKILL.md"
 
 ### Retry 结果（22 个昨晚 FAIL 工具，11:23–12:21）
@@ -7046,3 +7060,36 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - `DEV_LOG.md`
 ### 测试状态
 - 未执行：本次仅做结构检查和整理方案建议，未移动或删除任何项目文件。
+
+## 2026-07-12 — Git 长期分支收敛建议
+### 完成内容
+- 核对远端分支：GitHub 默认分支仍是旧 `feature/invest-expansion`；仓库不存在 `main`，旧稳定分支实际名为 `master`。
+- `master` 和 `feature/invest-expansion` 均已完整包含在 `production` 历史中；`gcp-head` / `codex/msu-aligned-20260704` 另有 2 个独有历史提交，删除前必须先创建归档标签。
+- 建议长期仅保留 `production` 作为默认、受保护的权威分支，并使用短期 `feature/*` 分支开发。GCP 是测试环境，不再作为长期开发分支；候选 feature 提交部署到 GCP 验证，通过后合入 `production`，再将同一不可变镜像部署到 MSU。
+- 不建议以后同时维护并手工同步 `gcp`、`main/master`、`production` 三条长期分支，这会重新制造版本漂移。
+- 分支删除属于破坏性 GitHub 操作，本次仅形成建议，没有覆盖或删除任何远端引用。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- PASS：已 fetch/prune 并检查所有远端分支的提交包含关系和独有提交。
+
+## 2026-07-12 — 开发日志合并与历史测试归档
+### 完成内容
+- 将根 `DEV_LOG.md` 明确为唯一权威、只追加的项目开发日志；后续不得再创建并列 `DEV_LOG*.md`。
+- 将 `dev_log_20260516.md` 重命名归档为 `docs/history/development-summary-through-2026-05-16.md`，明确它是从主日志派生的冻结摘要，不再追加。
+- 将 2026-03-16 手工测试日志改名为 `manual_test_record_20260316.md`，明确其仅为测试证据，不是项目开发日志。
+- 使用 `git mv` 将根目录 3 个一次性测试文件、已被替代的早期 GCP browser/smoke runner，以及 2026-03 的 Manual GCP/QGIS/容器诊断整体移入 `telecouplingAI-project/Systematic_tests/archive/`；未删除历史文件。
+- 保留当前活跃测试：`backend/tests/`、`AI_GCP_test/`、`AI_local_test/`、`AI_GCP_direct_test/`、`AI_GCP_llm_test/` 和 `Manual_ClientToGCP_test/`。
+- 新增根 `pytest.ini`，默认仅发现 `backend/tests/`，避免误运行归档脚本；重写 `Systematic_tests/README.md` 说明活跃入口和 archive 边界。
+### 关键变更文件
+- `DEV_LOG.md`
+- `PROJECT_MEMORY.md`
+- `pytest.ini`
+- `docs/history/development-summary-through-2026-05-16.md`
+- `telecouplingAI-project/Systematic_tests/README.md`
+- `telecouplingAI-project/Systematic_tests/archive/`
+### 测试状态
+- PASS：默认 `pytest --collect-only` 仅收集 215 个活跃后端测试，没有收集 archive。
+- PASS：活跃 Python 测试/runner 脚本全部通过语法编译。
+- PASS：MSU/GCP 生产主机源码漂移审计仍为 0。
+- 环境限制：本地完整 pytest 为 69 PASS / 1 SKIP，其余因当前 Windows 环境缺少 `aiofiles`、`natcap.invest` 和 pytest async 插件而失败；没有归档路径相关导入或收集错误。

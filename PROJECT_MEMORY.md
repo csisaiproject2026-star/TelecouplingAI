@@ -15,6 +15,13 @@
 - Servers are not Git repositories. Never deploy with `git pull` on GCP or MSU.
 - Alignment rule confirmed 2026-07-04: after validating the MSU-equivalent commit on GCP, point both `gcp-head` and the dated MSU alignment branch at the same commit SHA and push both branches to `origin`.
 
+## Documentation sources of truth
+
+- `DEV_LOG.md` at the repository root is the only canonical append-only development log. Do not create additional project `DEV_LOG*.md` files.
+- `PROJECT_MEMORY.md` is the first-read summary for current stable facts; use `DEV_LOG.md` only when detailed chronology is needed.
+- `docs/history/development-summary-through-2026-05-16.md` is a frozen digest derived from the root log, not a second log.
+- Dated test records under `telecouplingAI-project/Systematic_tests/archive/` are historical evidence and must not receive project-wide development entries.
+
 ## Server facts
 
 - GCP: `ssh csis-gcp`, IP `34.42.83.50`, project root `~/csis-platform/`.
