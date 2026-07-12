@@ -7111,3 +7111,19 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - PASS：`origin/production` 已指向 `69ff5c4`。
 - PASS：5 个 archive tags 的 peeled commit SHA 均与对应旧分支末端一致。
 - 阻塞：GitHub 默认分支仍为 `feature/invest-expansion`；旧分支删除尚未执行。
+
+## 2026-07-12 — GitHub 分支收敛完成
+### 完成内容
+- 仓库管理员将 GitHub 默认分支切换为 `production`，API 复核通过。
+- 在归档标签均已验证后，使用原子 push 删除远端 `master`、`feature/invest-expansion`、`gcp-head`、`codex/msu-aligned-20260704` 和 `codex/msu-latest-20260704`。
+- GitHub 远端现在只保留 `production` 一个 branch head；5 个 `archive/*` annotated tags 完整保留旧分支末端。
+- 更新 `AGENTS.md`、`CLAUDE.md` 和 `PROJECT_MEMORY.md`：以后从 `production` 创建短期 `feature/<topic>`，候选版本在 GCP 验证，合并后从同一提交构建不可变镜像并提升到 MSU。
+### 关键变更文件
+- `AGENTS.md`
+- `CLAUDE.md`
+- `PROJECT_MEMORY.md`
+- `DEV_LOG.md`
+### 测试状态
+- PASS：GitHub API 返回默认分支 `production`。
+- PASS：`git ls-remote --heads origin` 只返回 `production`。
+- PASS：5 个 archive tags 及其 peeled commit SHA 均仍存在。

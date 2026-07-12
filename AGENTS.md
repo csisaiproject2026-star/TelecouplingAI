@@ -46,11 +46,13 @@
 
 | 分支 | 用途 |
 |------|------|
-| `master` | POC 保护分支，保持稳定，不直接在此开发新功能 |
-| `feature/invest-expansion` | InVEST 新工具扩展开发分支（当前主力分支） |
+| `production` | GitHub 默认和唯一长期分支；代表已确认的权威源码 |
+| `feature/<topic>` | 从 `production` 创建的短期开发分支，合并后删除 |
 
-- 新功能统一在 feature 分支开发，本地调试通过后再推 GCP
-- 稳定后合并回 master
+- 不要直接在 `production` 开发；每项工作使用独立 `feature/<topic>` 分支
+- 候选提交先部署到 GCP 验证，通过后合并回 `production`
+- 从同一提交构建不可变镜像，再将同一镜像提升到 MSU
+- GCP 是测试环境，不对应长期 Git 分支
 
 ---
 

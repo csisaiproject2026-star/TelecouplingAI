@@ -5,15 +5,16 @@
 ## Repository and branches
 
 - Canonical GitHub remote: `origin = git@github.com:csisaiproject2026-star/TelecouplingAI.git`.
-- Protected stable branch: `master`.
-- Main development branch: `feature/invest-expansion`.
-- Deployment/history branch currently used by this workspace: `gcp-head`; it is based on `feature/invest-expansion` and contains the later GCP/Run2 fixes.
+- `production` is the GitHub default and only long-lived branch.
+- Create short-lived `feature/<topic>` branches from `production`; deploy the candidate commit to GCP, merge after validation, then promote the same immutable image to MSU.
+- GCP is a test environment, not a long-lived Git branch.
+- The former `master`, `feature/invest-expansion`, `gcp-head`, and dated `codex/*` branches were deleted on 2026-07-12 after their tips were preserved under `archive/*` annotated tags.
 - The worktree contains many historical untracked and deleted files. Never use `git add .`; stage an explicit file list only.
 - Historical untracked test data, screenshots, extracted feedback, prototypes, and local distribution packages are intentionally excluded unless the user explicitly names them. Do not treat them as missing work, delete them, or upload them by default. See `DEV_LOG.md` around the 2026-06-17/18 Git push notes for the original decision.
 - The established push scope is normally source code and explicitly requested documentation/evidence, not all local test datasets. Always show or audit the explicit staged list before committing.
 - User reaffirmed on 2026-07-04: test data and feedback must not be pushed to GitHub. This includes `feedbacks/`, Run test datasets, generated screenshots/results/logs, extracted feedback, and local training-manual image assets. Keep them local unless the user explicitly overrides this rule for a named file.
 - Servers are not Git repositories. Never deploy with `git pull` on GCP or MSU.
-- Alignment rule confirmed 2026-07-04: after validating the MSU-equivalent commit on GCP, point both `gcp-head` and the dated MSU alignment branch at the same commit SHA and push both branches to `origin`.
+- Do not recreate parallel environment branches or manually synchronize several long-lived branches; that historical workflow caused source drift.
 
 ## Documentation sources of truth
 
@@ -186,3 +187,4 @@
 - Source reconciliation does not imply a container deployment. Do not restart, recreate, or retag containers merely to make host source match Git.
 - The post-sync full audit at deployment-source commit `024615e` passed all scopes: 165 host files per server, 75 API/render runtime files per container, 44 Skills, 3 active frontend files, and 232 external User Guide files. Public health checks passed and no business container was restarted or recreated.
 - Reconciliation backups are under MSU `/home/jianan2/csis-platform/backups/20260712_source_reconciliation_a484d7a/` and GCP `/home/csisaiproject2026/csis-platform/backups/20260712_source_reconciliation_a484d7a/`.
+- GitHub branch consolidation completed on 2026-07-12: default branch `production`; all five former long-lived/history branch tips retained as annotated `archive/*` tags; no other remote heads remain.
