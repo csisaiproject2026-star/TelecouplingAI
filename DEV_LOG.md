@@ -7024,3 +7024,14 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 ### 备份
 - MSU：`/home/jianan2/csis-platform/backups/20260712_source_reconciliation_a484d7a/`
 - GCP：`/home/csisaiproject2026/csis-platform/backups/20260712_source_reconciliation_a484d7a/`
+
+## 2026-07-12 — 生产镜像规范重建决策
+### 完成内容
+- 明确本次源码对齐不等于立即重建生产容器；MSU 当前服务稳定且完整漂移审计通过，不为“整理状态”直接执行 build/recreate。
+- 当前 Dockerfile 已通过 `COPY . .` 包含业务源码，无需为本次同步逐文件增加 COPY；但基础镜像 `latest`、部分宽松依赖和前端 `npm install` 尚不满足严格可复现构建。
+- 后续应先改进构建可复现性，在 GCP/非生产环境从 `production` 提交构建并完成回归，再将同一不可变镜像提升到 MSU；不要在 MSU、GCP 各自独立构建两个可能不同的镜像。
+- 在新镜像完成验证和回滚准备前，禁止对 MSU 执行 `docker compose up --force-recreate`。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- 未执行：本次仅形成生产发布决策，没有 Docker build、容器重启或 recreate。
