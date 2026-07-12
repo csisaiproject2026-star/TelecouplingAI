@@ -206,7 +206,7 @@
 - 验证：`run_sdr` → `run_Sediment_Delivery_Ratio_SDR` 后，首测 0 重试 6.9s 直接成功（21.6s/3 重试 → 10.4s/0 重试）。
 - 重试逻辑改进：`_HIGH_TEMP_TOOLS = {run_crop_pollination}`，base temperature 0.9，retry 温度不低于 base —— Pollination 从 69.2s/7 重试 → 26.3s/0 重试。
 - **函数名设计原则**：避免多义缩写、避免与常见自然语言概念重名；推荐完整词汇 + 领域前缀 + 含动词。
-- 笔记记入 `LLM_VOCABULARY_AGENT_NOTES.md`。
+- 笔记记入 `docs/research/LLM_VOCABULARY_AGENT_NOTES.md`。
 
 ## 2026-05-06 — LLM 路径英文 prompt 10/10 全通过
 
@@ -232,7 +232,7 @@
 
 - 补全 16 个缺失集成测试（11→27，覆盖全部 26 个 InVEST 工具）。
 - 修复 8 处 InVEST 3.14.3 与旧版本的 API 参数名差异（CBC `lucode→code`、SWY `et0_dir`、Scenic `aoi_path`/`refraction`、Wave `dem_path`/`valuation_container` 等），并修复 `scenic_quality.py`、`wave_energy.py`。
-- 本地 26/26、GCP 26/26 通过（GCP 33 容器，总耗时 4 分 22 秒）。生成 `TOOL_TIMING_REPORT.md`。
+- 本地 26/26、GCP 26/26 通过（GCP 33 容器，总耗时 4 分 22 秒）。生成 `docs/reports/TOOL_TIMING_REPORT.md`。
 - 计时：最慢 Scenic Quality 43.9s，最快 CBC Preprocessor 0.2s。
 
 ## 2026-05-04 — 新增 Recreation & Tourism（第 26 工具）

@@ -376,7 +376,7 @@
 ### 测试状态
 - 全面测试:每个工具 × 4 情形(正确/缺文件/路径错/类型错)=**359 个用例,GCP 359/359、MSU 359/359 全过**。
 - GCP 全量 41 工具 LLM 回归:**41 通过 / 0 失败 / 1 跳过**(Recreation),新加的 CSV 工具一个都没被误拦。
-- 两台都重建了后端镜像把改动存进去(很快,依赖有缓存,没重装)。报告:`VALIDATION_TEST_REPORT.md`。
+- 两台都重建了后端镜像把改动存进去(很快,依赖有缓存,没重装)。报告:`docs/reports/VALIDATION_TEST_REPORT.md`。
 
 ---
 
@@ -393,7 +393,7 @@
 - happy-path 端到端另由全量回归(41 PASS / 1 SKIP)+ direct InVEST 运行覆盖。
 
 ### 关键变更文件
-- `VALIDATION_TEST_REPORT.md`（详细报告,新建）
+- `docs/reports/VALIDATION_TEST_REPORT.md`（详细报告,新建）
 - `Systematic_tests/AI_GCP_test/03_smoke_stress_test/_validation_full_test.py`（全面测试脚本）
 
 ---
@@ -506,7 +506,7 @@
 - **结论**:硬件能轻松扛 100+,瓶颈在 LLM 配额。建议(按成本):① MSU/GCP **拆分 key**(各得 1M/min,免费~2×)② 升 Tier / 多 key 轮换 ③ 修好 Tier A 再降 token footprint。
 
 ### 关键变更文件
-- `MSU_STRESS_REPORT.md`(新建,完整数据+CPU/内存表+结论)
+- `docs/reports/MSU_STRESS_REPORT.md`(新建,完整数据+CPU/内存表+结论)
 - `Systematic_tests/AI_GCP_test/03_smoke_stress_test/stress_msu.py`、`measure_tokens.py`(新建压测/测量工具)
 - `backend/agent.py`(本地有 Tier A 改动,**未提交、未上线**,因回归 habitat)
 
@@ -531,7 +531,7 @@
 ### 关键变更文件
 - 本地 `~/.ssh/config`（新增 csis-msu/csis-gcp）、新增 `~/.ssh/id_ed25519_msu`
 - 服务器 `~/csis-platform/telecouplingAI-project/`（代码+数据+`.env`/`.env.docker`+相对软链）
-- `msu_dev.md`（完整部署日志/运维手册，新建）、`DEPLOY_NEW_SERVER_MSU.md`（计划+清单，新建）
+- `docs/ops/msu_dev.md`（完整部署日志/运维手册，新建）、`docs/ops/DEPLOY_NEW_SERVER_MSU.md`（计划+清单，新建）
 
 ### 测试状态
 - **38/38 容器 Up**，`tele-backend` healthy（`CSIS backend started ✅`）。
@@ -1355,7 +1355,7 @@ telecouplingAI-project/Systematic_tests/
   - task_queue.py 初次 scp 路径错误（scp 到 `~/csis-platform/backend/` 而非 `~/csis-platform/backend/workers/`），导致 "Unknown tool: run_Sediment_D" 错误
   - 修正路径后重建镜像，第二次测试运行中（会话结束时仍在运行）
 - **SKILL 文件挂载**：docker-compose.yml 为 api-server 添加 volume mount `./telecouplingAI-project/.claude/skills:/.claude/skills:ro`，PRE_EXECUTION 上下文从 0 → 33,781 chars
-- **词汇表笔记**：创建 `LLM_VOCABULARY_AGENT_NOTES.md`，记录 tokenizer 词表局限性 vs 语义关联、Glossary Injection 方案分析、函数名设计原则
+- **词汇表笔记**：创建 `docs/research/LLM_VOCABULARY_AGENT_NOTES.md`，记录 tokenizer 词表局限性 vs 语义关联、Glossary Injection 方案分析、函数名设计原则
 
 ### 函数名设计原则（本项目经验总结）
 - ❌ 避免：多义缩写（SDR、HRA、CBC）
@@ -1370,7 +1370,7 @@ telecouplingAI-project/Systematic_tests/
 - `backend/tests/test_llm_path.py` — SDR prompt 使用新名称
 - `backend/tests/test_tools.py` — 工具名字符串更新
 - `docker-compose.yml`（GCP）— SKILL 文件 volume mount
-- `LLM_VOCABULARY_AGENT_NOTES.md`（新）— 词表与 LLM Agent 的关系分析
+- `docs/research/LLM_VOCABULARY_AGENT_NOTES.md`（新）— 词表与 LLM Agent 的关系分析
 
 ### 测试状态（最终结果，10/10 全部通过）
 
@@ -1481,7 +1481,7 @@ SDR 第 3 次重试通过（temp=0.9），Pollination 第 7 次通过（temp=1.0
   4. AWY prompt：`seasonality_constant=5` 改为 `=15`（防止 Gemini 问确认）
 - 添加 NatCap 样本数据到 `datainput_for_demo/SampleData/`（7 个子目录）
 - SKILL 文件部署到容器 `/.claude/skills/`（docker cp）
-- 生成 LLM 路径测试计时报告（追加至 `TOOL_TIMING_REPORT.md` §7）
+- 生成 LLM 路径测试计时报告（追加至 `docs/reports/TOOL_TIMING_REPORT.md` §7）
 
 ### 测试结果（LLM 路径 — Gemini）
 
@@ -1505,7 +1505,7 @@ SDR 第 3 次重试通过（temp=0.9），Pollination 第 7 次通过（temp=1.0
 - `backend/tests/test_llm_path.py` — 新增 LLM 路径测试脚本
 - `datainput_for_demo/SampleData/NDR/biophysical_table_gura.csv` — 删除无效列
 - `datainput_for_demo/SampleData/HabitatQuality/sensitivity_willamette.csv` — lucode→lulc
-- `TOOL_TIMING_REPORT.md` — 新增 §7 LLM 路径测试结果
+- `docs/reports/TOOL_TIMING_REPORT.md` — 新增 §7 LLM 路径测试结果
 
 ### 测试状态
 - LLM 路径（Gemini → InVEST）：8/10 PASS
@@ -1530,7 +1530,7 @@ SDR 第 3 次重试通过（temp=0.9），Pollination 第 7 次通过（temp=1.0
 - GCP 部署：33 个容器全部运行，镜像重建成功
 - GCP 集成测试：26/26 通过，总耗时 4 分 22 秒
 - Celery API 管道 smoke test：SWY 13s/PASS，Crop Percentile 4s/PASS，输出文件确认写入
-- 生成工具计时报告：`TOOL_TIMING_REPORT.md`
+- 生成工具计时报告：`docs/reports/TOOL_TIMING_REPORT.md`
 
 ### 关键变更文件
 - `backend/tests/test_invest_integration.py` — 新增 16 个测试，修复 8 个（共 27 个）
@@ -2448,7 +2448,7 @@ function generateUUID() {
 
 ### 七、Playwright 持久化测试框架
 
-新建 `demo_files/playwright_demo/runner.js`：单一浏览器窗口持久运行，轮询 `cmd.json` 执行命令（goto / upload / send / fill / waitDone / screenshot），用于交互式工具测试。
+新建 `docs/demo/playwright_demo/runner.js`：单一浏览器窗口持久运行，轮询 `cmd.json` 执行命令（goto / upload / send / fill / waitDone / screenshot），用于交互式工具测试。
 
 ### 八、SSH 密钥清理
 
@@ -5728,14 +5728,14 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
   - MSU **活着**:公网 `https://ai.telecoupling.msu.edu/health`=200(走 WAF)。
   - 本机(Claude 跑在用户机器上)实测:**ICMP ping 35.9.219.33 通、raw TCP:80 OPEN、TCP:22 与 443 超时**。sandbox 开/关一样。
   - 用户当前用 **UPNet**(HTTP 代理,本机 `HTTP_PROXY=127.0.0.1:29758`)——只暴露 80,**不给 SSH:22**。试过 `ssh -o ProxyCommand="connect -H 127.0.0.1:29758 %h %p"` 穿代理 → 代理**拒绝到 22 的 CONNECT**("Connection closed")。
-  - 对照 `msu_dev.md` §5:2026-05-28 成功部署时是**经校园网**(服务器 last login 来自 `172.21.x` 内网)、**raw TCP:22 OPEN、直连 `ssh csis-msu` 即可**。
+  - 对照 `docs/ops/msu_dev.md` §5:2026-05-28 成功部署时是**经校园网**(服务器 last login 来自 `172.21.x` 内网)、**raw TCP:22 OPEN、直连 `ssh csis-msu` 即可**。
   - **结论:UPNet 代理连不了 SSH;需和当年一样的校园网/全隧道 VPN(能 raw 直连 35.9.219.33:22)。等用户切网。**
-- **回灌时 MSU 关键差异(务必遵守,摘自 msu_dev.md)**:① 数据目录在 `/home/jianan2/csis-data/`(非 GCP 的 `/data/`);② `.env.docker` **绝不覆盖**(`FILE_SERVER_URL=http://35.9.219.33/download/` 走 80、host 路径不同);③ MSU 当年镜像是从 GCP `docker save|load` 传的、非本地 rebuild——回灌可同法传镜像或本地 rebuild,到时定。
+- **回灌时 MSU 关键差异(务必遵守,摘自 docs/ops/msu_dev.md)**:① 数据目录在 `/home/jianan2/csis-data/`(非 GCP 的 `/data/`);② `.env.docker` **绝不覆盖**(`FILE_SERVER_URL=http://35.9.219.33/download/` 走 80、host 路径不同);③ MSU 当年镜像是从 GCP `docker save|load` 传的、非本地 rebuild——回灌可同法传镜像或本地 rebuild,到时定。
 - 全部代码改动已 commit(gcp-head),GCP dev 已生效。**待办不变:等 MSU SSH 通 → 只读比对 GCP↔MSU → 定计划 → 谨慎回灌 + 一并 bake 未固化的修复。**
 
-## 2026-07-02 — MSU 回灌：再次尝试连接，SSH:22 仍不通（用户指示用 msu_dev.md 连 MSU 准备推代码）
+## 2026-07-02 — MSU 回灌：再次尝试连接，SSH:22 仍不通（用户指示用 docs/ops/msu_dev.md 连 MSU 准备推代码）
 ### 本次动作
-- 按用户要求，用 `msu_dev.md` 的连接方式尝试 SSH 到 MSU（`ssh csis-msu`，HostName 35.9.219.33 / user jianan2 / key id_ed25519_msu）准备推代码。
+- 按用户要求，用 `docs/ops/msu_dev.md` 的连接方式尝试 SSH 到 MSU（`ssh csis-msu`，HostName 35.9.219.33 / user jianan2 / key id_ed25519_msu）准备推代码。
 ### 实测结果（全部本机验证，非猜）
 - `ssh csis-msu`（22 端口）→ **connect timed out**；原始 TCP:22 与 TCP:443 直连均超时。
 - 当前 HTTP 代理 CONNECT 到 :22 → **代理拒绝/无响应**（和 DEV_LOG 之前记录一致）。
@@ -5746,7 +5746,7 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 ### 待办 / 下一步（不变）
 - **需用户切到能 raw 直连 35.9.219.33:22 的网络**（MSU 校园网 或 全隧道 VPN，非现在只转 HTTP 的 UPNet 代理）——与 2026-05-28 成功部署时相同条件。
 - 网络一通即重试 `ssh csis-msu`；通了**先做只读比对 GCP↔MSU**（MSU 停在 5 周前镜像，差异大，勿盲目 tar 覆盖），再定回灌清单 → 谨慎推 + 一并 bake 未固化的修复（render 图例标题、coastal、network 文件名、agent 路由）。
-- 回灌铁律（摘 msu_dev.md）：MSU 数据目录 `/home/jianan2/csis-data/`；`.env.docker` 永不覆盖（`FILE_SERVER_URL=http://35.9.219.33/download/` 走 80）。
+- 回灌铁律（摘 docs/ops/msu_dev.md）：MSU 数据目录 `/home/jianan2/csis-data/`；`.env.docker` 永不覆盖（`FILE_SERVER_URL=http://35.9.219.33/download/` 走 80）。
 
 ## 2026-07-02 — MSU 回灌：VPN 通了，做完 GCP↔MSU 只读比对 + 出计划（待用户审批，未推）
 ### 连通性
@@ -5802,12 +5802,12 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 ### 关键经验
 - 管理 MSU（SSH:22）需 **MSU 全隧道 VPN**（`new.vpn.msu.edu`→172.21.x 校园 IP）；UPNet HTTP 代理只放 :80/:443、不够。
 - 镜像传输走 **GCP→MSU 直连**（两台美国机器），不经开发机中国链路。
-- 详情见 `msu_dev.md` §8 + `MSU_Backport_Plan_20260702.md` 附录 A。
+- 详情见 `docs/ops/msu_dev.md` §8 + `MSU_Backport_Plan_20260702.md` 附录 A。
 ### 待办（下次）
 - 有空可把这套「clean 派生镜像 7efd306」思路也用到 GCP，把 GCP 那 4 个热补丁正式 bake（目前 GCP 仍是镜像+热补丁）。MSU 现在反而比 GCP 更干净。
 
 ## 2026-07-02 — MSU 回灌收尾：文档 + 记忆 + 一个已知副作用
-- 文档已补齐：`msu_dev.md` §8（部署记录/回滚/连接经验）、`MSU_Backport_Plan_20260702.md` 附录 A（GCP↔MSU 比对证据）、本 DEV_LOG。
+- 文档已补齐：`docs/ops/msu_dev.md` §8（部署记录/回滚/连接经验）、`MSU_Backport_Plan_20260702.md` 附录 A（GCP↔MSU 比对证据）、本 DEV_LOG。
 - 记忆已更新：`project_msu_sync_pending` 标记 DONE + 索引行更新。
 - **⚠️ 已知副作用（非 bug）**：换 GCP 前端镜像(0d62e1dc)后，MSU 原「真实 0→100% 上传进度条」消失，改为 GCP 的单请求上传 + 不确定「一直闪」进度条。符合用户 07-01 的取舍（单请求更可靠 > 进度条）。若需改善：加「按大小/时间模拟」的进度指示，勿退回两步上传。
 - 未动 GCP。可选后续：用同样薄层办法把 GCP 那 4 个热补丁也正式 bake（目前 MSU 比 GCP 干净）。
@@ -5830,7 +5830,7 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 ## 2026-07-02 — 会话收尾
 - 本会话完成：MSU 全量回灌（GCP→MSU 镜像直传 + 薄层烤 4 修复）+ GCP 同法固化。两台均把 4 修复 bake 进镜像（GCP=83aaab7 / MSU=7efd306），不再依赖临时热补丁，recreate 不回退。
 - 记忆已同步：`project_msu_sync_pending` 标记 DONE + 两台均已 bake + 索引行更新。
-- 关键经验沉淀在 `msu_dev.md` §8 与本 DEV_LOG：管理 MSU 需全隧道 VPN(172.21.x)；镜像走 GCP↔MSU 直连；安全门先比 md5（发现 agent.py 是 CRLF↔LF 纯行尾差异）；GCP 用 `up -d`（非 --force-recreate）保网站不下线。
+- 关键经验沉淀在 `docs/ops/msu_dev.md` §8 与本 DEV_LOG：管理 MSU 需全隧道 VPN(172.21.x)；镜像走 GCP↔MSU 直连；安全门先比 md5（发现 agent.py 是 CRLF↔LF 纯行尾差异）；GCP 用 `up -d`（非 --force-recreate）保网站不下线。
 
 ## 2026-07-02 — 讨论：网页测试时的文件上传能力（未动代码，待用户定方向）
 - 用户问「网页测试时你没法上传文件对吧」。澄清（不打包票）：
@@ -7127,3 +7127,36 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - PASS：GitHub API 返回默认分支 `production`。
 - PASS：`git ls-remote --heads origin` 只返回 `production`。
 - PASS：5 个 archive tags 及其 peeled commit SHA 均仍存在。
+
+## 2026-07-12 — production 仓库与 MSU 部署边界澄清
+### 完成内容
+- 明确 `production` 是可构建生产版本的完整 Git 仓库，除部署源码外还可包含文档、测试、历史归档和仓库配置；它不是 MSU 整个服务器目录的逐字节快照。
+- MSU/GCP 必须与 `production` 一致的是 `deploy/audit_production_drift.py` 定义的受控部署源码。服务器专属环境文件、证书、数据、outputs/uploads 和外置 User Guide 本来就不会与 Git 完全相同。
+- 根目录文档归类、移除误跟踪的 `node_modules`/`dump.rdb` 等仓库整理不会改变 165 个受控部署文件，因此不会造成生产运行代码漂移。
+- 按用户要求暂停后续整理；在该边界确认前未移动或删除新的根目录文件。
+- 用户确认理解该边界：整理完成并验证后，仓库结构变更仍提交并推送到 `production`；只有受控部署文件发生变化时才同步或部署服务器。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- 未执行：本轮仅澄清仓库与部署边界并暂停整理。
+
+## 2026-07-12 — fulldev 根目录结构整理
+### 完成内容
+- 重写过时的根 `readme.md` 为 `README.md`，准确说明当前架构、目录、`production` 分支流程、GCP/MSU 环境和部署安全边界。
+- 将 9 个历史文档从根目录分类到 `docs/archive/`、`docs/ops/`、`docs/reports/`、`docs/research/` 和 `docs/reference/`，并更新有效引用；新增 `docs/README.md` 索引。
+- 将早期 `demo_files/` 移至 `docs/demo/`，同时移动其 Markdown 转 HTML 的 `package.json`/lock；保留 walkthrough、截图、脚本和 Playwright lock，新增历史 demo 说明。
+- 删除 Git 中误提交的根和 demo `node_modules/`、Redis `dump.rdb`、Playwright command state/log；这些均可由 lock 文件或运行过程重建。
+- `.gitignore` 新增 Redis、日志和 demo command-state 规则，防止生成物再次进入 Git。
+- 保留 `telecouplingAI-project/`、`feedbacks/` 和活动 `usecaseLevel_workflow/` 原位；未修改受控部署源码，也未操作服务器。
+### 关键变更文件
+- `README.md`
+- `.gitignore`
+- `PROJECT_MEMORY.md`
+- `DEV_LOG.md`
+- `docs/`
+### 测试状态
+- PASS：根目录默认 pytest 仍只发现 215 个活跃后端测试。
+- PASS：`docs/demo/` 两套 npm lock 均通过 `npm ci --dry-run`。
+- PASS：移动后的 3 个 demo JavaScript 文件通过 `node --check`。
+- PASS：Git 跟踪文件中 `node_modules` 和 `dump.rdb` 数量均为 0。
+- PASS：MSU/GCP 165 个受控主机源码文件仍无漂移。

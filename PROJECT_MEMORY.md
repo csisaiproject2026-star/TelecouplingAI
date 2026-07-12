@@ -22,6 +22,9 @@
 - `PROJECT_MEMORY.md` is the first-read summary for current stable facts; use `DEV_LOG.md` only when detailed chronology is needed.
 - `docs/history/development-summary-through-2026-05-16.md` is a frozen digest derived from the root log, not a second log.
 - Dated test records under `telecouplingAI-project/Systematic_tests/archive/` are historical evidence and must not receive project-wide development entries.
+- Root documentation is indexed by `docs/README.md`: operations in `docs/ops/`, reports in `docs/reports/`, research in `docs/research/`, reusable references in `docs/reference/`, historical demos in `docs/demo/`, and superseded specifications in `docs/archive/`.
+- Generated dependencies and runtime state (`node_modules/`, `dump.rdb`, logs, demo command state) are not tracked. Recreate Node dependencies from the lock files in `docs/demo/` and `docs/demo/playwright_demo/`.
+- `feedbacks/` remains local evidence governed by the no-new-push rule, and `usecaseLevel_workflow/` remains an active design workspace; neither was relocated during the 2026-07-12 root cleanup.
 
 ## Server facts
 
@@ -188,3 +191,4 @@
 - The post-sync full audit at deployment-source commit `024615e` passed all scopes: 165 host files per server, 75 API/render runtime files per container, 44 Skills, 3 active frontend files, and 232 external User Guide files. Public health checks passed and no business container was restarted or recreated.
 - Reconciliation backups are under MSU `/home/jianan2/csis-platform/backups/20260712_source_reconciliation_a484d7a/` and GCP `/home/csisaiproject2026/csis-platform/backups/20260712_source_reconciliation_a484d7a/`.
 - GitHub branch consolidation completed on 2026-07-12: default branch `production`; all five former long-lived/history branch tips retained as annotated `archive/*` tags; no other remote heads remain.
+- Repository-root cleanup completed without changing the controlled deployment tree: the stale README was replaced, historical documents/demos moved under `docs/`, and committed Node/Redis/runtime artifacts removed. Post-cleanup MSU/GCP host-source audit still passed all 165 controlled files.

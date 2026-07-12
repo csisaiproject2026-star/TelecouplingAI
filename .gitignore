@@ -17,6 +17,11 @@ __pycache__/
 # Node
 node_modules/
 
+# Runtime state and logs
+dump.rdb
+*.log
+docs/demo/playwright_demo/cmd.json*
+
 # OS
 .DS_Store
 Thumbs.db
