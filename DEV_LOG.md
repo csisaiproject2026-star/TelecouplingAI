@@ -7160,3 +7160,13 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - PASS：移动后的 3 个 demo JavaScript 文件通过 `node --check`。
 - PASS：Git 跟踪文件中 `node_modules` 和 `dump.rdb` 数量均为 0。
 - PASS：MSU/GCP 165 个受控主机源码文件仍无漂移。
+
+## 2026-07-13 — Workflow 测试指南任务移交
+### 完成内容
+- 用户需要基于原始 `fulldev` 中未上传 Git 的 Run 测试资料和两份 Workflow User Guide 生成测试指南及反馈表。
+- 当前会话受限于 Copilot 隔离 worktree，不能直接读写原始 `C:\YPHOME\...\fulldev`；用户已在原目录另开 session 继续该任务。
+- 本会话停止相关生成工作，避免使用不完整的 Git/服务器副本制作资料。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- 未执行：任务已移交到能直接访问原始本地资料的新 session。
