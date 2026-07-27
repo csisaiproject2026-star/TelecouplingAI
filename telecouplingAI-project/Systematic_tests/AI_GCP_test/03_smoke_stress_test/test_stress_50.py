@@ -272,7 +272,11 @@ async def run_chat(client: httpx.AsyncClient, sid: str, prompt: str,
                 elif etype == "tool_start":
                     tool_invoked = True
                 elif etype == "tool_result":
-                    output_files = [f["filename"] for f in ev.get("files", [])]
+                    output_files.extend(
+                        f["filename"]
+                        for f in ev.get("files", [])
+                        if f.get("filename") not in output_files
+                    )
                 elif etype == "error":
                     error = ev.get("message", "unknown")
                 elif etype == "done":

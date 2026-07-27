@@ -7288,3 +7288,25 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - 独立代码审查：未发现高置信问题。
 - 本机 backend 全套：106 PASS、1 SKIP；123 项因本机缺少 `geopandas` 等既有 GIS 运行依赖而失败，未发现与本修复相关的回归。
 - GCP 尚未部署本修复；下一步先做小规模 fast-pool 复测，通过后再恢复 50→100→200 阶梯。MSU 未修改。
+
+## 2026-07-28 — capacity-200-v1 快工具 GCP 验收通过
+### 完成内容
+- 提交并发布 `ea641be`（`capacity-200-v1-ea641be`），在 GCP 以 `csic_backend:capacity-200-v1-ea641be` 构建不可变候选镜像，仅重建 `tele-backend`；Redis、Celery workers、frontend 和 MSU 均未修改。
+- GCP 回滚源镜像保留为 `csic_backend:capacity-200-v1-165e307-running`；源码和 `.env.docker` 备份位于 `~/csis-platform/backups/20260728_capacity_ea641be/`。
+- 依次完成 10、50、100、200 用户 fast-pool 阶梯，最终 200 用户复测达到 200/200，且所有当轮 session 均保留。
+- 修正压测统计器：后续 `read_file_content` 返回空文件列表时，不再覆盖前序业务工具已经收到的输出文件。首次 200 用户报告中的唯一“no error”失败实际已生成并持久化两个 CO2 CSV 和完整模型回复，属于测试脚本误判；修正后完整复测为 200/200。
+### 关键变更文件
+- `telecouplingAI-project/backend/agent.py`
+- `telecouplingAI-project/backend/tests/test_agent_gemini_timeouts.py`
+- `telecouplingAI-project/Systematic_tests/AI_GCP_test/03_smoke_stress_test/test_stress_50.py`
+- `DEV_LOG.md`
+- `PROJECT_MEMORY.md`
+### 测试状态
+- 10 用户：10/10 PASS，10/10 sessions 保留，wall 17.2 秒。
+- 50 用户：50/50 PASS，50/50 sessions 保留，p95 60.0 秒，wall 81.0 秒。
+- 100 用户：100/100 PASS，100/100 sessions 保留，p95 219.3 秒，wall 244.4 秒。
+- 最终 200 用户：200/200 PASS，200/200 sessions 保留，p50 294.5 秒、p95 459.5 秒、最大 464.5 秒，wall 487.4 秒；CPU 峰值 19.8%，RAM 峰值 6611/32093 MB。
+- 最终工具分布：CO2 47/47、Food Security 53/53、OLS 49/49、CBA 51/51。
+- 200 用户均进入容量队列；长延迟来自 Tier 2 的 2.7M TPM 安全节流，不是服务器资源饱和或请求挂起。
+- 结果证据：GCP `~/csis-platform/capacity-results/capacity-200-v1-ea641be-20260728/fast-200-final.json` 和 `fast-200-final.log`。
+- 本轮只验证了小型内联 CSV 的 fast-pool；尚未验证 200 人同时上传大文件、mixed/heavy 工具队列或公网/WAF 上传链路，因此不能把本结果外推为“大文件 200 并发已通过”。

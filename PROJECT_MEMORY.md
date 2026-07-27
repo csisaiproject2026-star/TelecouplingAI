@@ -50,6 +50,8 @@
 - The seven long tails were not Gemini, CPU, Redis capacity, or Celery compute saturation. All 50 runs reached Celery dispatch, and the affected fast workers finished in milliseconds.
 - Root cause: `backend/agent.py` dispatched Celery before subscribing to the task's Redis Pub/Sub channel. Fast workers could publish `tool_result` and `done` before the subscriber existed; Redis Pub/Sub does not replay missed messages. The 1800-second timeout was inside the message-loop body, so it also could not fire when no message arrived.
 - The local fix preassigns the Celery task ID, confirms the Pub/Sub subscription before dispatch, and wraps the whole listener in a real asynchronous timeout. Do not resume 100/200-user testing until this candidate is deployed to GCP and passes small fast-pool runs plus repeated 50-user runs at the 99% gate.
+- GCP candidate `capacity-200-v1-ea641be` deployed and passed the fast-pool ladder: 10/10, 50/50, 100/100, and final 200/200 with complete session retention. At 200 users, p50 was 294.5 seconds, p95 459.5 seconds, maximum 464.5 seconds, CPU peak 19.8%, and RAM peak 6.6/32 GB. Evidence is under `~/csis-platform/capacity-results/capacity-200-v1-ea641be-20260728/`.
+- This validates small inline-CSV fast tools only. It does not validate 200 concurrent large uploads, public WAF upload behavior, disk throughput/capacity, or 200 mixed/heavy InVEST jobs. Keep those as separate capacity gates before claiming unrestricted 200-user capacity.
 
 ## Deployment discipline
 
