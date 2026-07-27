@@ -43,6 +43,8 @@ logger = logging.getLogger(__name__)
 _CJK_TEXT_RE = re.compile(r"[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\u3040-\u30ff\uac00-\ud7af]")
 _THINKING_ENGLISH_FALLBACK = "Processing the request and preparing the next step.\n"
 _GEMINI_STALL_TIMEOUT = 60
+_GEMINI_ATTEMPT_TIMEOUT = 120
+_GEMINI_STALL_RESTARTS = 2
 
 
 def _sanitize_visible_thinking_text(text: str) -> str:
@@ -231,20 +233,54 @@ async def _generate_streaming(client, model_name: str, contents, config, emit,
         if retry_wait is not None:
             await asyncio.sleep(retry_wait)
 
+
+async def _generate_streaming_with_watchdog(
+    client,
+    model_name: str,
+    contents,
+    config,
+    emit,
+):
+    """Restart a Gemini stream that exceeds the hard per-attempt deadline."""
+    for restart in range(_GEMINI_STALL_RESTARTS + 1):
+        try:
+            return await asyncio.wait_for(
+                _generate_streaming(
+                    client,
+                    model_name,
+                    contents,
+                    config,
+                    emit,
+                ),
+                timeout=_GEMINI_ATTEMPT_TIMEOUT,
+            )
+        except asyncio.TimeoutError:
+            if restart >= _GEMINI_STALL_RESTARTS:
+                raise
+            logger.warning(
+                "[agent] Gemini stream attempt exceeded %ss; "
+                "restarting request (%s/%s)",
+                _GEMINI_ATTEMPT_TIMEOUT,
+                restart + 1,
+                _GEMINI_STALL_RESTARTS,
+            )
+
+
 # ---------------------------------------------------------------------------
 # Gemini client — lazy singleton, created on first use
 # ---------------------------------------------------------------------------
 
 def _get_client() -> genai.Client:
     import httpx
+    timeout = httpx.Timeout(60.0, connect=30.0, pool=30.0)
     # Always create a fresh client — the genai SDK may close the httpx.AsyncClient
     # after each session, so reusing a cached client causes ConnectError on
     # subsequent requests. Fresh clients are lightweight and avoid stale pool issues.
     return genai.Client(
         api_key=settings.GOOGLE_API_KEY,
         http_options=HttpOptions(
-            httpx_client=httpx.Client(verify=False, timeout=300.0),
-            httpx_async_client=httpx.AsyncClient(verify=False, timeout=300.0),
+            httpx_client=httpx.Client(verify=False, timeout=timeout),
+            httpx_async_client=httpx.AsyncClient(verify=False, timeout=timeout),
         ),
     )
 
@@ -2288,7 +2324,7 @@ async def run_agent(
             tool_config=_tool_config,
         )
 
-        response = await _generate_streaming(
+        response = await _generate_streaming_with_watchdog(
             client,
             model_name,
             contents,

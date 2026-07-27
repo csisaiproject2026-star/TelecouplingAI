@@ -69,3 +69,28 @@ async def test_nonstreaming_timeout_releases_capacity_slot(bounded_gate):
     snapshot = await bounded_gate.snapshot()
     assert snapshot.active == 0
     assert snapshot.waiting == 0
+
+
+@pytest.mark.asyncio
+async def test_outer_watchdog_restarts_entire_stream_attempt(monkeypatch):
+    attempts = 0
+
+    async def hanging_stream(*args, **kwargs):
+        nonlocal attempts
+        attempts += 1
+        await asyncio.Event().wait()
+
+    monkeypatch.setattr(agent, "_generate_streaming", hanging_stream)
+    monkeypatch.setattr(agent, "_GEMINI_ATTEMPT_TIMEOUT", 0.01)
+    monkeypatch.setattr(agent, "_GEMINI_STALL_RESTARTS", 2)
+
+    with pytest.raises(asyncio.TimeoutError):
+        await agent._generate_streaming_with_watchdog(
+            SimpleNamespace(),
+            "test-model",
+            [],
+            {},
+            lambda event: None,
+        )
+
+    assert attempts == 3
