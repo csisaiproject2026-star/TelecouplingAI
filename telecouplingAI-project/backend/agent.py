@@ -42,6 +42,7 @@ logger = logging.getLogger(__name__)
 
 _CJK_TEXT_RE = re.compile(r"[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\u3040-\u30ff\uac00-\ud7af]")
 _THINKING_ENGLISH_FALLBACK = "Processing the request and preparing the next step.\n"
+_GEMINI_STALL_TIMEOUT = 60
 
 
 def _sanitize_visible_thinking_text(text: str) -> str:
@@ -91,10 +92,13 @@ async def _generate_with_retry(client, model_name: str, contents, config, max_re
     for attempt in range(max_retries):
         try:
             async with gemini_capacity_gate.slot(estimated_tokens):
-                return await client.aio.models.generate_content(
-                    model=model_name,
-                    contents=contents,
-                    config=config,
+                return await asyncio.wait_for(
+                    client.aio.models.generate_content(
+                        model=model_name,
+                        contents=contents,
+                        config=config,
+                    ),
+                    timeout=_GEMINI_STALL_TIMEOUT,
                 )
         except (genai_errors.APIError, httpx.HTTPError, asyncio.TimeoutError) as exc:
             kind = _transient_error_kind(exc)
@@ -130,7 +134,6 @@ async def _generate_streaming(client, model_name: str, contents, config, emit,
     # function call. Both leave the user stuck. We abort a silent stream after
     # _STALL_TIMEOUT and treat an answer-less stream as empty, then retry on a FRESH
     # connection (stalls are transient → a retry usually succeeds).
-    _STALL_TIMEOUT = 60  # seconds with no new chunk
     estimated_tokens = gemini_capacity_gate.estimate_input_tokens(contents, config)
     capacity_notice_sent = False
 
@@ -152,11 +155,18 @@ async def _generate_streaming(client, model_name: str, contents, config, emit,
                 maybe = client.aio.models.generate_content_stream(
                     model=model_name, contents=contents, config=config,
                 )
-                stream = await maybe if inspect.isawaitable(maybe) else maybe
+                stream = (
+                    await asyncio.wait_for(maybe, timeout=_GEMINI_STALL_TIMEOUT)
+                    if inspect.isawaitable(maybe)
+                    else maybe
+                )
                 ait = stream.__aiter__()
                 while True:
                     try:
-                        chunk = await asyncio.wait_for(ait.__anext__(), timeout=_STALL_TIMEOUT)
+                        chunk = await asyncio.wait_for(
+                            ait.__anext__(),
+                            timeout=_GEMINI_STALL_TIMEOUT,
+                        )
                     except StopAsyncIteration:
                         break
                     cand = chunk.candidates[0] if getattr(chunk, "candidates", None) else None
@@ -201,7 +211,7 @@ async def _generate_streaming(client, model_name: str, contents, config, emit,
             logger.warning(
                 "[agent] Gemini stream STALLED >%ss with no output "
                 "(attempt %s/%s), retrying on fresh connection",
-                _STALL_TIMEOUT,
+                _GEMINI_STALL_TIMEOUT,
                 attempt + 1,
                 max_retries,
             )
