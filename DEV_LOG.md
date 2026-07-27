@@ -7170,3 +7170,73 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - `DEV_LOG.md`
 ### 测试状态
 - 未执行：任务已移交到能直接访问原始本地资料的新 session。
+
+## 2026-07-27 — MSU 200 人并发容量讨论
+### 完成内容
+- 复核 2026-05-28/29 MSU 压测：服务器为 32 vCPU / 62 GB RAM；100 个并发快工具用户时 CPU 约 1.4%、RAM 峰值约 14.4 GB，硬件不是主要瓶颈。
+- 明确当前不能承诺 200 个同时活跃用户：历史压测在 100 并发、200 次运行时仅 77% 通过，p50 约 160 秒，45 次失败；主要受 Gemini 输入 token 配额和退避等待限制。
+- 复核当前源码限制：`MAX_SESSIONS=50` 会在超过 50 个 session 时淘汰最久未活跃 session；Gemini 仅允许 3 个并行 API 调用；API 当前为单 Uvicorn 进程；每个工具队列通常 `concurrency=1`。
+- 场景结论：200 人浏览静态页面可行；200 人在线但少量分散操作可能可行；200 人同时聊天或同时运行模型目前不可行，需容量改造和真实 200 用户压测后才能承诺。
+- 建议优先完成专用 Gemini 配额/项目、session 容量与淘汰策略、全局请求队列/限流、提示词与 schema 安全瘦身、热门 worker 扩容、SSE heartbeat/WAF 验证，再进行分层 200 用户测试。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- 未执行新压测；结论基于既有 MSU 10/25/50/75/100 用户容量阶梯和当前生产源码静态检查。
+
+## 2026-07-27 — Gemini 多 API Key 容量方案评估
+### 完成内容
+- 核对 Google Gemini 官方限流规则：RPM、TPM、RPD 和付费速率限制按 Google Cloud project 计算，而不是按 API key 计算；同一 project 创建多个 key 不会增加配额。
+- 明确多个独立 project/key 可能形成独立配额池，但生产扩容应优先使用 MSU 专用付费 project、提升 usage tier 或申请 rate-limit increase，而不是仅靠创建 key 绕过配额。
+- 复核当前后端：仅支持单个 `GOOGLE_API_KEY`，Gemini client 创建集中在 `backend/agent.py::_get_client()`，因此增加 project/key pool 不需要重写 agent 主流程。
+- 识别生产级 key pool 所需能力：每 project 独立并发限制、最少负载选择、429 cooldown/切换、401/403 key 下线、脱敏指标、全局排队和多进程 Redis 协调。
+- 发现当前 429/503 退避发生在 `_GEMINI_SEMAPHORE` 上下文内，等待时仍占用最多 3 个 Gemini 并发槽；后续并发改造应将 sleep 移出 semaphore，并优先读取结构化状态和 `Retry-After`。
+- 向用户澄清“MSU 专用 project/key”的含义：GCP 与 MSU 分别使用独立 Google Cloud project 的配额池，而不是在同一 project 下仅创建两个 key。
+- 用户确认使用 MSU 时 GCP 网站不使用；因此两台服务器不存在实际同时争用，拆分 project 主要提供环境隔离，不能直接提高 MSU 单站并发，容量重点应转向 MSU 当前 project 的付费等级和实际 RPM/TPM。
+- 用户确认当前 Gemini project 为付费 Tier 2；后续容量计算仍需以 AI Studio 中 Gemini 2.5 Flash 的实时 RPM/TPM 为准，Tier 2 本身不能证明可支持 200 个同时活跃用户。
+- 用户提供 AI Studio 截图，确认 `CSIS-AI-Platform-Project` 的 Gemini 2.5 Flash 当前限额为 2,000 RPM、3,000,000 TPM、100,000 RPD；过去一天页面显示峰值使用量为 2 RPM、68.99K TPM、2 RPD。
+- 当前 300 万 TPM 已是历史压测 100 万 TPM 假设的三倍；按约 43K 输入 token/次估算，TPM 理论上约允许 69 次模型调用/分钟，但 3 并发 semaphore、50 session 和单工具 worker 仍需先改造和复测。
+- 核对 Google 当前 Tier 3 规则：Cloud Billing 账户累计实际支付达到 USD 1,000，且首次成功付款已满 30 天后自动升级；满足条件并完成支付处理后通常约 10 分钟内反映，无需手动切换 usage tier。
+- 与用户确认容量优化的预期发布流程（仅讨论，未实施）：在本机隔离 worktree 的短期 feature 分支开发和测试；将候选源码部署到 GCP、保留服务器 `.env.docker` 并完成回归/分层压测；通过后合并到 GitHub `production`，从确认提交构建不可变镜像；经用户批准后将同一镜像提升到 MSU，并保留回滚镜像和执行生产 smoke test。
+- 解释 200 用户测试方法（仅讨论）：使用异步 HTTP 客户端创建 200 个虚拟用户，通过真实 `/api/upload` 和 `/api/chat` SSE 接口按可配置到达窗口发请求；分 fast/mixed 工具池，收集成功率、吞吐、p50/p95/p99、首事件等待、429/5xx/超时和服务器 CPU/RAM/网络。
+- 识别现有 `stress_msu.py` 的覆盖缺口：底层脚本使用 `sid = user_id-tool_name`，每个工具都是独立单轮 session，不能验证 `MAX_SESSIONS=50` 淘汰后真实用户的多轮历史/上传文件是否保留；正式 200 用户验收需增加“一用户一个 session + 后续追问”的连续性场景，并汇总首事件延迟。
+- 推荐容量阶梯为 10/25/50/100/150/200，分别测试平缓到达和 30 秒突发；重负载先在 GCP 后端直连和 GCP 公网路径执行，MSU WAF 路径仅在批准的维护窗口做逐级最终验证。
+### 关键变更文件
+- `DEV_LOG.md`
+- `PROJECT_MEMORY.md`
+- `telecouplingAI-project/backend/config.py`（评估）
+- `telecouplingAI-project/backend/agent.py`（评估）
+### 测试状态
+- 未修改运行代码，未执行测试；结论基于 Google Gemini 官方 rate-limit 文档和当前源码静态检查。
+
+## 2026-07-27 — 200 用户容量候选版本 capacity-200-v1
+### 完成内容
+- 按“200 个独立用户可同时提交、允许排队但不得丢 session 或静默失败”的目标完成本机候选实现，版本代号为 `capacity-200-v1`。
+- 将 SessionManager 从同步 Redis 改为异步 Redis；默认 `MAX_SESSIONS` 从 50 提升到 500；使用 Redis sorted-set LRU 索引、原子 Lua JSON 更新和逐请求活跃租约，避免阻塞事件循环、并发写覆盖、被淘汰 session 残缺复活及重叠 SSE 提前解除保护。
+- 新增 Gemini 容量门：默认 8 个并发调用、500 个等待请求、按当前 Tier 2 的 3,000,000 input TPM 使用 90% 安全预算；按实际组装的 contents/config 保守估算 token，并在即将调用 Gemini 前进行滚动 60 秒预留。
+- 重构 Gemini 429/5xx/timeout/空流重试：并发槽在退避等待前释放，读取结构化 API 状态和 `Retry-After`，高负载排队通过 `capacity_wait` SSE 明示给用户。
+- SSE 心跳改为可配置的 10 秒；新增 `/health/capacity` 和批量 session 保留探针，返回 release version、有效 session 数及 Gemini active/waiting/TPM 预留。
+- 压测脚本改为每个虚拟用户保持唯一持久 session，逐个验证本次 session 是否保留；记录首 SSE、首模型/工具活动、排队次数、队列位置、吞吐和 p50/p95/p99；要求收到 terminal `done`，使用绝对超时，并在成功率低于 99% 或任一 session 丢失时返回失败。
+- 200 用户快工具测试默认每人一个工具、15 分钟绝对时限；该时限与 2 次 Gemini 调用/工具及约 60 次调用/分钟的 TPM 安全排放速度一致。
+- 计划 GCP 回滚镜像代号：`pre-capacity-200-20260727`；通过测试的候选镜像使用 `capacity-200-v1` 与精确 Git SHA 标识。
+### 关键变更文件
+- `telecouplingAI-project/backend/config.py`
+- `telecouplingAI-project/backend/main.py`
+- `telecouplingAI-project/backend/agent.py`
+- `telecouplingAI-project/backend/shared/session_manager.py`
+- `telecouplingAI-project/backend/shared/gemini_capacity.py`
+- `telecouplingAI-project/backend/tests/test_session_manager.py`
+- `telecouplingAI-project/backend/tests/test_gemini_capacity.py`
+- `telecouplingAI-project/backend/tests/test_api.py`
+- `telecouplingAI-project/frontend/src/App.jsx`
+- `telecouplingAI-project/Systematic_tests/AI_GCP_test/03_smoke_stress_test/test_stress_50.py`
+- `telecouplingAI-project/Systematic_tests/AI_GCP_test/03_smoke_stress_test/stress_msu.py`
+- `telecouplingAI-project/.env.example`
+- `telecouplingAI-project/.env.docker.gcp`
+- `telecouplingAI-project/.env.docker.msu`
+### 测试状态
+- PASS：容量/session/API/agent focused tests 24 项。
+- PASS：changed Python `compileall`、`git diff --check`。
+- PASS：frontend Vite production build。
+- PASS：三轮专门代码审查，最终 release review 无高置信问题。
+- 本机完整 InVEST 测试受缺少 Docker/conda `natcap.invest` 等地理依赖阻断；用户确认以环境完整的 GCP 测试为最终依据。
+- GCP 尚未部署或测试；MSU 未修改。

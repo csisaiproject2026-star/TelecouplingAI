@@ -74,7 +74,10 @@ class ToolRun:
     duration:   float
     retried:    bool  = False
     error:      Optional[str] = None
-    queue_wait: float = 0.0
+    first_event_delay: float = 0.0
+    first_work_delay: float = 0.0
+    capacity_queued: bool = False
+    queue_position: int = 0
 
 
 # ── Tool pool (all tools that have data on GCP) ───────────────────────────────
@@ -227,22 +230,30 @@ async def upload_inline(client: httpx.AsyncClient, sid: str, files: list) -> tup
 
 async def run_chat(client: httpx.AsyncClient, sid: str, prompt: str,
                    timeout: int) -> tuple:
-    """Returns (success, error, tool_invoked, first_event_delay_s)."""
+    """Return success plus SSE and capacity-wait observations."""
     output_files = []
     tool_invoked = False
     error = None
     t_first = None
+    t_first_work = None
+    capacity_queued = False
+    queue_position = 0
+    done_received = False
     t_send = time.time()
 
-    try:
+    async def consume_stream():
+        nonlocal error, t_first, t_first_work
+        nonlocal capacity_queued, queue_position, tool_invoked, output_files
+        nonlocal done_received
         async with client.stream(
             "POST", f"{BASE_URL}/api/chat",
             headers={"X-Session-ID": sid},
             data={"message": prompt, "model": DEFAULT_MODEL},
-            timeout=timeout,
+            timeout=httpx.Timeout(connect=30, read=None, write=60, pool=30),
         ) as resp:
             if resp.status_code != 200:
-                return False, f"HTTP {resp.status_code}", False, 0.0
+                error = f"HTTP {resp.status_code}"
+                return
             async for line in resp.aiter_lines():
                 if not line.startswith("data: "):
                     continue
@@ -253,17 +264,41 @@ async def run_chat(client: httpx.AsyncClient, sid: str, prompt: str,
                 if t_first is None:
                     t_first = time.time() - t_send
                 etype = ev.get("type", "")
-                if etype == "tool_start":
+                if etype in {"thinking", "text_chunk", "tool_start"} and t_first_work is None:
+                    t_first_work = time.time() - t_send
+                if etype == "capacity_wait":
+                    capacity_queued = True
+                    queue_position = max(queue_position, int(ev.get("queue_position") or 0))
+                elif etype == "tool_start":
                     tool_invoked = True
                 elif etype == "tool_result":
                     output_files = [f["filename"] for f in ev.get("files", [])]
                 elif etype == "error":
                     error = ev.get("message", "unknown")
-    except Exception as e:
-        error = str(e)
+                elif etype == "done":
+                    done_received = True
 
-    success = bool(output_files) and not error
-    return success, error, tool_invoked, t_first or 0.0
+    try:
+        await asyncio.wait_for(consume_stream(), timeout=timeout)
+    except asyncio.TimeoutError:
+        error = f"absolute timeout after {timeout}s"
+    except httpx.HTTPError as exc:
+        error = str(exc)
+
+    if not done_received and not error:
+        error = "stream ended before terminal done event"
+    success = bool(output_files) and done_received and not error
+    retryable_no_tool = done_received and not tool_invoked and not error
+    return (
+        success,
+        error,
+        tool_invoked,
+        t_first or 0.0,
+        t_first_work or 0.0,
+        capacity_queued,
+        queue_position,
+        retryable_no_tool,
+    )
 
 
 # ── Single user ───────────────────────────────────────────────────────────────
@@ -273,8 +308,8 @@ async def run_user(user_id: str, tool_list: list, delay: float, all_runs: list):
         await asyncio.sleep(delay)
 
     async with httpx.AsyncClient() as client:
+        sid = user_id
         for tool_name, files, prompt, timeout in tool_list:
-            sid = f"{user_id}-{tool_name}"
             t0 = time.time()
 
             ok, err = await upload_inline(client, sid, files)
@@ -286,13 +321,25 @@ async def run_user(user_id: str, tool_list: list, delay: float, all_runs: list):
             retried = False
             for attempt in range(2):
                 try:
-                    success, error, invoked, first_delay = await run_chat(
+                    (
+                        success,
+                        error,
+                        invoked,
+                        first_delay,
+                        first_work_delay,
+                        capacity_queued,
+                        queue_position,
+                        retryable_no_tool,
+                    ) = await run_chat(
                         client, sid, prompt, timeout)
                 except Exception as e:
-                    success, error, invoked, first_delay = False, str(e), False, 0.0
+                    success, error, invoked = False, str(e), False
+                    first_delay, first_work_delay = 0.0, 0.0
+                    capacity_queued, queue_position = False, 0
+                    retryable_no_tool = False
                 if success:
                     break
-                if not invoked and attempt == 0:
+                if retryable_no_tool and attempt == 0:
                     retried = True
                     await asyncio.sleep(2)
                 else:
@@ -301,7 +348,10 @@ async def run_user(user_id: str, tool_list: list, delay: float, all_runs: list):
             duration = time.time() - t0
             all_runs.append(ToolRun(user_id, tool_name, success, duration,
                                     retried=retried, error=error,
-                                    queue_wait=first_delay or 0.0))
+                                    first_event_delay=first_delay,
+                                    first_work_delay=first_work_delay,
+                                    capacity_queued=capacity_queued,
+                                    queue_position=queue_position))
             icon = "✓" if success else "✗"
             rs = " ↩" if retried else ""
             extra = f"  → {error[:70]}" if error else ""
@@ -310,12 +360,28 @@ async def run_user(user_id: str, tool_list: list, delay: float, all_runs: list):
 
 # ── Stats and report ──────────────────────────────────────────────────────────
 
-def print_stress_report(all_runs: list, wall_time: float):
+def print_stress_report(
+    all_runs: list,
+    wall_time: float,
+    capacity_before: dict | None = None,
+    capacity_after: dict | None = None,
+    retention_probe: dict | None = None,
+    run_id: str = "",
+):
     total  = len(all_runs)
     passed = sum(1 for r in all_runs if r.success)
     failed = total - passed
     retried = sum(1 for r in all_runs if r.retried)
     durations = [r.duration for r in all_runs if r.success]
+    first_events = [r.first_event_delay for r in all_runs if r.first_event_delay > 0]
+    first_work = [r.first_work_delay for r in all_runs if r.first_work_delay > 0]
+    capacity_queued = [r for r in all_runs if r.capacity_queued]
+    retention_ok = bool(
+        retention_probe
+        and retention_probe.get("requested") == NUM_USERS
+        and retention_probe.get("retained") == NUM_USERS
+        and not retention_probe.get("missing")
+    )
 
     print(f"\n{'=' * 78}")
     print(f"  STRESS TEST RESULTS")
@@ -330,6 +396,24 @@ def print_stress_report(all_runs: list, wall_time: float):
     if durations:
         tp = passed / (wall_time / 60)
         print(f"  Throughput     : {tp:.2f} successful runs/min")
+    print()
+
+    if first_events:
+        print(
+            f"  First SSE event: p50 {percentile(first_events,50):.1f}s  "
+            f"p95 {percentile(first_events,95):.1f}s"
+        )
+    if first_work:
+        print(
+            f"  First model/tool activity: p50 {percentile(first_work,50):.1f}s  "
+            f"p95 {percentile(first_work,95):.1f}s"
+        )
+    print(f"  Capacity queued: {len(capacity_queued)}/{total}")
+    if capacity_before or capacity_after:
+        print(f"  Capacity before: {capacity_before or 'unavailable'}")
+        print(f"  Capacity after : {capacity_after or 'unavailable'}")
+        print(f"  Session retention: {'PASS' if retention_ok else 'FAIL'} "
+              f"({retention_probe or 'probe unavailable'})")
     print()
 
     if durations:
@@ -369,7 +453,8 @@ def print_stress_report(all_runs: list, wall_time: float):
     return {
         "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "base_url": BASE_URL,
-        "config": {"num_users": NUM_USERS, "tools_per_user": TOOLS_PER_USER,
+        "config": {"run_id": run_id, "num_users": NUM_USERS,
+                   "tools_per_user": TOOLS_PER_USER,
                    "arrival_window_s": ARRIVAL_WINDOW},
         "summary": {"total": total, "passed": passed, "failed": failed,
                     "retried": retried, "wall_time_s": round(wall_time, 1),
@@ -382,6 +467,21 @@ def print_stress_report(all_runs: list, wall_time: float):
             "min": round(min(durations), 1) if durations else 0,
             "avg": round(statistics.mean(durations), 1) if durations else 0,
             "max": round(max(durations), 1) if durations else 0,
+            "first_event_p50": round(percentile(first_events, 50), 1),
+            "first_event_p95": round(percentile(first_events, 95), 1),
+            "first_work_p50": round(percentile(first_work, 50), 1),
+            "first_work_p95": round(percentile(first_work, 95), 1),
+        },
+        "capacity": {
+            "queued_runs": len(capacity_queued),
+            "maximum_reported_queue_position": max(
+                (r.queue_position for r in capacity_queued),
+                default=0,
+            ),
+            "before": capacity_before,
+            "after": capacity_after,
+            "retention_probe": retention_probe,
+            "session_retention_ok": retention_ok,
         },
         "per_tool": [{
             "tool": tn,
@@ -393,13 +493,37 @@ def print_stress_report(all_runs: list, wall_time: float):
     }
 
 
+async def get_capacity_snapshot() -> dict | None:
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            response = await client.get(f"{BASE_URL}/health/capacity")
+            response.raise_for_status()
+            return response.json()
+    except httpx.HTTPError:
+        return None
+
+
+async def get_session_retention(session_ids: list[str]) -> dict | None:
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            response = await client.post(
+                f"{BASE_URL}/health/capacity/sessions",
+                json={"session_ids": session_ids},
+            )
+            response.raise_for_status()
+            return response.json()
+    except httpx.HTTPError:
+        return None
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 async def main(num_users: int = NUM_USERS):
+    run_id = f"stress-{time.strftime('%Y%m%d%H%M%S')}-{os.getpid()}"
     print(f"\n{'=' * 78}")
     print(f"  CSIS Stress Test  →  {BASE_URL}  (model: {DEFAULT_MODEL})")
     print(f"  {num_users} users  {TOOLS_PER_USER} tools/user  "
-          f"arrival window: {ARRIVAL_WINDOW}s")
+          f"arrival window: {ARRIVAL_WINDOW}s  run: {run_id}")
     print(f"{'=' * 78}\n")
 
     arrivals = sorted([random.uniform(0, ARRIVAL_WINDOW) for _ in range(num_users)])
@@ -410,6 +534,7 @@ async def main(num_users: int = NUM_USERS):
         chosen = random.sample(ALL_TOOLS, min(TOOLS_PER_USER, len(ALL_TOOLS)))
         random.shuffle(chosen)
         user_tools.append(chosen)
+    session_ids = [f"{run_id}-u{i+1:03d}" for i in range(num_users)]
 
     print("  First 5 users:")
     for i in range(min(5, num_users)):
@@ -423,10 +548,11 @@ async def main(num_users: int = NUM_USERS):
         metrics_collector(metric_samples, stop, interval=METRICS_INTERVAL))
 
     wall_start = time.time()
+    capacity_before = await get_capacity_snapshot()
     print("▶ Starting stress test ...\n")
 
     tasks = [
-        run_user(f"u{i+1:02d}", user_tools[i], arrivals[i], all_runs)
+        run_user(session_ids[i], user_tools[i], arrivals[i], all_runs)
         for i in range(num_users)
     ]
     await asyncio.gather(*tasks)
@@ -437,7 +563,16 @@ async def main(num_users: int = NUM_USERS):
     metrics_task.cancel()
 
     print(f"\n■ Complete  wall={wall_time:.1f}s\n")
-    report = print_stress_report(all_runs, wall_time)
+    capacity_after = await get_capacity_snapshot()
+    retention_probe = await get_session_retention(session_ids)
+    report = print_stress_report(
+        all_runs,
+        wall_time,
+        capacity_before=capacity_before,
+        capacity_after=capacity_after,
+        retention_probe=retention_probe,
+        run_id=run_id,
+    )
 
     if metric_samples:
         print("── Resource Usage ──")
@@ -446,6 +581,7 @@ async def main(num_users: int = NUM_USERS):
     with open(REPORT_PATH, "w") as f:
         json.dump(report, f, indent=2)
     print(f"  Report saved → {REPORT_PATH}")
+    return report
 
 
 if __name__ == "__main__":
@@ -453,5 +589,15 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--users", type=int, default=NUM_USERS,
                         help=f"Number of concurrent users (default: {NUM_USERS})")
+    parser.add_argument("--request-timeout", type=int, default=900)
+    parser.add_argument("--min-pass-rate", type=float, default=99.0)
     args = parser.parse_args()
-    asyncio.run(main(num_users=args.users))
+    NUM_USERS = args.users
+    ALL_TOOLS = [
+        (name, files, prompt, max(timeout, args.request_timeout))
+        for name, files, prompt, timeout in ALL_TOOLS
+    ]
+    result = asyncio.run(main(num_users=args.users))
+    pass_rate = 100 * result["summary"]["passed"] / max(1, result["summary"]["total"])
+    capacity_ok = result["capacity"]["session_retention_ok"] is True
+    raise SystemExit(0 if pass_rate >= args.min_pass_rate and capacity_ok else 1)

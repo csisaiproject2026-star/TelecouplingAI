@@ -6,7 +6,7 @@ To change the server's public IP / hostname, set ONE variable in .env.docker:
 FILE_SERVER_URL is automatically derived from it.
 """
 from pathlib import Path
-from pydantic import model_validator
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _PROJECT_ROOT = Path(__file__).parent.parent
@@ -17,6 +17,13 @@ class Settings(BaseSettings):
     # --- AI ---
     GOOGLE_API_KEY: str = ""
     DEFAULT_MODEL: str = "gemini-2.5-flash"
+    GEMINI_MAX_CONCURRENT: int = Field(default=8, ge=1)
+    GEMINI_MAX_QUEUE: int = Field(default=500, ge=1)
+    GEMINI_INPUT_TPM_LIMIT: int = Field(default=3_000_000, ge=0)
+    GEMINI_TPM_UTILIZATION: float = Field(default=0.90, gt=0, le=1)
+    GEMINI_ESTIMATED_INPUT_TOKENS: int = Field(default=45_000, ge=1)
+    SSE_PING_SECONDS: int = Field(default=10, ge=1)
+    RELEASE_VERSION: str = "capacity-200-v1"
 
     # --- Public server URL (set this when IP changes — everything else derives from it) ---
     # Example: SERVER_BASE_URL=http://34.42.83.50  or  http://yourdomain.com
@@ -54,7 +61,8 @@ class Settings(BaseSettings):
 
     # --- Session ---
     SESSION_TTL_HOURS: int = 24
-    MAX_SESSIONS: int = 50
+    SESSION_ACTIVE_LEASE_SECONDS: int = Field(default=3600, ge=60)
+    MAX_SESSIONS: int = Field(default=500, ge=1)
     AUTH_REQUIRED: bool = False
 
     model_config = SettingsConfigDict(env_file=_ENV_FILE, extra="ignore")

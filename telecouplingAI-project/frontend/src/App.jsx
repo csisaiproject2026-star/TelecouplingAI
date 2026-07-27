@@ -630,6 +630,10 @@ function App() {
         appendBlock(chatId, { type: 'warning', message: event.message });
         break;
 
+      case 'capacity_wait':
+        appendBlock(chatId, { type: 'warning', message: event.message });
+        break;
+
       case 'error':
         appendBlock(chatId, { type: 'text', content: `❌ Error: ${event.message}` });
         break;

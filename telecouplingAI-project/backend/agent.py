@@ -19,28 +19,27 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import random
 import re
 from pathlib import Path
 from typing import Callable, Any
 
+import httpx
 import os
 
 from google import genai
+from google.genai import errors as genai_errors
 from google.genai import types
 from google.genai.client import HttpOptions
 import redis.asyncio as aioredis
 
 from config import settings
+from shared.gemini_capacity import gemini_capacity_gate
 from shared.utils import sanitize_error_message, validate_file_params_exist, validate_input_files, CSISError
 from shared.tool_file_specs import TOOL_FILE_SPECS
 
 logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# Gemini concurrency limiter — max 3 simultaneous API calls
-# ---------------------------------------------------------------------------
-
-_GEMINI_SEMAPHORE = asyncio.Semaphore(3)
 _CJK_TEXT_RE = re.compile(r"[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\u3040-\u30ff\uac00-\ud7af]")
 _THINKING_ENGLISH_FALLBACK = "Processing the request and preparing the next step.\n"
 
@@ -58,28 +57,58 @@ def _sanitize_visible_thinking_text(text: str) -> str:
     safe_text = "".join(safe_lines)
     return "" if _CJK_TEXT_RE.search(safe_text) else safe_text
 
-async def _generate_with_retry(client, model_name: str, contents, config, max_retries: int = 4):
-    """Call generate_content with semaphore + exponential backoff on 429/503."""
-    import random
-    for attempt in range(max_retries):
-        async with _GEMINI_SEMAPHORE:
+def _transient_error_kind(exc: BaseException) -> str | None:
+    if isinstance(exc, genai_errors.APIError):
+        code = int(exc.code or 0)
+        if code == 429:
+            return "rate limit"
+        if code in {500, 502, 503, 504}:
+            return "server error"
+        if code in {408}:
+            return "timeout"
+        return None
+    if isinstance(exc, (httpx.TimeoutException, asyncio.TimeoutError)):
+        return "timeout"
+    if isinstance(exc, httpx.TransportError):
+        return "transport error"
+    return None
+
+
+def _retry_delay(exc: BaseException, attempt: int) -> float:
+    if isinstance(exc, genai_errors.APIError) and exc.response is not None:
+        retry_after = exc.response.headers.get("retry-after")
+        if retry_after:
             try:
+                return max(0.0, float(retry_after))
+            except ValueError:
+                pass
+    return (2 ** attempt) + random.uniform(0, 1)
+
+
+async def _generate_with_retry(client, model_name: str, contents, config, max_retries: int = 4):
+    """Call Gemini with bounded admission and backoff outside the active slot."""
+    estimated_tokens = gemini_capacity_gate.estimate_input_tokens(contents, config)
+    for attempt in range(max_retries):
+        try:
+            async with gemini_capacity_gate.slot(estimated_tokens):
                 return await client.aio.models.generate_content(
                     model=model_name,
                     contents=contents,
                     config=config,
                 )
-            except Exception as e:
-                err_str = str(e).lower()
-                is_rate_limit = "429" in err_str or "quota" in err_str or "resource_exhausted" in err_str
-                is_server_err = "503" in err_str or "unavailable" in err_str
-                if (is_rate_limit or is_server_err) and attempt < max_retries - 1:
-                    wait = (2 ** attempt) + random.uniform(0, 1)
-                    logger.warning(f"[agent] Gemini {'rate limit' if is_rate_limit else 'server error'} "
-                                   f"(attempt {attempt+1}/{max_retries}), retrying in {wait:.1f}s")
-                    await asyncio.sleep(wait)
-                else:
-                    raise
+        except (genai_errors.APIError, httpx.HTTPError, asyncio.TimeoutError) as exc:
+            kind = _transient_error_kind(exc)
+            if kind is None or attempt >= max_retries - 1:
+                raise
+            wait = _retry_delay(exc, attempt)
+            logger.warning(
+                "[agent] Gemini %s (attempt %s/%s), retrying in %.1fs",
+                kind,
+                attempt + 1,
+                max_retries,
+                wait,
+            )
+            await asyncio.sleep(wait)
 
 
 class _StreamedResponse:
@@ -95,16 +124,29 @@ async def _generate_streaming(client, model_name: str, contents, config, emit,
     """Like _generate_with_retry but STREAMS: emits `thinking`/`text_chunk` events
     live as deltas arrive (so the UI's thinking block grows in real time), then
     returns the fully assembled response. Falls back through the same 429/503 retry."""
-    import random, inspect
+    import inspect
     # Per-chunk inactivity watchdog: Gemini 2.5 Flash intermittently opens the stream
     # (HTTP 200) and then stops emitting — or returns only "thinking" with no answer /
     # function call. Both leave the user stuck. We abort a silent stream after
     # _STALL_TIMEOUT and treat an answer-less stream as empty, then retry on a FRESH
     # connection (stalls are transient → a retry usually succeeds).
     _STALL_TIMEOUT = 60  # seconds with no new chunk
+    estimated_tokens = gemini_capacity_gate.estimate_input_tokens(contents, config)
+    capacity_notice_sent = False
+
+    async def emit_capacity_wait(event: dict) -> None:
+        nonlocal capacity_notice_sent
+        if not capacity_notice_sent:
+            capacity_notice_sent = True
+            await _maybe_await(emit(event))
+
     for attempt in range(max_retries):
-        async with _GEMINI_SEMAPHORE:
-            try:
+        retry_wait: float | None = None
+        try:
+            async with gemini_capacity_gate.slot(
+                estimated_tokens,
+                on_wait=emit_capacity_wait,
+            ):
                 collected = []
                 thinking_fallback_sent = False
                 maybe = client.aio.models.generate_content_stream(
@@ -147,31 +189,37 @@ async def _generate_streaming(client, model_name: str, contents, config, emit,
                 if not has_real and attempt < max_retries - 1:
                     logger.warning(f"[agent] Gemini empty/answer-less stream "
                                    f"(attempt {attempt+1}/{max_retries}), retrying on fresh connection")
-                    await asyncio.sleep((2 ** attempt) * 0.5 + random.uniform(0, 0.5))
-                    continue
-                content = (types.Content(role="model", parts=collected)
-                           if collected else types.Content(role="model"))
-                return _StreamedResponse(content)
-            except asyncio.TimeoutError:
-                if attempt < max_retries - 1:
-                    logger.warning(f"[agent] Gemini stream STALLED >{_STALL_TIMEOUT}s with no output "
-                                   f"(attempt {attempt+1}/{max_retries}), retrying on fresh connection")
-                    await asyncio.sleep(0.5 + random.uniform(0, 0.5))
-                    continue
-                raise
-            except Exception as e:
-                err_str = str(e).lower()
-                is_rate_limit = "429" in err_str or "quota" in err_str or "resource_exhausted" in err_str
-                is_server_err = "503" in err_str or "unavailable" in err_str
-                is_timeout = "timeout" in err_str or "timed out" in err_str or "deadline" in err_str
-                if (is_rate_limit or is_server_err or is_timeout) and attempt < max_retries - 1:
-                    wait = (2 ** attempt) + random.uniform(0, 1)
-                    _kind = ("rate limit" if is_rate_limit else "timeout" if is_timeout else "server error")
-                    logger.warning(f"[agent] Gemini stream {_kind} "
-                                   f"(attempt {attempt+1}/{max_retries}), retrying in {wait:.1f}s")
-                    await asyncio.sleep(wait)
+                    retry_wait = (2 ** attempt) * 0.5 + random.uniform(0, 0.5)
                 else:
-                    raise
+                    content = (types.Content(role="model", parts=collected)
+                               if collected else types.Content(role="model"))
+                    return _StreamedResponse(content)
+        except asyncio.TimeoutError:
+            if attempt >= max_retries - 1:
+                raise
+            retry_wait = 0.5 + random.uniform(0, 0.5)
+            logger.warning(
+                "[agent] Gemini stream STALLED >%ss with no output "
+                "(attempt %s/%s), retrying on fresh connection",
+                _STALL_TIMEOUT,
+                attempt + 1,
+                max_retries,
+            )
+        except (genai_errors.APIError, httpx.HTTPError) as exc:
+            kind = _transient_error_kind(exc)
+            if kind is None or attempt >= max_retries - 1:
+                raise
+            retry_wait = _retry_delay(exc, attempt)
+            logger.warning(
+                "[agent] Gemini stream %s (attempt %s/%s), retrying in %.1fs",
+                kind,
+                attempt + 1,
+                max_retries,
+                retry_wait,
+            )
+
+        if retry_wait is not None:
+            await asyncio.sleep(retry_wait)
 
 # ---------------------------------------------------------------------------
 # Gemini client — lazy singleton, created on first use
@@ -1979,6 +2027,7 @@ async def run_agent(
     event_callback: Callable[[dict], Any],
     model: str | None = None,
     chat_history: list[dict] | None = None,
+    session_manager: Any | None = None,
 ) -> None:
     """
     Main agent loop using Gemini native function calling.
@@ -1994,6 +2043,9 @@ async def run_agent(
     so no progress events are missed, then tool_start is sent to frontend.
     """
     from workers.task_queue import run_tool_task
+    if session_manager is None:
+        raise ValueError("run_agent requires the application session manager")
+    _sm = session_manager
 
     # Map each InVEST tool to its dedicated Celery queue (concurrency=1 per queue
     # prevents GDAL/InVEST multi-process conflicts under concurrent user load).
@@ -2066,8 +2118,6 @@ async def run_agent(
     )
 
     # Build initial user message (uploaded + previous output file paths prepended)
-    from shared.session_manager import SessionManager as _SM
-    _sm = _SM()
     context_lines = []
     current_paths = {f.get('path', '') for f in (files or [])}
     if files:
@@ -2078,7 +2128,7 @@ async def run_agent(
     # Re-inject files uploaded in previous turns so Gemini can use them even when
     # the user spreads parameter collection across multiple messages.
     prev_uploaded = [
-        f for f in _sm.get_uploaded_files(session_id)
+        f for f in await _sm.get_uploaded_files(session_id)
         if f.get('path', '') not in current_paths
     ]
     if prev_uploaded:
@@ -2086,7 +2136,7 @@ async def run_agent(
             f"Previously uploaded file: {f.get('filename', 'unknown')} at {f.get('path', '')}"
             for f in prev_uploaded
         ]
-    output_files = _sm.get_output_files(session_id)
+    output_files = await _sm.get_output_files(session_id)
     if output_files:
         context_lines += [
             f"Previous output file: {f.get('filename', 'unknown')} at {f.get('path', '')}"
@@ -2139,7 +2189,7 @@ async def run_agent(
     # answers; the supplement/"change the plan" box still re-proposes (its message
     # names a tool / explicitly asks to re-propose), and WORKFLOW_PROMPT tells the
     # model to call execute (not re-propose) on follow-ups.
-    _has_plan = _sm.get_workflow_plan(session_id) is not None
+    _has_plan = await _sm.get_workflow_plan(session_id) is not None
     # The "Add & re-plan" button explicitly asks for a new plan card. Force propose
     # regardless of _has_plan / single-tool detection (it's a deliberate refinement).
     _force_replan = (not _force_confirm) and _looks_like_workflow_replan(user_text)
@@ -2156,7 +2206,7 @@ async def run_agent(
     # Trigger execute when EITHER: the send carried fresh files (marker), OR it's a
     # plain "run it" with files already uploaded this session (text-only run — lets the
     # run sidestep the file-attached send entirely if that handoff flaked).
-    _has_uploads = bool(_sm.get_uploaded_files(session_id))
+    _has_uploads = bool(await _sm.get_uploaded_files(session_id))
     _force_execute_on_upload = (_has_plan and not _force_confirm and not _force_replan
                                 and (_looks_like_files_attached(user_text)
                                      or (_has_uploads and _looks_like_run_intent(user_text))))
@@ -2335,8 +2385,7 @@ async def run_agent(
                 else:
                     # Stash the valid plan so a later confirm turn can execute it.
                     try:
-                        from shared.session_manager import SessionManager as _SMx
-                        _SMx().set_workflow_plan(session_id, plan_dict)
+                        await _sm.set_workflow_plan(session_id, plan_dict)
                     except Exception:
                         logger.exception("[agent] failed to stash workflow plan")
                     workflow_proposed = True
@@ -2355,9 +2404,7 @@ async def run_agent(
             # ── Deterministic re-plan: keep the user's chosen steps EXACTLY, take only
             # the LLM's NEW step(s), and merge. The model cannot re-add deselected steps.
             if tool_name == "add_workflow_steps":
-                from shared.session_manager import SessionManager as _SMx
-                _smx = _SMx()
-                stored = _smx.get_workflow_plan(session_id)
+                stored = await _sm.get_workflow_plan(session_id)
                 keep_ids = _parse_replan_keep(user_text)   # None = token absent → keep all
                 try:
                     added = plan_from_llm_args(tool_input)  # new steps + new required_inputs
@@ -2390,7 +2437,7 @@ async def run_agent(
                           "instruction": "Fix these issues and call add_workflow_steps again with corrected new step(s)."}
                 else:
                     try:
-                        _smx.set_workflow_plan(session_id, plan_dict)
+                        await _sm.set_workflow_plan(session_id, plan_dict)
                     except Exception:
                         logger.exception("[agent] failed to stash merged workflow plan")
                     workflow_proposed = True
@@ -2407,9 +2454,7 @@ async def run_agent(
 
             # ── Workflow execution: run the confirmed plan (reconcile + stream each step).
             if tool_name == "execute_workflow_plan":
-                from shared.session_manager import SessionManager as _SMx
-                _sm = _SMx()
-                stored = _sm.get_workflow_plan(session_id)
+                stored = await _sm.get_workflow_plan(session_id)
                 if not stored:
                     function_response_parts.append(types.Part.from_function_response(
                         name=tool_name, response={"result": {
@@ -2431,7 +2476,7 @@ async def run_agent(
                 extra_inputs = _apply_file_overrides(stored, file_ovr)
                 if overrides or file_ovr:
                     try:
-                        _sm.set_workflow_plan(session_id, stored)  # persist so a retry keeps them
+                        await _sm.set_workflow_plan(session_id, stored)  # persist so a retry keeps them
                     except Exception:
                         logger.exception("[agent] failed to persist overrides")
                 wf_plan = plan_from_dict(stored)
@@ -2457,8 +2502,9 @@ async def run_agent(
                 _cur_batch = {f.get("path") for f in files
                               if isinstance(f, dict) and f.get("current_batch")}
                 try:
+                    uploaded_files = await _sm.get_uploaded_files(session_id)
                     inputs_map = _auto_map_inputs(wf_plan, inputs_map,
-                                                  _sm.get_uploaded_files(session_id),
+                                                  uploaded_files,
                                                   prefer_paths=_cur_batch)
                 except Exception:
                     logger.exception("[agent] auto-map inputs failed")
@@ -2512,7 +2558,7 @@ async def run_agent(
                     continue
 
                 try:
-                    _sm.add_output_files(session_id, wf_ctx.get("files", []))
+                    await _sm.add_output_files(session_id, wf_ctx.get("files", []))
                 except Exception:
                     pass
 
@@ -2534,10 +2580,14 @@ async def run_agent(
             if tool_name in {"render_spatial_file", "render_telecoupling_scene"}:
                 from shared.file_reference_resolver import resolve_render_file_references
 
+                prior_files = (
+                    await _sm.get_output_files(session_id)
+                    + await _sm.get_uploaded_files(session_id)
+                )
                 tool_input = resolve_render_file_references(
                     tool_name,
                     tool_input,
-                    _sm.get_output_files(session_id) + _sm.get_uploaded_files(session_id),
+                    prior_files,
                 )
             try:
                 validate_file_params_exist(tool_input)

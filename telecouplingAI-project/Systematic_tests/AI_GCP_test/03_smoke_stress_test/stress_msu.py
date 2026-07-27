@@ -32,7 +32,9 @@ if __name__ == "__main__":
     ap.add_argument("--pool", choices=["fast", "mixed"], default="fast")
     ap.add_argument("--window", type=int, default=30,
                     help="arrival window seconds (smaller = more simultaneous)")
-    ap.add_argument("--tools-per-user", type=int, default=2)
+    ap.add_argument("--tools-per-user", type=int, default=1)
+    ap.add_argument("--request-timeout", type=int, default=900)
+    ap.add_argument("--min-pass-rate", type=float, default=99.0)
     args = ap.parse_args()
 
     keep = FAST if args.pool == "fast" else (FAST | HEAVY)
@@ -40,7 +42,14 @@ if __name__ == "__main__":
     S.NUM_USERS = args.users
     S.ARRIVAL_WINDOW = args.window
     S.TOOLS_PER_USER = args.tools_per_user
+    S.ALL_TOOLS = [
+        (name, files, prompt, max(timeout, args.request_timeout))
+        for name, files, prompt, timeout in S.ALL_TOOLS
+    ]
 
     print(f"POOL={args.pool}  tools={[t[0] for t in S.ALL_TOOLS]}  "
           f"users={args.users}  window={args.window}s  tools/user={args.tools_per_user}")
-    asyncio.run(S.main(num_users=args.users))
+    report = asyncio.run(S.main(num_users=args.users))
+    pass_rate = 100 * report["summary"]["passed"] / max(1, report["summary"]["total"])
+    capacity_ok = report["capacity"]["session_retention_ok"] is True
+    raise SystemExit(0 if pass_rate >= args.min_pass_rate and capacity_ok else 1)

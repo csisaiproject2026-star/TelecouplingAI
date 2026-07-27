@@ -25,6 +25,10 @@ def set_env(monkeypatch, tmp_path):
     monkeypatch.setenv("GOOGLE_API_KEY", "fake-key-for-testing")
     monkeypatch.setenv("SHARED_DIR", str(tmp_path / "outputs"))
     monkeypatch.setenv("UPLOADS_DIR", str(tmp_path / "uploads"))
+    from config import settings
+    monkeypatch.setattr(settings, "GOOGLE_API_KEY", "fake-key-for-testing")
+    monkeypatch.setattr(settings, "SHARED_DIR", str(tmp_path / "outputs"))
+    monkeypatch.setattr(settings, "UPLOADS_DIR", str(tmp_path / "uploads"))
     os.makedirs(str(tmp_path / "outputs"), exist_ok=True)
     os.makedirs(str(tmp_path / "uploads"), exist_ok=True)
 
@@ -33,12 +37,20 @@ def set_env(monkeypatch, tmp_path):
 def mock_session_manager():
     """Return a mock SessionManager that doesn't need Redis."""
     sm = MagicMock()
-    sm.get_session.return_value = {"created_at": 0.0, "last_active": 0.0}
-    sm.create_session.return_value = {}
-    sm.touch_session.return_value = None
-    sm.add_uploaded_file.return_value = None
-    sm.add_output_files.return_value = None
-    sm.delete_session.return_value = None
+    sm.get_session = AsyncMock(return_value={"created_at": 0.0, "last_active": 0.0})
+    sm.create_session = AsyncMock(return_value={})
+    sm.touch_session = AsyncMock(return_value=True)
+    sm.mark_session_active = AsyncMock(return_value=True)
+    sm.mark_session_inactive = AsyncMock(return_value=None)
+    sm.add_uploaded_file = AsyncMock(return_value=None)
+    sm.get_uploaded_files = AsyncMock(return_value=[])
+    sm.get_chat_history = AsyncMock(return_value=[])
+    sm.add_chat_turn = AsyncMock(return_value=None)
+    sm.add_output_files = AsyncMock(return_value=None)
+    sm.delete_session = AsyncMock(return_value=None)
+    sm.count_sessions = AsyncMock(return_value=1)
+    sm.sessions_exist = AsyncMock(return_value={"capacity-user": True})
+    sm.close = AsyncMock(return_value=None)
     return sm
 
 
@@ -62,6 +74,32 @@ def test_health(client):
     resp = client.get("/health")
     assert resp.status_code == 200
     assert resp.json() == {"status": "ok"}
+
+
+def test_capacity_health(client):
+    resp = client.get("/health/capacity")
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["status"] == "ok"
+    assert data["release_version"]
+    assert data["sessions"]["current"] == 1
+    assert data["sessions"]["maximum"] >= 200
+    assert data["gemini"]["max_queue"] >= 200
+
+
+def test_capacity_session_probe(client):
+    resp = client.post(
+        "/health/capacity/sessions",
+        json={"session_ids": ["capacity-user"]},
+    )
+
+    assert resp.status_code == 200
+    assert resp.json() == {
+        "requested": 1,
+        "retained": 1,
+        "missing": [],
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -172,7 +210,8 @@ def test_delete_session(client):
 def test_chat_sse_returns_text_chunk(client, mock_session_manager):
     """Mock the agent to emit a text_chunk and done event, verify SSE format."""
 
-    async def fake_agent(message, session_id, files, event_callback, model=None, chat_history=None):
+    async def fake_agent(message, session_id, files, event_callback, model=None,
+                         chat_history=None, session_manager=None):
         await event_callback({"type": "text_chunk", "content": "Hello from CSIS!"})
         await event_callback({"type": "done"})
 
@@ -195,7 +234,8 @@ def test_chat_sse_returns_text_chunk(client, mock_session_manager):
 def test_chat_sse_error_event_on_agent_failure(client, mock_session_manager):
     """If agent raises, SSE should contain an error event (not a 500)."""
 
-    async def failing_agent(message, session_id, files, event_callback, model=None, chat_history=None):
+    async def failing_agent(message, session_id, files, event_callback, model=None,
+                            chat_history=None, session_manager=None):
         raise RuntimeError("Simulated agent crash")
 
     with patch("agent.run_agent", side_effect=failing_agent):
@@ -214,7 +254,8 @@ def test_chat_sse_error_event_on_agent_failure(client, mock_session_manager):
 def test_chat_sse_assigns_session_id_if_missing(client, mock_session_manager):
     """If no X-Session-ID header, backend should assign one and return it."""
 
-    async def fake_agent(message, session_id, files, event_callback, model=None, chat_history=None):
+    async def fake_agent(message, session_id, files, event_callback, model=None,
+                         chat_history=None, session_manager=None):
         await event_callback({"type": "done"})
 
     with patch("agent.run_agent", side_effect=fake_agent):

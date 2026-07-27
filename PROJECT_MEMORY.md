@@ -34,6 +34,16 @@
 - Per-server `.env` and `.env.docker` files must never be copied from local or between servers.
 - `SERVER_BASE_URL` is the single base URL setting; download URLs are derived by backend configuration.
 
+## MSU Gemini capacity checkpoint (2026-07-27)
+
+- User-provided Google AI Studio evidence confirms the active project `CSIS-AI-Platform-Project` is Tier 2.
+- Active Gemini 2.5 Flash limits shown on 2026-07-27: 2,000 RPM, 3,000,000 input TPM, and 100,000 RPD.
+- Current Google billing rule checked on 2026-07-27: Tier 3 is automatically granted after the linked Cloud Billing account has paid USD 1,000 and 30 days have elapsed since its first successful payment; eligible upgrades usually appear within about 10 minutes after payment/criteria processing.
+- This supersedes the historical May 2026 stress-test assumption of 1,000,000 input TPM for current capacity planning.
+- At the historical prompt footprint of about 43,000 input tokens per model call, TPM alone permits about 69 model calls per minute in theory; a user workflow may require multiple model calls.
+- Current application limits remain more immediate: `MAX_SESSIONS=50`, one Uvicorn process, `_GEMINI_SEMAPHORE=3`, and usually one Celery worker slot per tool queue.
+- Do not promise 200 simultaneously active users without raising/fixing session capacity, improving Gemini concurrency/backpressure, and rerunning realistic 200-user tests through the public MSU WAF.
+
 ## Deployment discipline
 
 - Transfer only selected source files or a tar archive that explicitly excludes `.env` and `.env.docker`.

@@ -9,6 +9,7 @@ Endpoints:
   POST   /api/download_zip/{session_id}     Bundle a specific set of result files into one ZIP
   DELETE /api/sessions/{session_id}         Delete session and outputs
   GET    /health                            Health check
+  GET    /health/capacity                   Session and Gemini capacity snapshot
 """
 from __future__ import annotations
 import asyncio
@@ -87,7 +88,14 @@ async def startup_check() -> None:
         raise RuntimeError("GOOGLE_API_KEY is not set. Check your .env file.")
     os.makedirs(settings.SHARED_DIR, exist_ok=True)
     os.makedirs(settings.UPLOADS_DIR, exist_ok=True)
+    await get_session_manager().count_sessions()
     logger.info("CSIS backend started ✅")
+
+
+@app.on_event("shutdown")
+async def shutdown() -> None:
+    if _session_manager is not None:
+        await _session_manager.close()
 
 
 # ---------------------------------------------------------------------------
@@ -97,6 +105,41 @@ async def startup_check() -> None:
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+
+@app.get("/health/capacity")
+async def capacity_health():
+    from shared.gemini_capacity import gemini_capacity_gate
+
+    gemini = (await gemini_capacity_gate.snapshot()).as_dict()
+    sessions = await get_session_manager().count_sessions()
+    return {
+        "status": "ok",
+        "release_version": settings.RELEASE_VERSION,
+        "sessions": {
+            "current": sessions,
+            "maximum": settings.MAX_SESSIONS,
+        },
+        "gemini": gemini,
+    }
+
+
+class SessionProbeRequest(BaseModel):
+    session_ids: list[str]
+
+
+@app.post("/health/capacity/sessions")
+async def capacity_session_probe(request: SessionProbeRequest):
+    session_ids = list(dict.fromkeys(request.session_ids))
+    if len(session_ids) > settings.MAX_SESSIONS:
+        raise HTTPException(status_code=400, detail="Too many session IDs")
+    existence = await get_session_manager().sessions_exist(session_ids)
+    missing = [session_id for session_id, exists in existence.items() if not exists]
+    return {
+        "requested": len(session_ids),
+        "retained": len(session_ids) - len(missing),
+        "missing": missing,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -115,11 +158,11 @@ async def chat_endpoint(
 
     # Resolve or create session
     session_id = x_session_id or f"csis_{uuid.uuid4().hex}"
-    session = sm.get_session(session_id)
+    session = await sm.get_session(session_id)
     if not session:
-        sm.create_session(session_id)
+        await sm.create_session(session_id)
     else:
-        sm.touch_session(session_id)
+        await sm.touch_session(session_id)
 
     # If no message but files were uploaded, generate a sensible default prompt
     if not message or not message.strip():
@@ -171,21 +214,28 @@ async def chat_endpoint(
             os.makedirs(os.path.dirname(dest), exist_ok=True)
             async with aiofiles.open(dest, "wb") as f:
                 await f.write(await uf.read())
-            sm.add_uploaded_file(session_id, dest)
+            await sm.add_uploaded_file(session_id, dest)
             uploaded.append({"filename": rel, "path": dest, "current_batch": True})
             logger.info(f"[upload] {uf.filename} → {dest}")
 
-    # Include files previously uploaded via /api/upload in this session
-    session_data = sm.get_session(session_id)
-    if session_data:
-        existing_paths = {f["path"] for f in uploaded}
-        for f in sm.get_uploaded_files(session_id):
-            if f["path"] not in existing_paths:
-                uploaded.append(f)
+    session_lease = await sm.mark_session_active(session_id)
+    if session_lease is None:
+        raise HTTPException(status_code=409, detail="Session expired before processing started")
+    try:
+        # Include files previously uploaded via /api/upload in this session.
+        session_data = await sm.get_session(session_id)
+        if session_data:
+            existing_paths = {f["path"] for f in uploaded}
+            for f in await sm.get_uploaded_files(session_id):
+                if f["path"] not in existing_paths:
+                    uploaded.append(f)
 
-    # Retrieve prior conversation history and save the current user turn
-    chat_history = sm.get_chat_history(session_id)
-    sm.add_chat_turn(session_id, "user", message)
+        # Retrieve prior conversation history and save the current user turn.
+        chat_history = await sm.get_chat_history(session_id)
+        await sm.add_chat_turn(session_id, "user", message)
+    except Exception:
+        await sm.mark_session_inactive(session_lease)
+        raise
 
     async def event_stream():
         queue: asyncio.Queue[dict | None] = asyncio.Queue()
@@ -211,6 +261,7 @@ async def chat_endpoint(
                     event_callback=callback,
                     model=model,
                     chat_history=chat_history,
+                    session_manager=sm,
                 )
             except Exception as exc:
                 import traceback as _tb
@@ -249,7 +300,7 @@ async def chat_endpoint(
                     # Store output file paths in session for multi-turn context
                     output_files = event.get("files", [])
                     if output_files:
-                        sm.add_output_files(session_id, [
+                        await sm.add_output_files(session_id, [
                             {"filename": f["filename"], "path": f.get("path", "")}
                             for f in output_files if f.get("path")
                         ])
@@ -266,7 +317,7 @@ async def chat_endpoint(
             ai_text = "".join(ai_text_parts)
             if ai_text:
                 ai_text = _INLINE_BASE64_IMG_RE.sub('[inline image suppressed]', ai_text)
-                sm.add_chat_turn(session_id, "model", ai_text)
+                await sm.add_chat_turn(session_id, "model", ai_text)
         finally:
             # Client disconnected or stream ended — cancel the agent task to
             # prevent zombie coroutines and "Task was destroyed but pending" errors.
@@ -278,14 +329,15 @@ async def chat_endpoint(
                     await agent_task
                 except (asyncio.CancelledError, Exception):
                     pass
+            await sm.mark_session_inactive(session_lease)
 
-    # EventSourceResponse(ping=15) emits a comment frame ": ping\n\n" every 15s
-    # whenever the generator is idle. That defeats MSU WAF idle timeouts (which
+    # EventSourceResponse emits a comment frame whenever the generator is idle.
+    # That defeats MSU WAF idle timeouts (which
     # otherwise sever the connection during long tool runs and surface as a
     # "Failed to fetch" in the browser).
     return EventSourceResponse(
         event_stream(),
-        ping=15,
+        ping=settings.SSE_PING_SECONDS,
         headers={
             "Cache-Control": "no-cache",
             "X-Accel-Buffering": "no",
@@ -342,8 +394,8 @@ async def upload_endpoint(
 ):
     sm = get_session_manager()
     session_id = x_session_id or f"csis_{uuid.uuid4().hex}"
-    if not sm.get_session(session_id):
-        sm.create_session(session_id)
+    if not await sm.get_session(session_id):
+        await sm.create_session(session_id)
 
     upload_dir = os.path.join(settings.UPLOADS_DIR, session_id)
     os.makedirs(upload_dir, exist_ok=True)
@@ -364,7 +416,7 @@ async def upload_endpoint(
         os.makedirs(os.path.dirname(dest), exist_ok=True)
         async with aiofiles.open(dest, "wb") as f:
             await f.write(await uf.read())
-        sm.add_uploaded_file(session_id, dest)
+        await sm.add_uploaded_file(session_id, dest)
         saved.append({"filename": rel, "path": dest})
         logger.info(f"[upload] {rel} → {dest}")
 
@@ -504,7 +556,7 @@ def download_zip(session_id: str, req: ZipRequest):
 
 @app.delete("/api/sessions/{session_id}")
 async def delete_session(session_id: str):
-    get_session_manager().delete_session(session_id)
+    await get_session_manager().delete_session(session_id)
     return {"status": "deleted", "session_id": session_id}
 
 
