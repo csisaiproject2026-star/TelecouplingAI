@@ -72,25 +72,48 @@ async def test_nonstreaming_timeout_releases_capacity_slot(bounded_gate):
 
 
 @pytest.mark.asyncio
-async def test_outer_watchdog_restarts_entire_stream_attempt(monkeypatch):
+async def test_watchdog_detaches_without_leaking_capacity_or_events(
+    monkeypatch,
+    bounded_gate,
+):
     attempts = 0
+    release_cancelled = asyncio.Event()
+    detached_tasks = []
+    emitted = []
 
-    async def hanging_stream(*args, **kwargs):
+    async def hanging_stream(client, model_name, contents, config, emit):
         nonlocal attempts
         attempts += 1
-        await asyncio.Event().wait()
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            detached_tasks.append(asyncio.current_task())
+            await release_cancelled.wait()
+            await emit({"type": "text_chunk", "content": "stale"})
+            return SimpleNamespace(), True
 
-    monkeypatch.setattr(agent, "_generate_streaming", hanging_stream)
+    async def capture_event(event):
+        emitted.append(event)
+
+    monkeypatch.setattr(agent, "_consume_gemini_stream", hanging_stream)
     monkeypatch.setattr(agent, "_GEMINI_ATTEMPT_TIMEOUT", 0.01)
-    monkeypatch.setattr(agent, "_GEMINI_STALL_RESTARTS", 2)
 
     with pytest.raises(asyncio.TimeoutError):
-        await agent._generate_streaming_with_watchdog(
+        await agent._generate_streaming(
             SimpleNamespace(),
             "test-model",
             [],
             {},
-            lambda event: None,
+            capture_event,
+            max_retries=3,
         )
 
     assert attempts == 3
+    await asyncio.sleep(0)
+    assert len(detached_tasks) == 3
+    snapshot = await bounded_gate.snapshot()
+    assert snapshot.active == 0
+    assert snapshot.waiting == 0
+    release_cancelled.set()
+    await asyncio.gather(*detached_tasks)
+    assert emitted == []

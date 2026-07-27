@@ -44,7 +44,6 @@ _CJK_TEXT_RE = re.compile(r"[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\u3040-\u30f
 _THINKING_ENGLISH_FALLBACK = "Processing the request and preparing the next step.\n"
 _GEMINI_STALL_TIMEOUT = 60
 _GEMINI_ATTEMPT_TIMEOUT = 120
-_GEMINI_STALL_RESTARTS = 2
 
 
 def _sanitize_visible_thinking_text(text: str) -> str:
@@ -125,17 +124,74 @@ class _StreamedResponse:
         self.candidates = [types.Candidate(content=content)]
 
 
+async def _consume_gemini_stream(client, model_name: str, contents, config, emit):
+    """Consume one SDK stream attempt without owning a capacity slot."""
+    import inspect
+    collected = []
+    thinking_fallback_sent = False
+    maybe = client.aio.models.generate_content_stream(
+        model=model_name, contents=contents, config=config,
+    )
+    stream = (
+        await asyncio.wait_for(maybe, timeout=_GEMINI_STALL_TIMEOUT)
+        if inspect.isawaitable(maybe)
+        else maybe
+    )
+    ait = stream.__aiter__()
+    while True:
+        try:
+            chunk = await asyncio.wait_for(
+                ait.__anext__(),
+                timeout=_GEMINI_STALL_TIMEOUT,
+            )
+        except StopAsyncIteration:
+            break
+        cand = chunk.candidates[0] if getattr(chunk, "candidates", None) else None
+        if not cand or cand.content is None or not cand.content.parts:
+            continue
+        for part in cand.content.parts:
+            if part.function_call is not None:
+                collected.append(part)
+            elif part.text:
+                if getattr(part, "thought", False):
+                    visible_thinking = _sanitize_visible_thinking_text(part.text)
+                    if visible_thinking:
+                        await _maybe_await(emit({
+                            "type": "thinking",
+                            "content": visible_thinking,
+                        }))
+                    elif not thinking_fallback_sent:
+                        await _maybe_await(emit({
+                            "type": "thinking",
+                            "content": _THINKING_ENGLISH_FALLBACK,
+                        }))
+                        thinking_fallback_sent = True
+                else:
+                    await _maybe_await(emit({
+                        "type": "text_chunk",
+                        "content": part.text,
+                    }))
+                collected.append(part)
+
+    has_real = any(
+        getattr(part, "function_call", None) is not None
+        or (
+            getattr(part, "text", None)
+            and not getattr(part, "thought", False)
+        )
+        for part in collected
+    )
+    content = (
+        types.Content(role="model", parts=collected)
+        if collected
+        else types.Content(role="model")
+    )
+    return _StreamedResponse(content), has_real
+
+
 async def _generate_streaming(client, model_name: str, contents, config, emit,
                               max_retries: int = 4):
-    """Like _generate_with_retry but STREAMS: emits `thinking`/`text_chunk` events
-    live as deltas arrive (so the UI's thinking block grows in real time), then
-    returns the fully assembled response. Falls back through the same 429/503 retry."""
-    import inspect
-    # Per-chunk inactivity watchdog: Gemini 2.5 Flash intermittently opens the stream
-    # (HTTP 200) and then stops emitting — or returns only "thinking" with no answer /
-    # function call. Both leave the user stuck. We abort a silent stream after
-    # _STALL_TIMEOUT and treat an answer-less stream as empty, then retry on a FRESH
-    # connection (stalls are transient → a retry usually succeeds).
+    """Stream Gemini with bounded admission and cancellation-resistant retries."""
     estimated_tokens = gemini_capacity_gate.estimate_input_tokens(contents, config)
     capacity_notice_sent = False
 
@@ -147,65 +203,57 @@ async def _generate_streaming(client, model_name: str, contents, config, emit,
 
     for attempt in range(max_retries):
         retry_wait: float | None = None
+        attempt_state = {"active": True}
+
+        async def attempt_emit(event, state=attempt_state):
+            if state["active"]:
+                await _maybe_await(emit(event))
+
         try:
             async with gemini_capacity_gate.slot(
                 estimated_tokens,
                 on_wait=emit_capacity_wait,
             ):
-                collected = []
-                thinking_fallback_sent = False
-                maybe = client.aio.models.generate_content_stream(
-                    model=model_name, contents=contents, config=config,
+                stream_task = asyncio.create_task(
+                    _consume_gemini_stream(
+                        client,
+                        model_name,
+                        contents,
+                        config,
+                        attempt_emit,
+                    )
                 )
-                stream = (
-                    await asyncio.wait_for(maybe, timeout=_GEMINI_STALL_TIMEOUT)
-                    if inspect.isawaitable(maybe)
-                    else maybe
+                try:
+                    done, _ = await asyncio.wait(
+                        {stream_task},
+                        timeout=_GEMINI_ATTEMPT_TIMEOUT,
+                    )
+                except asyncio.CancelledError:
+                    attempt_state["active"] = False
+                    stream_task.cancel()
+                    stream_task.add_done_callback(_discard_task_result)
+                    raise
+
+                if not done:
+                    attempt_state["active"] = False
+                    stream_task.cancel()
+                    stream_task.add_done_callback(_discard_task_result)
+                    raise asyncio.TimeoutError(
+                        f"Gemini stream exceeded {_GEMINI_ATTEMPT_TIMEOUT}s"
+                    )
+
+                response, has_real = stream_task.result()
+
+            if not has_real and attempt < max_retries - 1:
+                logger.warning(
+                    "[agent] Gemini empty/answer-less stream "
+                    "(attempt %s/%s), retrying on fresh connection",
+                    attempt + 1,
+                    max_retries,
                 )
-                ait = stream.__aiter__()
-                while True:
-                    try:
-                        chunk = await asyncio.wait_for(
-                            ait.__anext__(),
-                            timeout=_GEMINI_STALL_TIMEOUT,
-                        )
-                    except StopAsyncIteration:
-                        break
-                    cand = chunk.candidates[0] if getattr(chunk, "candidates", None) else None
-                    if not cand or cand.content is None or not cand.content.parts:
-                        continue
-                    for part in cand.content.parts:
-                        if part.function_call is not None:
-                            collected.append(part)
-                        elif part.text:
-                            if getattr(part, "thought", False):
-                                visible_thinking = _sanitize_visible_thinking_text(part.text)
-                                if visible_thinking:
-                                    await _maybe_await(emit({"type": "thinking", "content": visible_thinking}))
-                                elif not thinking_fallback_sent:
-                                    await _maybe_await(emit({
-                                        "type": "thinking",
-                                        "content": _THINKING_ENGLISH_FALLBACK,
-                                    }))
-                                    thinking_fallback_sent = True
-                            else:
-                                await _maybe_await(emit({"type": "text_chunk", "content": part.text}))
-                            collected.append(part)
-                # An answer-less stream (no function call and no non-thought text — e.g.
-                # "only thinking then stops") is effectively empty; retry fresh.
-                has_real = any(
-                    getattr(p, "function_call", None) is not None
-                    or (getattr(p, "text", None) and not getattr(p, "thought", False))
-                    for p in collected
-                )
-                if not has_real and attempt < max_retries - 1:
-                    logger.warning(f"[agent] Gemini empty/answer-less stream "
-                                   f"(attempt {attempt+1}/{max_retries}), retrying on fresh connection")
-                    retry_wait = (2 ** attempt) * 0.5 + random.uniform(0, 0.5)
-                else:
-                    content = (types.Content(role="model", parts=collected)
-                               if collected else types.Content(role="model"))
-                    return _StreamedResponse(content)
+                retry_wait = (2 ** attempt) * 0.5 + random.uniform(0, 0.5)
+            else:
+                return response
         except asyncio.TimeoutError:
             if attempt >= max_retries - 1:
                 raise
@@ -234,36 +282,12 @@ async def _generate_streaming(client, model_name: str, contents, config, emit,
             await asyncio.sleep(retry_wait)
 
 
-async def _generate_streaming_with_watchdog(
-    client,
-    model_name: str,
-    contents,
-    config,
-    emit,
-):
-    """Restart a Gemini stream that exceeds the hard per-attempt deadline."""
-    for restart in range(_GEMINI_STALL_RESTARTS + 1):
-        try:
-            return await asyncio.wait_for(
-                _generate_streaming(
-                    client,
-                    model_name,
-                    contents,
-                    config,
-                    emit,
-                ),
-                timeout=_GEMINI_ATTEMPT_TIMEOUT,
-            )
-        except asyncio.TimeoutError:
-            if restart >= _GEMINI_STALL_RESTARTS:
-                raise
-            logger.warning(
-                "[agent] Gemini stream attempt exceeded %ss; "
-                "restarting request (%s/%s)",
-                _GEMINI_ATTEMPT_TIMEOUT,
-                restart + 1,
-                _GEMINI_STALL_RESTARTS,
-            )
+def _discard_task_result(task: asyncio.Task) -> None:
+    """Consume a detached timed-out task without waiting for SDK cancellation."""
+    try:
+        task.result()
+    except (asyncio.CancelledError, Exception):
+        pass
 
 
 # ---------------------------------------------------------------------------
@@ -2324,7 +2348,7 @@ async def run_agent(
             tool_config=_tool_config,
         )
 
-        response = await _generate_streaming_with_watchdog(
+        response = await _generate_streaming(
             client,
             model_name,
             contents,
