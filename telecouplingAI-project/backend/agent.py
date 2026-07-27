@@ -21,6 +21,7 @@ import json
 import logging
 import random
 import re
+import uuid
 from pathlib import Path
 from typing import Callable, Any
 
@@ -44,6 +45,8 @@ _CJK_TEXT_RE = re.compile(r"[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\u3040-\u30f
 _THINKING_ENGLISH_FALLBACK = "Processing the request and preparing the next step.\n"
 _GEMINI_STALL_TIMEOUT = 60
 _GEMINI_ATTEMPT_TIMEOUT = 120
+_TOOL_EVENT_TIMEOUT = 1800
+_PUBSUB_SUBSCRIBE_TIMEOUT = 5
 
 
 def _sanitize_visible_thinking_text(text: str) -> str:
@@ -2047,6 +2050,105 @@ async def _maybe_await(result: Any) -> None:
         await result
 
 
+async def _dispatch_tool_and_relay(
+    task_dispatcher: Any,
+    *,
+    tool_name: str,
+    tool_input: dict,
+    session_id: str,
+    queue: str,
+    event_callback: Callable[[dict], Any],
+) -> tuple[str, dict]:
+    """Subscribe before dispatch so fast worker results cannot be lost."""
+    task_id = str(uuid.uuid4())
+    channel = f"progress:{session_id}:{task_id}"
+    r_sub = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
+    pubsub = r_sub.pubsub()
+    subscribed = False
+
+    try:
+        await pubsub.subscribe(channel)
+        subscribed = True
+        try:
+            async with asyncio.timeout(_PUBSUB_SUBSCRIBE_TIMEOUT):
+                while True:
+                    confirmation = await pubsub.get_message(
+                        ignore_subscribe_messages=False,
+                        timeout=1,
+                    )
+                    if (
+                        confirmation
+                        and confirmation.get("type") == "subscribe"
+                        and confirmation.get("channel") == channel
+                    ):
+                        break
+        except TimeoutError as exc:
+            raise TimeoutError(
+                f"Redis subscription for tool {task_id} was not confirmed"
+            ) from exc
+
+        celery_result = task_dispatcher.apply_async(
+            args=[tool_name, tool_input, session_id],
+            queue=queue,
+            task_id=task_id,
+        )
+        if celery_result.id != task_id:
+            raise RuntimeError(
+                f"Celery returned unexpected task id {celery_result.id}"
+            )
+        logger.info(
+            "[agent] Celery task dispatched: %s session=%s tool=%s",
+            task_id,
+            session_id,
+            tool_name,
+        )
+
+        await _maybe_await(event_callback({
+            "type": "tool_start",
+            "tool": tool_name,
+            "message": f"Starting {tool_name}...",
+            "task_id": task_id,
+        }))
+
+        tool_result_event: dict = {}
+        try:
+            async with asyncio.timeout(_TOOL_EVENT_TIMEOUT):
+                async for raw_msg in pubsub.listen():
+                    if raw_msg["type"] != "message":
+                        continue
+                    try:
+                        event = json.loads(raw_msg["data"])
+                    except json.JSONDecodeError:
+                        continue
+
+                    event_type = event.get("type")
+                    if event_type == "tool_start":
+                        continue
+
+                    await _maybe_await(event_callback(event))
+
+                    if event_type == "tool_result":
+                        tool_result_event = event
+                    elif event_type == "done":
+                        break
+                    elif event_type == "error":
+                        raise RuntimeError(
+                            event.get("message", "Tool execution failed")
+                        )
+        except TimeoutError as exc:
+            raise TimeoutError(
+                f"Tool {task_id} timed out after {_TOOL_EVENT_TIMEOUT}s"
+            ) from exc
+
+        return task_id, tool_result_event
+    finally:
+        try:
+            if subscribed:
+                await pubsub.unsubscribe(channel)
+        finally:
+            await r_sub.aclose()
+
+
 def _build_function_response(
     tool_name: str,
     tool_result_event: dict,
@@ -2680,62 +2782,16 @@ async def run_agent(
                 )
                 continue
 
-            # ── Step 1: dispatch Celery to obtain the real task_id ──────────
             queue = _TOOL_QUEUES.get(tool_name, "q_default")
-            celery_result = run_tool_task.apply_async(
-                args=[tool_name, tool_input, session_id],
-                queue=queue,
-            )
-            task_id = celery_result.id
-            logger.info(f"[agent] Celery task dispatched: {task_id}")
-
-            # ── Step 2: subscribe Redis BEFORE any worker events arrive ─────
-            r_sub = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
-            pubsub = r_sub.pubsub()
-            await pubsub.subscribe(f"progress:{session_id}:{task_id}")
-
-            # ── Step 3: notify frontend (agent's own tool_start with real id)
-            await _maybe_await(event_callback({
-                "type": "tool_start",
-                "tool": tool_name,
-                "message": f"Starting {tool_name}...",
-                "task_id": task_id,
-            }))
-
             try:
-                # ── Step 4: relay worker events until done/error ─────────────
-                loop = asyncio.get_running_loop()
-                tool_result_event: dict = {}
-                deadline = loop.time() + 1800.0
-
-                async for raw_msg in pubsub.listen():
-                    if loop.time() > deadline:
-                        raise TimeoutError(f"Tool {task_id} timed out after 1800s")
-                    if raw_msg["type"] != "message":
-                        continue
-                    try:
-                        event = json.loads(raw_msg["data"])
-                    except json.JSONDecodeError:
-                        continue
-
-                    event_type = event.get("type")
-
-                    # Skip worker's tool_start — agent already sent one above
-                    if event_type == "tool_start":
-                        continue
-
-                    await _maybe_await(event_callback(event))
-
-                    if event_type == "tool_result":
-                        tool_result_event = event
-                    elif event_type == "done":
-                        break
-                    elif event_type == "error":
-                        raise RuntimeError(event.get("message", "Tool execution failed"))
-
-                await pubsub.unsubscribe(f"progress:{session_id}:{task_id}")
-
-                # ── Step 5: build Gemini function_response + POST_EXECUTION ──
+                task_id, tool_result_event = await _dispatch_tool_and_relay(
+                    run_tool_task,
+                    tool_name=tool_name,
+                    tool_input=tool_input,
+                    session_id=session_id,
+                    queue=queue,
+                    event_callback=event_callback,
+                )
                 result_summary, post_skill_text = _build_function_response(
                     tool_name, tool_result_event
                 )
@@ -2764,8 +2820,6 @@ async def run_agent(
                         response={"error": safe_msg},
                     )
                 )
-            finally:
-                await r_sub.aclose()
 
         # A proposed plan is terminal for this turn: stop now so we don't run a
         # second LLM turn (which would re-think and re-summarize -> duplicate plans).

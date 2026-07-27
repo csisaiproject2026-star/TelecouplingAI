@@ -7240,3 +7240,51 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - PASS：三轮专门代码审查，最终 release review 无高置信问题。
 - 本机完整 InVEST 测试受缺少 Docker/conda `natcap.invest` 等地理依赖阻断；用户确认以环境完整的 GCP 测试为最终依据。
 - GCP 尚未部署或测试；MSU 未修改。
+
+## 2026-07-27 — capacity-200-v1 GCP 候选部署与阶段性压测
+### 完成内容
+- 已在 GCP 建立源码/`.env.docker` 备份，并给部署前正在运行的 backend/frontend 精确镜像添加 `pre-capacity-200-20260727-running` 回滚标签。
+- 已部署候选源码并仅重建/切换 `tele-backend` 与 `tele-frontend`；Redis 和 Celery workers 未重启，MSU 未修改。
+- GCP 当前运行版本为 `capacity-200-v1-165e307`；backend 镜像 `sha256:b2f96bfe30aefe9ae5122d5e43dcf0e3b64a2de80055e8708e51aff26fcbe381`，容量端点确认 500 sessions、8 Gemini 并发、500 等待队列和 2.7M TPM 安全预算。
+- 真实阶梯压测发现 Google SDK 少量流不响应 asyncio cancellation；迭代加入整流 deadline，并最终将 Gemini 容量槽所有权移到逻辑外层，失控 SDK 子任务可被废弃而不泄漏全局 semaphore 或继续发送 stale 事件。
+### 关键变更文件
+- `telecouplingAI-project/backend/agent.py`
+- `telecouplingAI-project/backend/tests/test_agent_gemini_timeouts.py`
+- `DEV_LOG.md`
+### 测试状态
+- 本机与 GCP 候选镜像 focused tests：27/27 PASS。
+- 早期候选在 50 用户分别为 47/50、48/50，均保留 50/50 sessions；失败为 900 秒 Gemini 流挂起。
+- 当前 `165e307`：10/10 PASS；25 用户在 63.7 秒内完成 24/25，25/25 sessions 保留。唯一失败为 CBA `done` 已收到但无输出文件、错误字段为空，不再是 900 秒挂起。
+- 阶梯按门槛已停在 25 用户；尚未验证 50/100/150/200，因此不能宣称达到 200 用户目标。
+
+## 2026-07-28 — GCP 继续执行 50/100/200 容量阶梯
+### 完成内容
+- 按用户确认保持 GCP 当前候选 `capacity-200-v1-165e307` 不变，直接从 50 用户继续 fast-pool 真实 Gemini 压测。
+- 50 用户级未达到 99% 验收门槛，因此脚本按设计停止，未继续执行 100 和 200 用户，避免在已失败基线上继续消耗配额和时间。
+- 测后 GCP backend 仍为 healthy，容量端点正常，Gemini active/waiting 均归零；MSU 未修改。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- 50 用户：43/50 PASS（86%），7 个请求触发 900 秒绝对超时。
+- Session 保留：50/50 PASS，无 session 丢失。
+- 成功请求延迟：p50 45.4 秒、p95 60.4 秒、最大 61.7 秒；CPU 峰值 23.0%，RAM 峰值 6129 MB / 32093 MB，服务器硬件仍非瓶颈。
+- 工具结果：Food Security 15/15；OLS 9/12；CO2 11/13；CBA 8/10。
+- 100/200 用户：未执行；需先定位 watchdog 覆盖范围之外的 7 个长尾请求。
+
+## 2026-07-28 — 定位并修复 50 用户快工具长尾
+### 完成内容
+- 对 50 用户完整 backend/worker 日志逐项对账，确认当轮恰好有 50 次 Celery dispatch；7 个失败请求并非卡在 Gemini，而是快工具在 10–20 ms 内完成后，其 Redis Pub/Sub 结果被 API 端漏接。
+- 根因是 `agent.py` 的实际顺序与注释相反：先 `apply_async`，再建立 Pub/Sub 订阅。Redis Pub/Sub 不保存历史消息，因此 worker 若先发布 `tool_result`/`done`，请求会永久等待。
+- 原 1800 秒工具 timeout 位于 `async for pubsub.listen()` 循环体内；丢失全部消息后循环体不再执行，timeout 同样永远无法触发，最终只能由压测客户端在 900 秒断开。
+- 修复为 API 端预生成 Celery task ID，建立并确认对应 Redis 订阅后再 dispatch；同时使用包围整个监听过程的 `asyncio.timeout`，保证无新消息时也能触发服务端 timeout，并在所有退出路径释放 Pub/Sub/Redis 资源。
+- 增加两项回归测试：验证极速 worker 在 dispatch 时订阅已确认，以及完全无 Pub/Sub 消息时 timeout 能按时触发。
+### 关键变更文件
+- `telecouplingAI-project/backend/agent.py`
+- `telecouplingAI-project/backend/tests/test_agent_gemini_timeouts.py`
+- `DEV_LOG.md`
+- `PROJECT_MEMORY.md`
+### 测试状态
+- 聚焦容量/Session/工具事件测试：13/13 PASS。
+- 独立代码审查：未发现高置信问题。
+- 本机 backend 全套：106 PASS、1 SKIP；123 项因本机缺少 `geopandas` 等既有 GIS 运行依赖而失败，未发现与本修复相关的回归。
+- GCP 尚未部署本修复；下一步先做小规模 fast-pool 复测，通过后再恢复 50→100→200 阶梯。MSU 未修改。

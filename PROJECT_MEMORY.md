@@ -44,6 +44,13 @@
 - Current application limits remain more immediate: `MAX_SESSIONS=50`, one Uvicorn process, `_GEMINI_SEMAPHORE=3`, and usually one Celery worker slot per tool queue.
 - Do not promise 200 simultaneously active users without raising/fixing session capacity, improving Gemini concurrency/backpressure, and rerunning realistic 200-user tests through the public MSU WAF.
 
+## 200-user capacity checkpoint (2026-07-28)
+
+- Candidate `capacity-200-v1-165e307` raised GCP to 500 sessions, 8 Gemini calls, a 500-request Gemini queue, and a 2.7M input-TPM safety budget. Session continuity and resource usage remained healthy, but its 50-user fast-pool run reached only 43/50 because seven requests hit the client-side 900-second timeout.
+- The seven long tails were not Gemini, CPU, Redis capacity, or Celery compute saturation. All 50 runs reached Celery dispatch, and the affected fast workers finished in milliseconds.
+- Root cause: `backend/agent.py` dispatched Celery before subscribing to the task's Redis Pub/Sub channel. Fast workers could publish `tool_result` and `done` before the subscriber existed; Redis Pub/Sub does not replay missed messages. The 1800-second timeout was inside the message-loop body, so it also could not fire when no message arrived.
+- The local fix preassigns the Celery task ID, confirms the Pub/Sub subscription before dispatch, and wraps the whole listener in a real asynchronous timeout. Do not resume 100/200-user testing until this candidate is deployed to GCP and passes small fast-pool runs plus repeated 50-user runs at the 99% gate.
+
 ## Deployment discipline
 
 - Transfer only selected source files or a tar archive that explicitly excludes `.env` and `.env.docker`.
