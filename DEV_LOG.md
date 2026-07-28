@@ -7618,3 +7618,19 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - `DEV_LOG.md`
 ### 测试状态
 - MSU SSH：BLOCKED（连接超时，等待 VPN 路由在当前 Windows 会话中生效）。
+
+## 2026-07-28 — 将系统关系标签与聊天页脚热部署到 MSU
+### 完成内容
+- VPN 重连后确认 `35.9.219.33:22` 可达，并成功登录 `csis-telecoupling`。
+- 部署前确认 MSU `/home` 还有 616 GB 可用空间，目标容器均正常运行。
+- 创建主机源码和容器运行时双重备份后，将提交 `8aeba48` 的关系分类、QGIS 样式、smoke 脚本、`App.jsx` 和前端 `dist` 热部署到 MSU。
+- 仅重启 `tele-celery-render` 并替换 `tele-frontend` 静态文件；未修改 `.env`/`.env.docker`，未重建、提交、重标记或固化 Docker 镜像。
+- MSU 回滚备份：`~/csis-platform/backups/20260728_system_labels_footer_8aeba48/`。
+### 关键变更文件
+- `PROJECT_MEMORY.md`
+- `DEV_LOG.md`
+### 测试状态
+- MSU 容器内 QGIS smoke 通过：图例准确返回 `Domestic systems`、`Adjacent systems`、`Distant systems`，3 条 Flow feature 成功渲染。
+- `tele-celery-render` 状态 running、restart count 0，最近 3 分钟无 `ERROR`/`Traceback`。
+- 公网 `https://ai.telecoupling.msu.edu/` 返回 200并加载 `index-VMleCgSm.js`；bundle 含版权文字与 `Contact us`，`/health` 返回 200。
+- MSU 宿主机与 render 容器内三个部署文件 SHA-256 一致。
