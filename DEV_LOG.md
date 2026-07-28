@@ -7534,3 +7534,13 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - PostgreSQL：6 occurrences / 5 fingerprint groups。
 - Admin API：返回 5 个 DEMO groups、合计 occurrence_count=6，所有状态为 `new`。
 - 合成数据保留供用户在 `http://127.0.0.1:18080/admin/errors` 查看。
+
+## 2026-07-28 — 明确 200 用户压测的错误取证边界
+### 完成内容
+- 确认 Error Registry 部署后的 GCP 50/100/200 用户测试中，FastAPI、Agent、Workflow 和 Celery 产生的结构化错误会进入 PostgreSQL，并可按 release、session、task、tool 和 fingerprint 查询。
+- 明确 Registry 不是唯一证据：压测客户端自身超时/断线、nginx/WAF 拒绝、网络中断、容器 SIGKILL/OOM 及进程来不及写事件的故障，可能不会入库。
+- 后续容量测试必须同时保存三类证据：压测客户端逐请求结果、Error Registry 聚合/明细、Docker/nginx/系统资源日志；不能仅以数据库为空判断“没有错误”。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- 本次为测试策略确认，无代码或服务器改动。
