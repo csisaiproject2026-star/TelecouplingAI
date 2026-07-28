@@ -7511,3 +7511,13 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - 公网 `http://34.42.83.50/api/admin/session`：403。
 - SSH 隧道 `http://127.0.0.1:18080/api/admin/session`：未登录时 401。
 - 临时账号经隧道登录/登出：200/200；公开 `/health` 保持正常。
+
+## 2026-07-28 — 明确 Error Registry 不追溯旧错误
+### 完成内容
+- 用户展示的 Workflow `Column mismatch` 截图发生在 Error Registry 部署前，因此不会自动出现在新数据库中。
+- GCP Registry 从 2026-07-28 05:02 UTC（北京时间 13:02）部署后开始收集；未自动导入历史聊天、截图或旧 Docker 日志。
+- 同类红色 `INVALID_PARAMS` 错误若在部署后再次发生，会作为 validation 事件登记并按 fingerprint 聚合；黄色 unsupported-file 警告当前属于正常上传提示，不作为错误事件登记。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- 已查询 GCP PostgreSQL，当前错误 occurrence/group 均为 0；无服务器或业务代码改动。
