@@ -7486,3 +7486,12 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - `DEV_LOG.md`
 ### 测试状态
 - 仅补充运维说明，无服务器或业务代码改动。
+
+## 2026-07-28 — 澄清 GCP Admin 登录页当前不可登录
+### 完成内容
+- 说明 `http://34.42.83.50/admin/errors` 能显示 Username/Password 是因为 Admin SPA 静态页面已部署，但 GCP 的 `ADMIN_ENABLED=false`，后端登录 API 返回 404，当前不存在可用登录凭据。
+- 在可信 HTTPS 或 SSH 隧道/IP 限制建立前，不通过公网 HTTP 开放 Admin 密码登录。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- 仅补充状态说明，无服务器或业务代码改动。
