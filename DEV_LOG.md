@@ -7761,3 +7761,13 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - `DEV_LOG.md`
 ### 测试状态
 - 公网 `/health/capacity` 实时返回 `sessions.current=7`、`sessions.maximum=500`。
+
+## 2026-07-28 — 说明 Session 弹性容量语义
+### 完成内容
+- 明确 Session 数量按实际用户创建从当前值动态增长，并非预先固定占用 500 份资源。
+- 达到 500 上限后按 LRU 淘汰不活跃 Session；正在执行且持有 active lease 的 Session 受保护，不参与淘汰。
+- 区分 Session 保留容量与执行容量：Gemini 同时执行仍固定限制为 8，其余请求进入最多 500 的等待队列。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- N/A（容量语义说明，无代码或服务器变更）。
