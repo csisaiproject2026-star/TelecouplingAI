@@ -7521,3 +7521,16 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - `DEV_LOG.md`
 ### 测试状态
 - 已查询 GCP PostgreSQL，当前错误 occurrence/group 均为 0；无服务器或业务代码改动。
+
+## 2026-07-28 — 为 GCP Admin 页面生成合成错误示例
+### 完成内容
+- 在 GCP 通过正式 Redis Stream → collector → PostgreSQL 链路写入 6 条明确标记为 `DEMO` 的合成事件，不使用真实用户文件、Prompt 或 Session。
+- 覆盖 validation/info、application/error、capacity/warning、external/warning、infrastructure/critical 五类；validation 写入两次且 fingerprint 相同，用于展示聚合计数 `2`。
+- 示例 Session 固定为 `demo_error_registry_20260728`，error code 均以 `DEMO_` 开头，便于筛选和后续清理。
+### 关键变更文件
+- GCP PostgreSQL Error Registry（仅合成展示数据）
+- `DEV_LOG.md`
+### 测试状态
+- PostgreSQL：6 occurrences / 5 fingerprint groups。
+- Admin API：返回 5 个 DEMO groups、合计 occurrence_count=6，所有状态为 `new`。
+- 合成数据保留供用户在 `http://127.0.0.1:18080/admin/errors` 查看。
