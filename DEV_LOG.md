@@ -7379,3 +7379,16 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 ### 测试状态
 - 下载包包含 31 个原始上传文件、2 个 GCP 运行源码文件、2 份错误日志和 manifest。
 - 本次只读 GCP 并下载证据，未修改或重启任何服务器服务。
+
+## 2026-07-28 — 讨论 Admin 错误登记与查询方案
+### 完成内容
+- 仅讨论、未改业务代码。建议采用混合方案：结构化错误数据库作为 Admin 查询入口，JSON Lines/容器日志保留完整技术现场，用户原始文件按独立证据保留策略处理；不建议以 CSV 作为主记录。
+- 错误记录应统一生成 `error_id`，并关联 UTC 时间、环境、release/commit、service、tool、session/task/request ID、错误分类、用户可见信息、内部异常/堆栈、耗时及脱敏后的输入文件清单；Admin 可按工具、时间、环境、错误类型、状态和 fingerprint 查询/聚合。
+- 建议区分 validation/user-input、application bug、capacity/timeout、external Gemini/WAF、infrastructure 五类，支持 New/Acknowledged/Resolved 状态、负责人和备注，避免正常用户输入错误淹没真正平台故障。
+- 用户文件不应永久复制进错误数据库，也不应记录 API key、完整 prompt、文件内容或服务器敏感路径。数据库只存文件名/扩展名/大小/hash/受控证据路径；出错输入可短期保留 7-14 天，并由 Admin 手动 `Preserve evidence` 延长。
+- 当前 40 多个 worker 并发写入场景下，若各服务直接写库，PostgreSQL 比 SQLite 更稳；若追求轻量，可让各服务写 Redis Stream，由单一 collector 写 host-mounted SQLite，但 Redis 只能作为传输队列，不能作为最终永久错误库。
+- 普通 Docker/JSON 日志仍需保留，因为数据库自身不可用、进程 SIGKILL、nginx/WAF 失败时，应用可能来不及写错误表。数据库和日志需要互补，而不是互相替代。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- N/A（架构讨论，无代码、配置或服务器改动）。
