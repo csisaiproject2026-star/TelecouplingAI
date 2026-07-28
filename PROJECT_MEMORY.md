@@ -59,6 +59,11 @@
 - Largest surviving GCP upload attributable to one task: Coastal Vulnerability, 29 files totaling 171,328,574 bytes (171.33 MB / 163.39 MiB). Largest surviving individual uploaded file: Offshore Wind `claybark_dem.tif`, 169,748,887 bytes (169.75 MB / 161.89 MiB).
 - A 355,123,328-byte GCP session directory is cumulative across many sequential tool tests and must not be reported as one task.
 - The largest explicitly documented successful upload through the MSU WAF is the roughly 18 MB SDR input set. An attempted roughly 811 MB Wave Energy `WaveData/` upload returned HTTP 413, so that dataset is now server-resident and not user-uploaded.
+- Authoritative User Guide inventory on GCP contains 43 single-tool sample ZIPs and two workflow sample ZIPs. Actual upload size means the sum of extracted files, because users upload the extracted contents rather than the compressed ZIP.
+- Largest guide upload sets: Coastal Vulnerability is 173,518,490 bytes (173.52 MB / 165.48 MiB, 50 files; 39.80 MB ZIP), and Scenic Quality is 169,764,205 bytes (169.76 MB / 161.90 MiB, 15 files; 24.84 MB ZIP). Of the 43 tool packages, only these two exceed 100 MiB; three are 10-100 MiB, 11 are 1-10 MiB, and 27 are at most 1 MiB.
+- Server-resident model data is correctly excluded from the guide upload requirement: the Wave Energy guide uploads only about 0.002 MiB. The Wind Energy guide upload is about 1.594 MiB.
+- Workflow upload sets are small: Soybean is 357,242 bytes (0.357 MB / 0.341 MiB, 20 files), and Tourism is 1,882,138 bytes (1.882 MB / 1.795 MiB, 13 files).
+- A simultaneous 200-user Coastal Vulnerability upload would introduce about 34.70 GB (32.32 GiB) of request payload before multipart and runtime overhead. The current whole-file `await uf.read()` implementation is not safe evidence for that scenario; large-upload concurrency remains a separate implementation and GCP load-test gate.
 
 ## Deployment discipline
 

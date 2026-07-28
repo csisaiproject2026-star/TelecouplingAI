@@ -7324,3 +7324,17 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 ### 测试状态
 - 当前 nginx `client_max_body_size` 为 500M，但这是单 HTTP 请求配置上限（且包含 multipart 开销），不是已验证的安全任务体积。
 - MSU SSH 当前超时，无法实时扫描 MSU 上传目录；MSU 结论来自既有测试记录。
+
+## 2026-07-28 — 核对 User Guide Sample Data 实际上传量
+### 完成内容
+- 只读扫描 GCP `/data/outputs/user-guides/` 中全部 Sample Data ZIP，共 43 个单工具包和 2 个 workflow 包；同时统计 ZIP 下载大小、解压后实际上传字节、文件数和包内文件明细。
+- 最大单工具上传包为 Coastal Vulnerability：50 个文件，解压后 173,518,490 bytes（173.52 MB / 165.48 MiB），ZIP 为 39.80 MB；其次为 Scenic Quality：15 个文件，解压后 169,764,205 bytes（169.76 MB / 161.90 MiB），ZIP 为 24.84 MB。
+- 43 个工具中，仅上述 2 个超过 100 MiB；3 个为 10-100 MiB，11 个为 1-10 MiB，27 个不超过 1 MiB。Wave Energy 的用户上传量仅约 0.002 MiB，约 811 MB 的 WaveData 确认为服务器内置数据，不计入用户上传。
+- Soybean workflow 需上传 20 个文件，共 357,242 bytes（0.357 MB / 0.341 MiB）；Tourism workflow 需上传 13 个文件，共 1,882,138 bytes（1.882 MB / 1.795 MiB）。
+- 若 200 人同时上传最大的 Coastal Vulnerability 指南数据，仅原始文件负载即约 34.70 GB（32.32 GiB），尚未计 multipart 和运行时开销；当前整文件 `await uf.read()` 路径不能据此视为安全。
+### 关键变更文件
+- `DEV_LOG.md`
+- `PROJECT_MEMORY.md`
+### 测试状态
+- ZIP 清单全部可由 Python `zipfile` 正常读取，45/45 包统计成功。
+- 本次为只读容量盘点，未修改 GCP/MSU 服务或运行容器。
