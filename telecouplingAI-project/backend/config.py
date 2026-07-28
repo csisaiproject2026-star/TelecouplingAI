@@ -23,8 +23,9 @@ class Settings(BaseSettings):
     GEMINI_INPUT_TPM_LIMIT: int = Field(default=3_000_000, ge=0)
     GEMINI_TPM_UTILIZATION: float = Field(default=0.90, gt=0, le=1)
     GEMINI_ESTIMATED_INPUT_TOKENS: int = Field(default=45_000, ge=1)
+    DIRECT_TOOL_COMPLETION_ENABLED: bool = False
     SSE_PING_SECONDS: int = Field(default=10, ge=1)
-    RELEASE_VERSION: str = "capacity-200-v1"
+    RELEASE_VERSION: str = "capacity-200-v2-direct-complete"
 
     # --- Public server URL (set this when IP changes — everything else derives from it) ---
     # Example: SERVER_BASE_URL=http://34.42.83.50  or  http://yourdomain.com

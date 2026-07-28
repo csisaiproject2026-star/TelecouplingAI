@@ -1936,6 +1936,139 @@ def _detect_tool_from_message(message: str) -> str | None:
     return None
 
 
+_DIRECT_TOOL_ALIASES: dict[str, tuple[str, ...]] = {
+    "run_model_selection_ols": (
+        "ols",
+        "run_ols",
+        "run ols",
+        "ordinary least squares",
+        "ols model",
+    ),
+    "run_factor_analysis_mixed_data": ("run_famd", "factor analysis mixed data"),
+    "run_co2_emissions": ("run_co2", "co2 emissions", "carbon dioxide emissions"),
+    "run_cost_benefit_analysis": ("run_cba", "cost-benefit analysis", "cost benefit analysis"),
+    "run_population_count_density": ("population count density", "population density"),
+    "run_draw_radial_flows": ("draw radial flows", "radial flow"),
+    "run_commodity_trade": ("commodity trade",),
+    "run_add_agents_interactively": ("add agents",),
+    "run_draw_agents_from_table": ("draw agents from table",),
+    "run_add_causes_interactively": ("add causes",),
+    "run_add_systems_interactively": ("add systems",),
+    "run_draw_systems_from_table": ("draw systems from table",),
+    "run_add_media_flows": ("add media flows",),
+    "run_food_security": ("food security",),
+    "run_nutrition_metrics": ("nutrition metrics",),
+    "run_geographical_detector": ("geographical detector", "geographic detector"),
+    "run_spatial_autocorrelation_moran": (
+        "spatial autocorrelation",
+        "moran's i",
+        "morans i",
+    ),
+}
+
+_DIRECT_COMPLETION_EXCLUDED_TOOLS = {
+    "propose_workflow_plan",
+    "execute_workflow_plan",
+    "render_spatial_file",
+    "render_telecoupling_scene",
+    "read_file_content",
+}
+
+_DIRECT_COMPLETION_WORKFLOW_MARKERS = (
+    "workflow",
+    "pipeline",
+    "multi-step",
+    "multistep",
+    "end-to-end",
+    "多步",
+    "工作流",
+)
+
+_RESULT_INTERPRETATION_MARKERS = (
+    "interpret",
+    "interpretation",
+    "explain",
+    "explanation",
+    "summarize",
+    "summarise",
+    "summary",
+    "analysis of the result",
+    "discussion of the result",
+    "description of the result",
+    "review of the result",
+    "overview of the result",
+    "describe the result",
+    "analyze the result",
+    "analyse the result",
+    "discuss the result",
+    "what do the results mean",
+    "what does the result mean",
+    "解读",
+    "解释",
+    "总结",
+)
+
+_RESULT_RENDER_RE = re.compile(
+    r"\b(render|visuali[sz]e|display|plot|map)\b|可视化|渲染|绘图",
+    re.IGNORECASE,
+)
+
+
+def _message_contains_tool_alias(message: str, alias: str) -> bool:
+    """Match aliases as tokens so one function name cannot prefix-match another."""
+    start = r"(?<!\w)" if alias and (alias[0].isalnum() or alias[0] == "_") else ""
+    end = r"(?!\w)" if alias and (alias[-1].isalnum() or alias[-1] == "_") else ""
+    return re.search(f"{start}{re.escape(alias)}{end}", message) is not None
+
+
+def _detect_unambiguous_direct_tool(message: str) -> str | None:
+    """Return one explicitly requested tool, or None when intent is ambiguous."""
+    msg_lower = (message or "").lower()
+    matches: set[str] = set()
+    for tool_name in _TOOL_BY_NAME:
+        aliases = {
+            tool_name.lower(),
+            tool_name.removeprefix("run_").replace("_", " ").lower(),
+        }
+        aliases.update(alias.lower() for alias in _DIRECT_TOOL_ALIASES.get(tool_name, ()))
+        aliases.update(keyword.lower() for keyword in _TOOL_KEYWORDS.get(tool_name, ()))
+        if any(_message_contains_tool_alias(msg_lower, alias) for alias in aliases):
+            matches.add(tool_name)
+    if len(matches) == 1:
+        return matches.pop()
+    return None
+
+
+def _direct_completion_tool_for_message(message: str) -> str | None:
+    """Return the only tool eligible for deterministic post-tool completion."""
+    msg_lower = (message or "").lower()
+    if any(marker in msg_lower for marker in _DIRECT_COMPLETION_WORKFLOW_MARKERS):
+        return None
+    if any(marker in msg_lower for marker in _RESULT_INTERPRETATION_MARKERS):
+        return None
+    if _RESULT_RENDER_RE.search(message or ""):
+        return None
+    tool_name = _detect_unambiguous_direct_tool(message)
+    if tool_name in _DIRECT_COMPLETION_EXCLUDED_TOOLS:
+        return None
+    return tool_name
+
+
+def _format_direct_tool_completion(tool_result_event: dict) -> str:
+    """Build the deterministic completion text shown after one successful tool."""
+    file_count = len(tool_result_event.get("files") or [])
+    if file_count == 0:
+        output_text = "No output files were generated."
+    elif file_count == 1:
+        output_text = "1 output file was generated."
+    else:
+        output_text = f"{file_count} output files were generated."
+    return (
+        f"Analysis completed successfully. {output_text}\n\n"
+        "To get an AI explanation, type: **Please interpret the results.**"
+    )
+
+
 # High-level analysis goals (use-case level, usually multi-tool) — when one of
 # these is asked WITHOUT a specific single tool, Gemini Flash tends to narrate a
 # plan in prose instead of calling propose_workflow_plan. We detect that intent
@@ -2317,6 +2450,11 @@ async def run_agent(
             for f in output_files
         ]
     user_text = "\n".join(context_lines) + "\n\n" + message if context_lines else message
+    direct_completion_tool = (
+        _direct_completion_tool_for_message(message)
+        if settings.DIRECT_TOOL_COMPLETION_ENABLED
+        else None
+    )
 
     # Build multi-turn contents: prepend prior conversation history so Gemini
     # remembers what was discussed in earlier turns of this session.
@@ -2409,6 +2547,17 @@ async def run_agent(
 
     for iteration in range(max_iterations):
         logger.info(f"[agent] iteration={iteration} session={session_id} model={model_name}")
+        buffered_direct_text: list[dict] = []
+
+        async def iteration_event_callback(event: dict) -> None:
+            if (
+                iteration == 0
+                and direct_completion_tool is not None
+                and event.get("type") == "text_chunk"
+            ):
+                buffered_direct_text.append(event)
+                return
+            await _maybe_await(event_callback(event))
 
         # Use the single-tool list on iteration 0 (when we know which tool to call),
         # then switch to full TOOLS list for follow-up iterations. A FORCED workflow
@@ -2457,7 +2606,7 @@ async def run_agent(
             model_name,
             contents,
             gen_cfg,
-            event_callback,
+            iteration_event_callback,
         )
 
         if not response.candidates:
@@ -2491,7 +2640,13 @@ async def run_agent(
                     temperature=retry_temp,
                     thinking_config=thinking_cfg,
                 )
-                resp2 = await _generate_streaming(client, model_name, retry_contents, retry_cfg, event_callback)
+                resp2 = await _generate_streaming(
+                    client,
+                    model_name,
+                    retry_contents,
+                    retry_cfg,
+                    iteration_event_callback,
+                )
                 c0 = resp2.candidates[0] if resp2.candidates else None
                 if c0 and c0.content is not None and c0.content.parts is not None:
                     response = resp2
@@ -2516,11 +2671,22 @@ async def run_agent(
         # NOTE: text/thinking are already streamed live to the frontend inside
         # _generate_streaming as deltas arrive — do NOT re-emit them here.
 
+        direct_call_candidate = (
+            iteration == 0
+            and direct_completion_tool is not None
+            and len(function_calls) == 1
+            and function_calls[0].name == direct_completion_tool
+        )
+        if not direct_call_candidate:
+            for buffered_event in buffered_direct_text:
+                await _maybe_await(event_callback(buffered_event))
+
         if not function_calls:
             break
 
         function_response_parts: list[types.Part] = []
         workflow_proposed = False        # propose_workflow_plan is terminal for the turn
+        direct_completion_result: dict | None = None
         plan_summary_fallback = ""
 
         for fc in function_calls:
@@ -2797,6 +2963,12 @@ async def run_agent(
                 result_summary, post_skill_text = _build_function_response(
                     tool_name, tool_result_event
                 )
+                if (
+                    direct_completion_tool == tool_name
+                    and len(function_calls) == 1
+                    and tool_result_event.get("type") == "tool_result"
+                ):
+                    direct_completion_result = tool_result_event
                 function_response_parts.append(
                     types.Part.from_function_response(
                         name=tool_name,
@@ -2823,6 +2995,13 @@ async def run_agent(
                         response={"error": safe_msg},
                     )
                 )
+
+        if direct_completion_result is not None:
+            await _maybe_await(event_callback({
+                "type": "text_chunk",
+                "content": _format_direct_tool_completion(direct_completion_result),
+            }))
+            break
 
         # A proposed plan is terminal for this turn: stop now so we don't run a
         # second LLM turn (which would re-think and re-summarize -> duplicate plans).

@@ -7692,3 +7692,22 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - `DEV_LOG.md`
 ### 测试状态
 - 本轮仅确认交互文案，未修改应用代码、服务器配置或容器。
+
+## 2026-07-28 — 实现 direct-tool 确定性完成候选
+### 完成内容
+- 实现版本 `capacity-200-v2-direct-complete`：明确且唯一的普通单工具成功返回 `tool_result` 后，发送确定性完成消息并跳过第二次 Gemini 调用。
+- 增加默认关闭的 `DIRECT_TOOL_COMPLETION_ENABLED` 开关；workflow、多工具、render/read、缺参、工具失败及用户要求解释/总结/渲染时均保留原有 Gemini 循环。
+- 完成消息按 0/1/N 个输出文件正确处理单复数，并提示用户输入 `Please interpret the results.` 按需获得 AI 解释。
+- 首轮 Gemini 若在 function call 旁夹带文本，候选路径会先缓冲；快速成功时丢弃该文本，避免确定性提示前出现额外模型文案。
+### 关键变更文件
+- `telecouplingAI-project/backend/agent.py`
+- `telecouplingAI-project/backend/config.py`
+- `telecouplingAI-project/backend/tests/test_agent_direct_completion.py`
+- `telecouplingAI-project/.env.example`
+- `telecouplingAI-project/.env.docker.gcp`
+- `telecouplingAI-project/.env.docker.msu`
+- `DEV_LOG.md`
+### 测试状态
+- PASS：direct completion 与 Gemini timeout focused tests 29/29。
+- PASS：`agent.py`、`config.py` 和新增测试文件编译检查。
+- 尚未部署；下一步仅在 GCP 启用候选并验证一次调用完成与后续解释，MSU 保持不变。
