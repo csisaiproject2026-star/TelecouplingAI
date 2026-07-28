@@ -7402,3 +7402,15 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - `DEV_LOG.md`
 ### 测试状态
 - N/A（架构讨论，无代码、配置或服务器改动）。
+
+## 2026-07-28 — 讨论 Admin 错误查询界面
+### 完成内容
+- 仅讨论、未改业务代码。建议提供独立且受保护的 `/admin/errors` 页面作为主要查询入口，不要求 Admin SSH 服务器、翻 Docker 日志或直接操作数据库。
+- 列表页支持按时间、GCP/MSU、release、service/tool、错误分类、severity、处理状态、error/session/task ID 和 fingerprint 筛选；默认显示近 24 小时未处理的平台错误，并将同 fingerprint 的重复错误聚合为一行，展示次数、首次/最近发生时间和受影响 Session 数。
+- 详情页展示脱敏后的用户可见错误、内部 traceback、执行与排队耗时、文件元数据、相关日志时间窗和版本信息；提供下载受控诊断包、Preserve evidence、状态流转、负责人和 Admin 备注。
+- Admin 页面必须单独鉴权并记录审计日志；当前网站 `AUTH_REQUIRED=False`，不能直接把该页面及错误 API 暴露到公网。初期可仅允许 VPN/IP allowlist + Admin 密码，成熟后接 MSU SSO/OIDC。
+- 推荐 GCP/MSU 错误写入统一错误库并带 `environment` 字段，以便在同一页面切换环境；若网络隔离，则每站本地写入、由只读 collector 汇总到中央 Admin 库。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- N/A（架构讨论，无代码、配置或服务器改动）。
