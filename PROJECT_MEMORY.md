@@ -56,6 +56,14 @@
 - Execution remains intentionally bounded separately: eight concurrent Gemini calls with a 500-request wait queue and a 2.7M-token/minute safety budget. The 200-user fast test succeeded by queueing, but p95 was about 7.7 minutes; capacity therefore means no silent loss, not immediate responses.
 - Most heavy InVEST model queues have Celery concurrency 1. If many users choose the same heavy model, those jobs serialize and may approach the 1800/2100-second Celery soft/hard limits. Same-tool bursts, mixed/heavy resources, cancellation, queue ETA/fairness, and the MSU public WAF path remain unvalidated.
 
+## 200-user bottleneck assessment (2026-07-28)
+
+- Current GCP host snapshot: 8 vCPU, 31 GiB RAM, no swap, and 23 GB free on the root/data filesystem. Idle available memory was 27 GiB. The Redis Session index was at its configured 500-session ceiling; new sessions can evict inactive LRU entries, so this is not a 200-user execution limit but does limit 24-hour history retention.
+- The validated 200-user fast-tool result is a correctness/capacity pass, not a latency pass: 200/200 succeeded, but p95 was 459.5 seconds. At the configured 2.7M input-TPM budget and conservative 45K tokens per Gemini call, about 60 calls/minute are admitted; roughly two model calls per user make a 200-user burst mathematically about 6-7 minutes before overhead.
+- Large uploads are the highest-priority hard blocker. Two upload paths still call `await uf.read()`, duplicating each complete file in Python memory. Two hundred largest guide packages are about 34.70 GB raw; this exceeds current GCP free disk before nginx/Starlette temporary buffering and exceeds the server's practical memory headroom for simultaneous whole-file reads.
+- Same-tool heavy bursts are a separate queue bottleneck. Most Celery workers use concurrency 1 (a small set of lightweight queues use 2), so many users choosing one InVEST model serialize even when host CPU/RAM are idle. Do not globally raise all worker concurrency because GDAL/InVEST memory and process safety differ by tool.
+- Recommended order: (1) chunked upload writes, partial-file cleanup, explicit per-file/session/global quotas and upload admission control; (2) move upload/temp/output storage to a volume with at least 100 GB free or object storage; (3) add queue depth/ETA/cancellation and per-tool limits; (4) run separate small-workflow, large-upload, same-heavy-tool, mixed, and MSU-WAF capacity ladders. Keep `MAX_SESSIONS=500`, Gemini concurrency 8, and the 500-request wait queue until new evidence justifies changing them.
+
 ## Upload-size evidence checkpoint (2026-07-28)
 
 - nginx currently permits `client_max_body_size 500M` for chat/upload requests, but this is a request-body configuration limit, not a validated safe upload size; multipart overhead also means usable file bytes are slightly lower.
