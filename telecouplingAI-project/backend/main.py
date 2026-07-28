@@ -18,6 +18,7 @@ import logging
 import os
 import re
 import tempfile
+import traceback
 import uuid
 import zipfile
 from pathlib import Path
@@ -42,14 +43,15 @@ _LEAK_PATH_RE = re.compile(
 )
 
 import aiofiles
-from fastapi import FastAPI, Form, Header, HTTPException, UploadFile, File
+from fastapi import FastAPI, Form, Header, HTTPException, Request, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse, ServerSentEvent
 import uvicorn
 
 from config import settings
+from shared.error_events import build_error_event, publish_error_event_async
 
 logging.basicConfig(
     level=logging.INFO,
@@ -58,6 +60,9 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="CSIS Ecosystem Intelligence Platform")
+
+from admin_errors import router as admin_errors_router
+app.include_router(admin_errors_router)
 
 app.add_middleware(
     CORSMiddleware,
@@ -78,6 +83,43 @@ def get_session_manager():
     return _session_manager
 
 
+@app.middleware("http")
+async def request_context(request: Request, call_next):
+    request_id = request.headers.get("x-request-id") or str(uuid.uuid4())
+    request.state.request_id = request_id
+    try:
+        response = await call_next(request)
+    except Exception as exc:
+        event = build_error_event(
+            exc,
+            service="api",
+            request_id=request_id,
+            error_code="UNHANDLED_API_ERROR",
+            context={
+                "method": request.method,
+                "route": request.url.path,
+            },
+            traceback_text=traceback.format_exc(),
+        )
+        try:
+            await publish_error_event_async(
+                get_session_manager().r,
+                event,
+            )
+        except Exception:
+            logger.exception("Failed to record unhandled API error")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "detail": "Internal server error",
+                "error_id": event["event_id"],
+            },
+            headers={"X-Request-ID": request_id},
+        )
+    response.headers["X-Request-ID"] = request_id
+    return response
+
+
 # ---------------------------------------------------------------------------
 # Startup
 # ---------------------------------------------------------------------------
@@ -88,12 +130,18 @@ async def startup_check() -> None:
         raise RuntimeError("GOOGLE_API_KEY is not set. Check your .env file.")
     os.makedirs(settings.SHARED_DIR, exist_ok=True)
     os.makedirs(settings.UPLOADS_DIR, exist_ok=True)
+    if settings.ERROR_REGISTRY_ENABLED:
+        os.makedirs(settings.ERROR_EVIDENCE_DIR, exist_ok=True)
     await get_session_manager().count_sessions()
+    from shared.error_runtime import error_registry_runtime
+    await error_registry_runtime.start()
     logger.info("CSIS backend started ✅")
 
 
 @app.on_event("shutdown")
 async def shutdown() -> None:
+    from shared.error_runtime import error_registry_runtime
+    await error_registry_runtime.stop()
     if _session_manager is not None:
         await _session_manager.close()
 
@@ -148,6 +196,7 @@ async def capacity_session_probe(request: SessionProbeRequest):
 
 @app.post("/api/chat")
 async def chat_endpoint(
+    request: Request,
     message: str = Form(""),
     model: str = Form(None),
     files: list[UploadFile] = File(default=[]),
@@ -264,13 +313,23 @@ async def chat_endpoint(
                     session_manager=sm,
                 )
             except Exception as exc:
-                import traceback as _tb
                 err_msg = str(exc) or f"{type(exc).__name__}: (no message)"
-                logger.exception(f"[chat] agent error [{type(exc).__name__}]: {err_msg}\n{_tb.format_exc()}")
+                logger.exception(f"[chat] agent error [{type(exc).__name__}]: {err_msg}\n{traceback.format_exc()}")
+                error_event = build_error_event(
+                    exc,
+                    service="api:chat",
+                    session_id=session_id,
+                    request_id=request.state.request_id,
+                    error_code="AGENT_FAILED",
+                    context={"model": model or settings.DEFAULT_MODEL},
+                    traceback_text=traceback.format_exc(),
+                )
+                await publish_error_event_async(sm.r, error_event)
                 await queue.put({
                     "type": "error",
                     "message": err_msg,
                     "error_code": "AGENT_FAILED",
+                    "error_id": error_event["event_id"],
                 })
             finally:
                 await queue.put(None)  # sentinel
@@ -304,6 +363,22 @@ async def chat_endpoint(
                             {"filename": f["filename"], "path": f.get("path", "")}
                             for f in output_files if f.get("path")
                         ])
+
+                if event.get("type") == "error" and not event.get("error_id"):
+                    event_exception = RuntimeError(
+                        event.get("message", "Unknown application error")
+                    )
+                    error_event = build_error_event(
+                        event_exception,
+                        service="api:chat",
+                        session_id=session_id,
+                        request_id=request.state.request_id,
+                        task_id=event.get("task_id"),
+                        error_code=event.get("error_code") or "CHAT_ERROR",
+                        context={"model": model or settings.DEFAULT_MODEL},
+                    )
+                    await publish_error_event_async(sm.r, error_event)
+                    event = {**event, "error_id": error_event["event_id"]}
 
                 yield ServerSentEvent(
                     data=json.dumps(event, ensure_ascii=False),

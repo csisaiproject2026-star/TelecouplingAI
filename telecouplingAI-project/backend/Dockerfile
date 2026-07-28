@@ -45,6 +45,8 @@ RUN pip install --no-cache-dir \
         "redis>=5.0.0" \
         "aiohttp[speedups]>=3.9.0" \
         "loguru>=0.7.0" \
+        "asyncpg>=0.30.0" \
+        "argon2-cffi>=23.1.0" \
         "beautifulsoup4>=4.12.0" \
         "esda>=2.5.1" \
         "libpysal>=4.9.2" \

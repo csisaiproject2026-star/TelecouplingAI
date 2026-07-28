@@ -11,10 +11,12 @@ if _backend_dir not in sys.path:
     sys.path.insert(0, _backend_dir)
 import json
 import logging
+import traceback
 
 import redis
 from celery import Celery
 from config import settings
+from shared.error_events import build_error_event, publish_error_event
 from shared.utils import sanitize_error_message
 
 logger = logging.getLogger(__name__)
@@ -187,9 +189,21 @@ def run_tool_task(self, tool_name: str, params: dict, session_id: str):
         publish(r, session_id, tid, {"type": "done", "task_id": tid})
     except Exception as e:
         logger.exception(f"Tool task failed: {tool_name}")
+        error_event = build_error_event(
+            e,
+            service=f"celery:{tool_name}",
+            tool=tool_name,
+            session_id=session_id,
+            task_id=tid,
+            error_code=getattr(e, "error_code", None) or "TOOL_FAILED",
+            params=params,
+            traceback_text=traceback.format_exc(),
+        )
+        publish_error_event(r, error_event)
         publish(r, session_id, tid, {
             "type": "error",
             "task_id": tid,
+            "error_id": error_event["event_id"],
             "message": sanitize_error_message(str(e)),
         })
     finally:

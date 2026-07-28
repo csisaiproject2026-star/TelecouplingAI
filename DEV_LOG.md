@@ -7424,3 +7424,28 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - `DEV_LOG.md`
 ### 测试状态
 - N/A（架构讨论，无代码、配置或服务器改动）。
+
+## 2026-07-28 — 实现 PostgreSQL Admin Error Registry
+### 完成内容
+- 实现 API/Celery 统一结构化错误事件，生成唯一 `error_id`，按 fingerprint 聚合，自动分类 severity/category，并通过 Redis Stream 交给单一 collector 持久化到 PostgreSQL；数据库不可用时不阻断公开网站，JSON 容器日志继续兜底。
+- 新增 `/admin/errors` 管理端：独立 Argon2id 登录、opaque session Cookie、CSRF、登录限速、审计日志、时间/环境/tool/category/severity/status/fingerprint 筛选、聚合列表、详情、状态/负责人/备注和登出。
+- 新增手动证据保全与 ZIP 下载；严格校验 Session ID 和根目录边界，拒绝符号链接，限制最大 2 GiB，采用临时目录完成后原子发布，并保证失败 ZIP 临时文件清理。
+- 扩充凭据脱敏，覆盖 Bearer/Basic/Digest、URL 用户密码、Google/AWS key、JSON secret 字段和带前缀的环境变量；Admin API不返回内部源路径。
+- Compose 新增内部 `postgres:16-alpine`、持久卷和 evidence 挂载；frontend nginx 增加 SPA fallback，使直接打开 `/admin/errors` 不再 404。
+- 将错误收集与 Admin 登录拆成 `ERROR_REGISTRY_ENABLED` / `ADMIN_ENABLED`。GCP 模板继续收集但默认关闭 Admin，因为当前公网仅 HTTP；MSU HTTPS 模板允许 Admin。部署前仍须生成真实数据库密码与 Argon2id Admin 哈希。
+### 关键变更文件
+- `telecouplingAI-project/backend/shared/error_events.py`
+- `telecouplingAI-project/backend/shared/error_store.py`
+- `telecouplingAI-project/backend/shared/error_runtime.py`
+- `telecouplingAI-project/backend/admin_errors.py`
+- `telecouplingAI-project/backend/main.py`
+- `telecouplingAI-project/backend/workers/task_queue.py`
+- `telecouplingAI-project/frontend/src/AdminErrors.jsx`
+- `telecouplingAI-project/docker-compose.yml`
+- `telecouplingAI-project/backend/tests/test_error_registry.py`
+### 测试状态
+- Python `compileall` 通过；错误登记/Admin/API focused tests 26/26 通过。
+- Frontend production build 通过；`docker compose config --quiet` 通过；`git diff --check` 通过。
+- 广义本地回归 53/54 通过；唯一失败是既有且无关的 `country_relation(None, 7)` 预期差异，未修改该行为。
+- 两轮只读代码审查发现的路径穿越、半成品证据、弱脱敏、Redis stale claim、SPA fallback、HTTP Admin 暴露和 ZIP 清理问题均已修复。
+- 尚未部署服务器；PostgreSQL/Redis 容器集成、真实错误入库和 Admin 页面端到端验证留作 GCP 候选部署门。

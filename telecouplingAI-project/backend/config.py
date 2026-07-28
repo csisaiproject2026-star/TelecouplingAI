@@ -6,6 +6,7 @@ To change the server's public IP / hostname, set ONE variable in .env.docker:
 FILE_SERVER_URL is automatically derived from it.
 """
 from pathlib import Path
+from urllib.parse import quote_plus
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -36,11 +37,22 @@ class Settings(BaseSettings):
     FILE_SERVER_URL: str = "http://file-server/download/"
 
     @model_validator(mode="after")
-    def derive_file_server_url(self) -> "Settings":
-        """Auto-derive FILE_SERVER_URL from SERVER_BASE_URL when set."""
+    def derive_urls(self) -> "Settings":
+        """Derive URLs from the small set of per-server settings."""
         if self.SERVER_BASE_URL:
             base = self.SERVER_BASE_URL.rstrip("/")
             self.FILE_SERVER_URL = f"{base}/download/"
+        if (
+            self.ERROR_REGISTRY_ENABLED
+            and not self.ERROR_DATABASE_URL
+            and self.POSTGRES_PASSWORD
+        ):
+            user = quote_plus(self.POSTGRES_USER)
+            password = quote_plus(self.POSTGRES_PASSWORD)
+            database = quote_plus(self.POSTGRES_DB)
+            self.ERROR_DATABASE_URL = (
+                f"postgresql://{user}:{password}@{self.ERROR_DB_HOST}:5432/{database}"
+            )
         return self
 
     # --- QGIS (Linux, inside Docker; override via .env for local Windows dev) ---
@@ -64,6 +76,37 @@ class Settings(BaseSettings):
     SESSION_ACTIVE_LEASE_SECONDS: int = Field(default=3600, ge=60)
     MAX_SESSIONS: int = Field(default=500, ge=1)
     AUTH_REQUIRED: bool = False
+
+    # --- Admin error registry ---
+    ERROR_REGISTRY_ENABLED: bool = False
+    ADMIN_ENABLED: bool = False
+    ERROR_ENVIRONMENT: str = "local"
+    ERROR_DATABASE_URL: str = ""
+    ERROR_DB_HOST: str = "error-db"
+    ERROR_DB_POOL_SIZE: int = Field(default=5, ge=1, le=50)
+    ERROR_DB_RETRY_SECONDS: int = Field(default=10, ge=1, le=300)
+    ERROR_STREAM_KEY: str = "csis:error-events"
+    ERROR_STREAM_GROUP: str = "error-registry"
+    ERROR_STREAM_MAXLEN: int = Field(default=100_000, ge=1000)
+    ERROR_STREAM_CLAIM_IDLE_MS: int = Field(default=60_000, ge=1000)
+    ERROR_RETENTION_DAYS: int = Field(default=90, ge=1, le=3650)
+    ERROR_EVIDENCE_DIR: str = "/data/error-evidence"
+    ERROR_EVIDENCE_MAX_BYTES: int = Field(
+        default=2 * 1024 * 1024 * 1024,
+        ge=1024,
+    )
+    ERROR_MAX_FILE_METADATA: int = Field(default=200, ge=1, le=5000)
+    ERROR_MAX_TRACEBACK_CHARS: int = Field(default=100_000, ge=1000)
+    POSTGRES_DB: str = "csis_errors"
+    POSTGRES_USER: str = "csis_error"
+    POSTGRES_PASSWORD: str = ""
+    ADMIN_USERNAME: str = ""
+    ADMIN_PASSWORD_HASH: str = ""
+    ADMIN_COOKIE_NAME: str = "csis_admin_session"
+    ADMIN_COOKIE_SECURE: bool = True
+    ADMIN_SESSION_HOURS: int = Field(default=8, ge=1, le=168)
+    ADMIN_LOGIN_MAX_ATTEMPTS: int = Field(default=5, ge=1, le=100)
+    ADMIN_LOGIN_WINDOW_SECONDS: int = Field(default=900, ge=60, le=86400)
 
     model_config = SettingsConfigDict(env_file=_ENV_FILE, extra="ignore")
 

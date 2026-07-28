@@ -2132,9 +2132,11 @@ async def _dispatch_tool_and_relay(
                     elif event_type == "done":
                         break
                     elif event_type == "error":
-                        raise RuntimeError(
+                        tool_error = RuntimeError(
                             event.get("message", "Tool execution failed")
                         )
+                        tool_error.error_id = event.get("error_id")
+                        raise tool_error
         except TimeoutError as exc:
             raise TimeoutError(
                 f"Tool {task_id} timed out after {_TOOL_EVENT_TIMEOUT}s"
@@ -2809,11 +2811,12 @@ async def run_agent(
             except Exception as exc:
                 logger.exception(f"[agent] Tool {tool_name} failed: {exc}")
                 safe_msg = sanitize_error_message(str(exc))
-                await _maybe_await(event_callback({
-                    "type": "error",
-                    "message": safe_msg,
-                    "error_code": "TOOL_FAILED",
-                }))
+                if not getattr(exc, "error_id", None):
+                    await _maybe_await(event_callback({
+                        "type": "error",
+                        "message": safe_msg,
+                        "error_code": "TOOL_FAILED",
+                    }))
                 function_response_parts.append(
                     types.Part.from_function_response(
                         name=tool_name,

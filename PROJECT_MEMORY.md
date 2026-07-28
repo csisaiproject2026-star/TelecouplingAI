@@ -68,6 +68,16 @@
 - Workflow upload sets are small: Soybean is 357,242 bytes (0.357 MB / 0.341 MiB, 20 files), and Tourism is 1,882,138 bytes (1.882 MB / 1.795 MiB, 13 files).
 - A simultaneous 200-user Coastal Vulnerability upload would introduce about 34.70 GB (32.32 GiB) of request payload before multipart and runtime overhead. The current whole-file `await uf.read()` implementation is not safe evidence for that scenario; large-upload concurrency remains a separate implementation and GCP load-test gate.
 
+## Admin error registry checkpoint (2026-07-28)
+
+- The implemented design is Celery/API structured events -> Redis Stream -> one API-hosted collector -> PostgreSQL. Workers do not open independent PostgreSQL pools. JSON container logs remain the fallback for database/Redis failures and hard process termination.
+- PostgreSQL stores fingerprint groups, individual occurrences, Admin users/sessions, and Admin audit records. Default retention is 90 days. Inputs are represented only by bounded filename/extension/size metadata; prompts, file contents, API keys, and internal source paths are not exposed through the Admin API.
+- `/admin/errors` uses independent Argon2id credentials, opaque server-side sessions, HttpOnly/SameSite cookies, CSRF checks, login throttling, status/assignment/notes, grouped search, and manual evidence preservation/download.
+- Evidence preservation validates the recorded session ID, rejects symlinks and paths outside configured upload/output roots, enforces a 2 GiB limit, and atomically publishes a completed evidence directory. Evidence is not copied permanently unless an Admin explicitly preserves it.
+- `ERROR_REGISTRY_ENABLED` and `ADMIN_ENABLED` are intentionally separate. GCP collection may run while Admin login remains disabled because the current GCP public endpoint is HTTP. Never enable GCP Admin login over public HTTP; add trusted HTTPS first. MSU may enable Admin because its public endpoint is HTTPS through the WAF.
+- Each server currently has its own PostgreSQL registry. The environment filter is useful within exported/centralized data, but a single page cannot query both servers until a central database or cross-site collector is added.
+- Local validation covered Python compilation, 26 focused backend tests, frontend production build, Compose rendering, and two read-only code reviews. PostgreSQL/Redis/container integration and public-path behavior remain GCP deployment gates.
+
 ## Deployment discipline
 
 - Transfer only selected source files or a tar archive that explicitly excludes `.env` and `.env.docker`.

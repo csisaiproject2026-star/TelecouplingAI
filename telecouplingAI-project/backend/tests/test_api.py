@@ -239,16 +239,19 @@ def test_chat_sse_error_event_on_agent_failure(client, mock_session_manager):
         raise RuntimeError("Simulated agent crash")
 
     with patch("agent.run_agent", side_effect=failing_agent):
-        with patch("main.get_session_manager", return_value=mock_session_manager):
-            resp = client.post(
-                "/api/chat",
-                data={"message": "crash me"},
-                headers={"X-Session-ID": "chat_err_01"},
-            )
+        with patch("main.publish_error_event_async", new_callable=AsyncMock) as publish_error:
+            with patch("main.get_session_manager", return_value=mock_session_manager):
+                resp = client.post(
+                    "/api/chat",
+                    data={"message": "crash me"},
+                    headers={"X-Session-ID": "chat_err_01"},
+                )
 
     assert resp.status_code == 200  # SSE always returns 200
     body = resp.text
     assert "error" in body
+    assert "error_id" in body
+    publish_error.assert_awaited_once()
 
 
 def test_chat_sse_assigns_session_id_if_missing(client, mock_session_manager):

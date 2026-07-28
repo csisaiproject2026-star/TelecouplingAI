@@ -29,3 +29,7 @@ aiohttp[speedups]>=3.9.0  # [speedups] pulls in propcache and other optional dep
 
 # --- Logging ---
 loguru>=0.7.0
+
+# --- Admin error registry ---
+asyncpg>=0.30.0
+argon2-cffi>=23.1.0

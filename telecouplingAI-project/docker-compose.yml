@@ -26,6 +26,7 @@ services:
     volumes:
       - ${HOST_SHARED_DIR:-/data/outputs}:/data/outputs
       - ${HOST_UPLOADS_DIR:-/data/uploads}:/data/uploads
+      - ${HOST_ERROR_EVIDENCE_DIR:-/data/error-evidence}:/data/error-evidence
       - ${HOST_MODEL_DATA_PATH:-/data/model_data}:/data/model_data:ro
       - ./datainput_for_demo:/data/datainput:ro
       - ./Systematic_tests:/home/csisaiproject2026/csis-platform/telecouplingAI-project/Systematic_tests
@@ -39,6 +40,23 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
+    restart: always
+
+  # ── PostgreSQL error registry (internal only; no host port) ───────────────
+  error-db:
+    image: postgres:16-alpine
+    container_name: tele-error-db
+    env_file: .env.docker
+    volumes:
+      - error_db_data:/var/lib/postgresql/data
+    expose:
+      - "5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     restart: always
 
   # ── Celery workers — one per tool queue (P1: concurrency=1 per tool) ────
@@ -949,3 +967,6 @@ services:
       - ${HOST_SHARED_DIR:-/data/outputs}:/usr/share/nginx/html/download:ro
       - ./nginx/file-server.conf:/etc/nginx/nginx.conf:ro
     restart: always
+
+volumes:
+  error_db_data:
