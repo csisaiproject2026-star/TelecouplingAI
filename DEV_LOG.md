@@ -7608,3 +7608,13 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - `DEV_LOG.md`
 ### 测试状态
 - 本轮为部署就绪判断，未修改应用代码，沿用 GCP 已通过的 QGIS smoke、前端 bundle 和 `/health` 验证结果。
+
+## 2026-07-28 — 检查 MSU VPN 与 SSH 连通性
+### 完成内容
+- 尝试通过 `ssh csis-msu` 连接 MSU `35.9.219.33:22`，当前工作会话仍在连接超时。
+- Windows 网络检查只发现 Wi-Fi 接口 `192.168.31.101`，未发现 MSU VPN 网络适配器或目标网段路由；TCP 22 与 Ping 均不可达。
+- 未向 MSU 传输文件、修改配置、重启容器或执行部署。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- MSU SSH：BLOCKED（连接超时，等待 VPN 路由在当前 Windows 会话中生效）。
