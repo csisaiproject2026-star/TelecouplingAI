@@ -7657,3 +7657,16 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - 风险：Food worker 峰值 511.8/512 MiB；建议先将其内存上限提高到至少 768 MiB（优选 1 GiB），不要同时提高 concurrency。
 - Session 阶梯累计达到 470/500，但未跨过 500，因此本次公网测试未覆盖达到上限后的 LRU eviction 行为。
 - 限定：未验证 200 个大文件上传、200 个重型/同模型 InVEST 任务或不受限多步 workflow。
+
+## 2026-07-28 — 分析 200 用户最大完成时间优化路径
+### 完成内容
+- 根据 MSU 200 用户结果确认最大完成时间主要由 Gemini TPM pacing 决定，而不是 MSU CPU/RAM：2.7M input TPM 安全预算配合每次 45K tokens 预留，约允许 60 次模型调用/分钟。
+- 当前单工具执行通常包含工具选择/参数调用和工具结果总结两次 Gemini 调用；200 用户理论需求约 400 次调用，与实测约 6 分钟尾延迟吻合。
+- 核对代码发现：单工具首轮虽然只暴露一个 FunctionDeclaration，但 system instruction 仍注入完整 Workflow Prompt/Capability Catalog；工具完成后的下一轮又恢复全部工具声明。
+- 建议优先实现 direct-tool fast path：明确单工具请求在成功返回工具卡后直接结束，或使用确定性短摘要，不再阻塞等待第二次 Gemini。
+- 第二优先级为 route-specific compact prompt 和基于实际请求/usage metadata 的动态 token reservation；必须测量后降低 45K floor，不能直接盲降。
+- 提高 Gemini concurrency 而不增加 TPM 不会显著缩短尾延迟；将 TPM utilization 从 90% 提到 95% 也仅约 5% 改善。Tier 3/Vertex 配额提升可线性改善，但应与代码减 token 结合。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- 本轮仅进行代码路径和容量数学分析，未修改应用代码、MSU 配置或容器。
