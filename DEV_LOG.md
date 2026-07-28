@@ -7598,3 +7598,13 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - `git diff --check` 通过。
 - GCP `tele-celery-render` QGIS smoke 通过：Flow 图例准确返回 `Domestic systems`、`Adjacent systems`、`Distant systems`，3 条 feature 均成功渲染。
 - GCP 公网页面加载 `index-VMleCgSm.js`，bundle 含版权文字与 `Contact us`，`/health` 返回 HTTP 200；render worker、frontend 和 nginx 均正常运行。
+
+## 2026-07-28 — 确认系统标签与页脚具备 MSU 部署条件
+### 完成内容
+- 根据 GCP 公网页面、真实 QGIS runtime、旧关系值兼容和容器运行结果，确认提交 `8aeba48` 具备提升到 MSU 的技术条件。
+- MSU 应继续采用先备份、后热更新、验证通过后由用户决定是否固化镜像的流程；当前 `Contact us` 仍为预期的空链接占位。
+- 实际部署仍取决于本机能够通过校园 VPN/SSH 连接 `csis-msu`。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- 本轮为部署就绪判断，未修改应用代码，沿用 GCP 已通过的 QGIS smoke、前端 bundle 和 `/health` 验证结果。
