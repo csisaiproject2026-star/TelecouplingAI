@@ -7338,3 +7338,16 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 ### 测试状态
 - ZIP 清单全部可由 Python `zipfile` 正常读取，45/45 包统计成功。
 - 本次为只读容量盘点，未修改 GCP/MSU 服务或运行容器。
+
+## 2026-07-28 — 评估 MSU 200 人大文件同时上传风险
+### 完成内容
+- 结合 MSU 历史实测规格（32 vCPU、62 GB RAM、637 GB home）和当前上传实现，确认 CPU 与最终数据盘容量不是首要瓶颈，但现状不能安全承诺 200 个最大 Sample Data 包同时上传。
+- 最坏情形 200 份 Coastal Vulnerability 为约 34.70 GB 原始入口流量；200 份 Scenic Quality 的 161.89 MiB 单个大 TIF 若同时执行 `await uf.read()`，仅 Python 文件字节就可能瞬时占用约 31.6 GiB，叠加约 14 GB 历史主机基线、multipart/代理缓冲和运行任务后存在 OOM 风险。
+- nginx 当前默认会缓冲请求体，Starlette 会暂存 multipart，随后应用再写入最终 uploads 目录；因此峰值临时磁盘占用可能显著高于最终 34.7 GB，并可能落在不同于 637 GB home 数据盘的 Docker/nginx 临时层。
+- MSU 公网 WAF 目前只有约 18 MB 上传成功的明确证据；尚未验证单个约 170 MB 请求，更未验证 50/100/200 路并发。当前 500M nginx 限制只是单请求配置值，不代表 WAF 或并发链路容量。
+- 结论：典型小包和两个 workflow 的 200 人上传量较低；200 人同时上传最大包属于未验证且当前实现不安全的独立容量场景。后续需分块写盘、上传并发门/排队、临时目录与配额治理，并在 GCP 后再走 MSU WAF 做阶梯压测。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- 本次为只读分析，未修改应用代码或服务器。
+- 实时 MSU SSH 因当前未连接 MSU VPN而超时；服务器规格采用 2026-05-28/29 的既有实测报告，当前空闲磁盘和网卡/WAF吞吐仍需联网后补测。
