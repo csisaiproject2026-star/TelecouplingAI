@@ -7469,3 +7469,12 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - PostgreSQL healthy；Redis Stream pending=0；真实 Celery→Redis→PostgreSQL 探针通过。
 - 40/40 Compose 服务 running，0 unhealthy；内网和公网 `/health` 均通过。
 - Admin 登录未在 GCP 开放或测试；必须先具备可信 HTTPS。MSU 尚未修改。
+
+## 2026-07-28 — 暂缓 GCP HTTPS 与 Admin 开放
+### 完成内容
+- 用户决定暂不为 GCP 配置域名/可信 HTTPS。
+- 保持 `ERROR_REGISTRY_ENABLED=true`、`ADMIN_ENABLED=false`：GCP 继续自动收集错误，但不在 HTTP 公网开放 Admin 登录；MSU 未修改。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- 无运行时改动；GCP 维持 40/40 服务运行和公开 `/health` 正常的已验证状态。
