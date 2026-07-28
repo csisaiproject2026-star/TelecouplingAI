@@ -7478,3 +7478,11 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - `DEV_LOG.md`
 ### 测试状态
 - 无运行时改动；GCP 维持 40/40 服务运行和公开 `/health` 正常的已验证状态。
+
+## 2026-07-28 — 说明 GCP Docker 构建缓存清理
+### 完成内容
+- 澄清磁盘使用率从 87% 降至 78% 是删除约 9.965 GB 可重建的 Docker build cache；未删除用户上传、输出、PostgreSQL 数据、运行容器、候选镜像或回滚镜像。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- 仅补充运维说明，无服务器或业务代码改动。
