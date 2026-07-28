@@ -7634,3 +7634,26 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - `tele-celery-render` 状态 running、restart count 0，最近 3 分钟无 `ERROR`/`Traceback`。
 - 公网 `https://ai.telecoupling.msu.edu/` 返回 200并加载 `index-VMleCgSm.js`；bundle 含版权文字与 `Contact us`，`/health` 返回 200。
 - MSU 宿主机与 render 容器内三个部署文件 SHA-256 一致。
+
+## 2026-07-28 — 完成 MSU 公网 WAF 200 用户容量验收
+### 完成内容
+- 审计发现 MSU 仍为旧容量配置（`MAX_SESSIONS=50`、无 `/health/capacity`），经用户批准后从提交 `ea641be` 构建 MSU thin candidate。
+- 为旧运行镜像、旧 latest、源码和 `.env.docker` 建立回滚点；候选切换前 29 项 focused tests 全部通过。
+- 仅重建 `api-server`，容量参数提升为 500 sessions、Gemini 8 并发、500 等待队列和 2.7M input TPM 安全预算；未重启 Redis、Celery workers 或 nginx，未覆盖密钥/数据。
+- 通过公网 `https://ai.telecoupling.msu.edu/` 运行 fast-pool 阶梯：10/10、50/50、100/100、200/200，所有阶段 session 100% 保留；原 CBA 提示在 10/50 用户阶段分别触发 2/8 次自动重试，修正后的 100/200 验收均为 0 重试。
+- 最终 200 用户：wall 380.0s、p50 269.5s、p95 345.6s、最大 348.7s、吞吐 31.58 runs/min、首 SSE p95 1.9s；OLS 55/55、CO2 40/40、CBA 56/56、Food 49/49。
+- 透明保留两轮诊断：一次本地代理造成的无效 3/10；一次提示歧义造成的 98/100。前者绕过本地代理后恢复，后者两个原 session 用明确提示均立即成功，验收复测 100/100。
+- 压测后删除 463 个测试 session 及对应上传/输出目录，恢复为 7 个原有 session。
+- 确认 Food/Nutrition 队列为 0 后维护性重启 `tele-celery-food`，将压测后保留内存从约 503 MiB 释放到 82.75 MiB；同时清理远端临时 build context。
+### 关键变更文件
+- `docs/reports/MSU_CAPACITY_200_20260728.md`
+- `PROJECT_MEMORY.md`
+- `DEV_LOG.md`
+### 测试状态
+- MSU candidate focused tests：29/29 通过。
+- 200 用户 fast-pool 公网 WAF：200/200，Session 200/200。
+- 主机 CPU 峰值 60%，runnable queue 短时峰值 25，最低 free+buffer+reclaimable cache 46.6 GiB；Gemini active/waiting 峰值 8/185。
+- API/Redis/测试 workers/nginx 无重启、无 OOM；测试后 active leases=0、目标队列长度=0、无 backend/worker `ERROR`/`Traceback`。
+- 风险：Food worker 峰值 511.8/512 MiB；建议先将其内存上限提高到至少 768 MiB（优选 1 GiB），不要同时提高 concurrency。
+- Session 阶梯累计达到 470/500，但未跨过 500，因此本次公网测试未覆盖达到上限后的 LRU eviction 行为。
+- 限定：未验证 200 个大文件上传、200 个重型/同模型 InVEST 任务或不受限多步 workflow。
