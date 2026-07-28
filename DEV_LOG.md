@@ -7752,3 +7752,12 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - API/Redis/相关 workers healthy，未见 OOM、异常重启或相关 `ERROR`/`Traceback`；测试后队列和 active leases 均为 0。
 - Food worker 峰值仍达到 512 MiB 上限；长期建议至少提高到 768 MiB、优选 1 GiB，但不要同时提高 concurrency。
 - 限定：本结果只验证小 CSV direct fast tools，不代表 200 个大文件上传、同类重型 InVEST 或不受限 workflow。
+
+## 2026-07-28 — 澄清 MSU Session 当前数量与容量上限
+### 完成内容
+- 澄清测试清理后“恢复原 7 个 Session”表示 Redis 当前保留的历史 Session 数量，不是容量上限。
+- MSU 线上容量配置仍为 `MAX_SESSIONS=500`；200 用户测试期间从 7 增长到 207，清理测试数据后回到原 7 个。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- 公网 `/health/capacity` 实时返回 `sessions.current=7`、`sessions.maximum=500`。
