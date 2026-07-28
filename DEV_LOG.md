@@ -7495,3 +7495,19 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - `DEV_LOG.md`
 ### 测试状态
 - 仅补充状态说明，无服务器或业务代码改动。
+
+## 2026-07-28 — 临时开放 GCP Admin 的 SSH 隧道访问
+### 完成内容
+- 按用户要求临时开放错误管理查询，但未把 Admin API 暴露到公网 HTTP。
+- GCP nginx 为 `/api/admin/` 增加临时访问控制：只允许 SSH 转发到主机后产生的 Docker gateway 地址；公网直接请求实测返回 403。
+- GCP 临时设置 `ADMIN_ENABLED=true`、`ADMIN_COOKIE_SECURE=false`，创建 Argon2id 临时 Admin 凭据；明文密码未写入仓库、DEV_LOG 或服务器 env，服务器只保存哈希。
+- 在开发机建立持久 SSH 本地转发 `127.0.0.1:18080 -> GCP 127.0.0.1:80`；通过隧道实测 Admin SPA 200、登录 200、登出 200。
+- 临时配置备份位于 `~/csis-platform/backups/20260728_temp_admin_ssh/`。用户查看完成后应恢复 env/nginx 备份、重建 API/nginx，并停止本地隧道。
+### 关键变更文件
+- GCP `nginx/nginx.conf`（临时限制规则，未提交源码）
+- GCP `.env.docker`（临时 Admin 开关与密码哈希，未回传）
+- `DEV_LOG.md`
+### 测试状态
+- 公网 `http://34.42.83.50/api/admin/session`：403。
+- SSH 隧道 `http://127.0.0.1:18080/api/admin/session`：未登录时 401。
+- 临时账号经隧道登录/登出：200/200；公开 `/health` 保持正常。
