@@ -53,6 +53,13 @@
 - GCP candidate `capacity-200-v1-ea641be` deployed and passed the fast-pool ladder: 10/10, 50/50, 100/100, and final 200/200 with complete session retention. At 200 users, p50 was 294.5 seconds, p95 459.5 seconds, maximum 464.5 seconds, CPU peak 19.8%, and RAM peak 6.6/32 GB. Evidence is under `~/csis-platform/capacity-results/capacity-200-v1-ea641be-20260728/`.
 - This validates small inline-CSV fast tools only. It does not validate 200 concurrent large uploads, public WAF upload behavior, disk throughput/capacity, or 200 mixed/heavy InVEST jobs. Keep those as separate capacity gates before claiming unrestricted 200-user capacity.
 
+## Upload-size evidence checkpoint (2026-07-28)
+
+- nginx currently permits `client_max_body_size 500M` for chat/upload requests, but this is a request-body configuration limit, not a validated safe upload size; multipart overhead also means usable file bytes are slightly lower.
+- Largest surviving GCP upload attributable to one task: Coastal Vulnerability, 29 files totaling 171,328,574 bytes (171.33 MB / 163.39 MiB). Largest surviving individual uploaded file: Offshore Wind `claybark_dem.tif`, 169,748,887 bytes (169.75 MB / 161.89 MiB).
+- A 355,123,328-byte GCP session directory is cumulative across many sequential tool tests and must not be reported as one task.
+- The largest explicitly documented successful upload through the MSU WAF is the roughly 18 MB SDR input set. An attempted roughly 811 MB Wave Energy `WaveData/` upload returned HTTP 413, so that dataset is now server-resident and not user-uploaded.
+
 ## Deployment discipline
 
 - Transfer only selected source files or a tar archive that explicitly excludes `.env` and `.env.docker`.

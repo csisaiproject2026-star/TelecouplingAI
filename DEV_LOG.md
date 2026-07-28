@@ -7310,3 +7310,17 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - 200 用户均进入容量队列；长延迟来自 Tier 2 的 2.7M TPM 安全节流，不是服务器资源饱和或请求挂起。
 - 结果证据：GCP `~/csis-platform/capacity-results/capacity-200-v1-ea641be-20260728/fast-200-final.json` 和 `fast-200-final.log`。
 - 本轮只验证了小型内联 CSV 的 fast-pool；尚未验证 200 人同时上传大文件、mixed/heavy 工具队列或公网/WAF 上传链路，因此不能把本结果外推为“大文件 200 并发已通过”。
+
+## 2026-07-28 — 核对历史单任务上传体积
+### 完成内容
+- 读取项目历史记录和 GCP `/data/uploads` 现存文件，区分 nginx 配置上限、单文件记录、单任务文件组及同一 session 多任务累计量。
+- GCP 现存可归属于单个 Coastal Vulnerability 任务的最大文件组为 29 个文件、171,328,574 bytes（171.33 MB / 163.39 MiB）；其中最大单文件为 `WaveWatchIII_global.dbf`，142,865,147 bytes。
+- GCP 现存最大单文件为 Offshore Wind 任务的 `claybark_dem.tif`，169,748,887 bytes（169.75 MB / 161.89 MiB）；该任务 13 个文件合计 169,753,638 bytes。
+- 最大 session 目录为 355,123,328 bytes，但文件时间和内容表明它是一个 session 连续测试多个工具的累计上传，不应算作单次任务。
+- 历史日志中明确记录的 MSU WAF 端到端成功上传为 SDR 约 18 MB；Wave Energy 的约 811 MB `WaveData/` 上传曾返回 HTTP 413，后改用服务器内置数据。
+### 关键变更文件
+- `DEV_LOG.md`
+- `PROJECT_MEMORY.md`
+### 测试状态
+- 当前 nginx `client_max_body_size` 为 500M，但这是单 HTTP 请求配置上限（且包含 multipart 开销），不是已验证的安全任务体积。
+- MSU SSH 当前超时，无法实时扫描 MSU 上传目录；MSU 结论来自既有测试记录。
