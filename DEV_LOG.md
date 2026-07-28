@@ -7414,3 +7414,13 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - `DEV_LOG.md`
 ### 测试状态
 - N/A（架构讨论，无代码、配置或服务器改动）。
+
+## 2026-07-28 — 确认 Admin 错误页面鉴权方式
+### 完成内容
+- 仅讨论、未改业务代码。确认 `/admin/errors` 必须使用与公开网站分离的 Admin 身份认证；建议至少采用独立用户名 + 密码，而不是全体管理员共享一个密码。
+- 密码不得硬编码或明文存库，应使用 Argon2id/bcrypt 哈希并通过每服务器 secret/env 初始化；登录后使用短时、Secure、HttpOnly、SameSite Cookie，配合失败限速、自动过期、退出和 Admin 操作审计。
+- VPN/IP allowlist 可作为第二层防护，但不能代替 Admin 登录；长期可迁移到 MSU SSO/OIDC + MFA。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- N/A（架构讨论，无代码、配置或服务器改动）。
