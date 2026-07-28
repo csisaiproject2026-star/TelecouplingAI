@@ -18,6 +18,10 @@ import agent
         ("Use the uploaded CSV and call run_ols.", "run_model_selection_ols"),
         ("Run the CO2 emissions tool.", "run_co2_emissions"),
         ("Run a cost-benefit analysis.", "run_cost_benefit_analysis"),
+        (
+            "Use the uploaded tables and call the single cost-benefit function.",
+            "run_cost_benefit_analysis",
+        ),
         ("Run food security with the uploaded table.", "run_food_security"),
         ("Run carbon storage.", "run_carbon_storage"),
     ],
