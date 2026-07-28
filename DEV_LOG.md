@@ -7365,3 +7365,17 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 ### 测试状态
 - 本次为配置与既有 GCP 证据复核，无业务代码或服务器改动。
 - GCP 容量候选已验证 200/200 session 保留；MSU 尚未部署该候选，且当前未连接 MSU VPN，实际 `.env.docker` 的 50/500 值待部署前只读确认。
+
+## 2026-07-28 — 下载 GCP Error 对应原始文件与运行源码
+### 完成内容
+- 检查最近 7 天全部 GCP 容器日志，区分真实业务错误、GDAL FutureWarning、公网 404 扫描和容量测试期间 worker 被重启产生的 SIGKILL 记录。
+- 定位到明确业务错误：2026-07-24 05:38:57 UTC，task `b31f34ff-dc08-4a0f-b65c-457addf1a903` 调用 `render_spatial_file` 渲染 `.csv`，触发 `Unsupported file type '.csv'`。
+- 对应 Session 为 `csis_31d9997e-c524-4927-8e4b-2207a46cb6f2`；从 GCP 下载该 Session 仍存的全部 31 个原始上传文件（约 26.9 MiB），并下载 render worker 当时实际运行的 `/app/workers/task_queue.py` 和 `/app/tools/render_tif.py`。
+- 同时保存精确错误时间窗日志及容量测试 Food Security worker 的 SIGKILL 摘录，打包为 session artifact `gcp-error-source-20260724.zip`（18,580,415 bytes，SHA-256 `97FEA44C7F803BF104DF6EDB68551A0E8F6FBA585A0797CC6E0D55FF3FE4179E`）。
+- 原始数据中同时存在 `commodity_trade_summary.csv` 和有效空间输出；错误是把 CSV 交给空间渲染器，未发现原始 SHP bundle 损坏证据。
+### 关键变更文件
+- `DEV_LOG.md`
+- Session artifact: `gcp-error-source-20260724.zip`
+### 测试状态
+- 下载包包含 31 个原始上传文件、2 个 GCP 运行源码文件、2 份错误日志和 manifest。
+- 本次只读 GCP 并下载证据，未修改或重启任何服务器服务。
