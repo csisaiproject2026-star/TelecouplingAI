@@ -77,6 +77,10 @@
 - `ERROR_REGISTRY_ENABLED` and `ADMIN_ENABLED` are intentionally separate. GCP collection may run while Admin login remains disabled because the current GCP public endpoint is HTTP. Never enable GCP Admin login over public HTTP; add trusted HTTPS first. MSU may enable Admin because its public endpoint is HTTPS through the WAF.
 - Each server currently has its own PostgreSQL registry. The environment filter is useful within exported/centralized data, but a single page cannot query both servers until a central database or cross-site collector is added.
 - Local validation covered Python compilation, 26 focused backend tests, frontend production build, Compose rendering, and two read-only code reviews. PostgreSQL/Redis/container integration and public-path behavior remain GCP deployment gates.
+- GCP candidate `error-registry-v1-dd62107` was deployed on 2026-07-28. Backend image ID: `sha256:0aeff852cd217fa1871a1fbe87bcfb5f7de058b35136102d18b9e8b80c67868d`; frontend image ID: `sha256:fb5aaec367272d1331876b6b521aa705f07eb083bccf6aae1d52c92f7686afb6`.
+- GCP rollback tags are `csic_backend:pre_error_registry_dd62107` (`sha256:b3c81a...`) and `csic_frontend:pre_error_registry_dd62107` (`sha256:f92245...`). Source/env backup: `~/csis-platform/backups/20260728_error_registry_v1_dd62107/`.
+- GCP validation passed with 40/40 Compose services running, zero unhealthy/restarting services, healthy PostgreSQL, Redis pending count zero, and public `/health` success. A real unknown-tool Celery probe persisted one occurrence and one fingerprint group through Redis/PostgreSQL; the probe rows were deleted afterward.
+- GCP `/admin/errors` SPA routing returns 200, but `/api/admin/*` intentionally returns 404 because `ADMIN_ENABLED=false`. Do not change this until trusted GCP HTTPS exists. The next Admin UI/login end-to-end gate belongs on the HTTPS MSU endpoint or a future secured GCP endpoint.
 
 ## Deployment discipline
 

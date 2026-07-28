@@ -7449,3 +7449,23 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - 广义本地回归 53/54 通过；唯一失败是既有且无关的 `country_relation(None, 7)` 预期差异，未修改该行为。
 - 两轮只读代码审查发现的路径穿越、半成品证据、弱脱敏、Redis stale claim、SPA fallback、HTTP Admin 暴露和 ZIP 清理问题均已修复。
 - 尚未部署服务器；PostgreSQL/Redis 容器集成、真实错误入库和 Admin 页面端到端验证留作 GCP 候选部署门。
+
+## 2026-07-28 — 部署 GCP Error Registry 候选
+### 完成内容
+- 将提交 `dd62107` 作为 `error-registry-v1-dd62107` 部署到 GCP；传输包只含明确源码文件，没有覆盖服务器 `.env.docker`。
+- 部署前备份完整 backend/frontend 源码、真实 env 和现有镜像；备份目录为 `~/csis-platform/backups/20260728_error_registry_v1_dd62107/`，回滚标签为 `csic_backend:pre_error_registry_dd62107` 和 `csic_frontend:pre_error_registry_dd62107`。
+- PostgreSQL 密码在 GCP 本地随机生成并只写入服务器 `.env.docker`，未输出或传回；启动内部 `postgres:16-alpine` 和持久卷。
+- 构建并部署 backend `sha256:0aeff852...` 与 frontend `sha256:fb5aaec...`；40 个 Compose 服务全部运行，0 unhealthy、0 restarting，公开 `/health` 正常。
+- 用 `q_net` 真实 Celery worker 派发未知工具探针，确认 worker 生成唯一 error event，经 Redis Stream/collector 写入 PostgreSQL，得到 1 条 occurrence 和 1 个 fingerprint group；验证后删除探针数据库记录。
+- 确认 `/admin/errors` SPA 返回 200，`/api/admin/session` 返回 404；GCP 当前为 HTTP，因此 `ERROR_REGISTRY_ENABLED=true`、`ADMIN_ENABLED=false`，只收集错误而不开放管理员凭据登录。
+- 清理 9.965 GB 无用 Docker build cache，根分区从 87% 降到 78%，不删除候选或回滚镜像。
+### 关键变更文件
+- GCP `~/csis-platform/telecouplingAI-project/` 中本次提交涉及的 backend/frontend/Compose 源码
+- GCP 服务器本地 `.env.docker`（仅安全合并 registry 配置；未回传）
+- `DEV_LOG.md`
+- `PROJECT_MEMORY.md`
+### 测试状态
+- Backend 镜像内 `asyncpg`、`argon2`、Admin router 和 collector imports 通过。
+- PostgreSQL healthy；Redis Stream pending=0；真实 Celery→Redis→PostgreSQL 探针通过。
+- 40/40 Compose 服务 running，0 unhealthy；内网和公网 `/health` 均通过。
+- Admin 登录未在 GCP 开放或测试；必须先具备可信 HTTPS。MSU 尚未修改。
