@@ -7682,3 +7682,13 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - `DEV_LOG.md`
 ### 测试状态
 - 本轮仅进行行为影响分析，未修改应用代码、服务器配置或容器。
+
+## 2026-07-28 — 确定 direct-tool 完成提示文案
+### 完成内容
+- 确认 direct-tool fast path 的确定性完成消息应在成功状态和输出文件数后，引导用户按需请求 AI 解释。
+- 推荐英文文案：`To get an AI explanation of the results, type: Please interpret the results.`
+- 使用正确拼写 `interpret`，不使用 `interprete`。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- 本轮仅确认交互文案，未修改应用代码、服务器配置或容器。
