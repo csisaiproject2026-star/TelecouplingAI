@@ -23,14 +23,16 @@ def test_relation_field_detection_accepts_shapefile_truncation():
 
 
 def test_relation_values_are_normalized():
-    assert normalize_flow_relation(True) == "Adjacent countries"
-    assert normalize_flow_relation("non_adjacent") == "Non-adjacent countries"
-    assert normalize_flow_relation("domestic") == "Domestic"
+    assert normalize_flow_relation(True) == "Adjacent systems"
+    assert normalize_flow_relation("non_adjacent") == "Distant systems"
+    assert normalize_flow_relation("Non-adjacent countries") == "Distant systems"
+    assert normalize_flow_relation("domestic") == "Domestic systems"
+    assert normalize_flow_relation("Domestic systems") == "Domestic systems"
 
 
 def test_country_relation_classification():
-    assert country_relation(4, 4) == "Domestic"
-    assert country_relation(4, 7, touches=True) == "Adjacent countries"
-    assert country_relation(4, 7, distance=0.01) == "Adjacent countries"
-    assert country_relation(4, 7, distance=5) == "Non-adjacent countries"
-    assert country_relation(None, 7) == "Unknown"
+    assert country_relation(4, 4) == "Domestic systems"
+    assert country_relation(4, 7, touches=True) == "Adjacent systems"
+    assert country_relation(4, 7, distance=0.01) == "Adjacent systems"
+    assert country_relation(4, 7, distance=5) == "Distant systems"
+    assert country_relation(None, 7) == "Distant systems"

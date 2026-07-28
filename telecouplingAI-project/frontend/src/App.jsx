@@ -894,7 +894,7 @@ function App() {
 
         {/* Input area */}
         {activeView === 'chat' && (
-        <div className="p-6">
+        <div className="px-6 pb-3 pt-6">
           <div className="max-w-[800px] mx-auto bg-[#f0f4f9] rounded-3xl px-5 py-3 flex flex-col gap-2 focus-within:bg-white focus-within:shadow-xl focus-within:ring-1 focus-within:ring-gray-200 transition-all">
             {selectedFiles.length > 0 && (
               <div className="flex flex-wrap gap-2">
@@ -933,6 +933,16 @@ function App() {
               </button>
             </div>
           </div>
+          <p className="mx-auto mt-2 max-w-[800px] text-center text-xs text-gray-500">
+            ©2026 CSIS Michigan State University,{' '}
+            <a
+              href=""
+              onClick={event => event.preventDefault()}
+              className="underline decoration-gray-300 underline-offset-2 transition-colors hover:text-blue-600"
+            >
+              Contact us
+            </a>
+          </p>
         </div>
         )}
       </div>

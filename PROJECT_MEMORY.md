@@ -125,10 +125,10 @@
   - Receiving: magenta inverted triangle `(232,62,140)`, QGIS marker size `5.5`.
   - Spillover: amber circle `(255,176,0)`, QGIS marker size `4.5`.
 - Flow rendering:
-  - Domestic: yellow.
-  - Adjacent countries: cyan.
-  - Non-adjacent countries: magenta.
-  - Unknown/no-match cases are normalized to Non-adjacent countries; the legend should show only Domestic / Adjacent countries / Non-adjacent countries.
+  - Domestic systems: yellow.
+  - Adjacent systems: cyan.
+  - Distant systems: magenta.
+  - Unknown/no-match cases are normalized to Distant systems; the legend should show only Domestic systems / Adjacent systems / Distant systems.
   - Flow map line widths are intentionally slim: categorical relation lines use QGIS width `1.4`; graduated magnitude widths are `0.3`, `0.75`, `1.4`, `2.1`; uniform fallback width is `0.9`.
 - Composite Telecoupling scenes include both the Flow country-relation legend and the System-type legend; scene legend font sizes should match `render_spatial_file` (`28px` for graduated numeric values, `24px` for legend titles/categories, using the same DejaVuSans-Bold preference).
 - Render calls resolve output basenames such as `radial_flows.shp` against session output paths before dispatch.
@@ -218,7 +218,7 @@
 
 - User rule clarified: after function changes, first hot-patch and let the user test. Only solidify Docker images when the user explicitly says to solidify; do not eagerly rebuild, commit, retag, or force-recreate images while more hot changes may be coming.
 - MSU and GCP `tele-celery-render` containers were hot-patched for flow/system rendering changes by syncing host source files, copying them into `/app/renderers/`, and restarting only `tele-celery-render`.
-- Current live flow/system behavior on MSU and GCP: system markers are half-sized; flow relation has only Domestic / Adjacent countries / Non-adjacent countries; flow line widths are half of the previous values.
+- Current source flow/system behavior uses Domestic systems / Adjacent systems / Distant systems; flow line widths remain half of the previous values. This label rename is not yet deployed to MSU or GCP.
 - Latest verified hot-patched `telecoupling_style.py` SHA-256 in both running render containers: `b16b79910b413f820faf289e8ed448fc630e5d66d3186cdae3bd29d67f9a671e`.
 - Latest verified hot-patched `_qgis_scene_render_worker.py` SHA-256 in both running render containers after scene legend font alignment: `d8feb9be686da133ef5d251feb06a1179c82bc97e7b64499252ffe734a1087c5`.
 - Backups for the latest flow-width hot patch: MSU `/home/jianan2/csis-platform/backups/20260712_flow_width_half/`; GCP `/home/csisaiproject2026/csis-platform/backups/20260712_flow_width_half/`.

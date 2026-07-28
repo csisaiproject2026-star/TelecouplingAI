@@ -77,9 +77,9 @@ print(json.dumps({
 }))
 
 assert flow_labels == {
-    "Domestic",
-    "Adjacent countries",
-    "Non-adjacent countries",
+    "Domestic systems",
+    "Adjacent systems",
+    "Distant systems",
 }
 assert len(set(system_colors.values())) == 3
 

@@ -7576,3 +7576,21 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 ### 测试状态
 - 尝试只读 SSH 检查 MSU 实时内存、磁盘和 Docker root，但当前未连接 MSU VPN，`35.9.219.33:22` 超时。
 - 本次未修改 GCP/MSU 代码、配置或容器。
+
+## 2026-07-28 — 更新 Flow 系统关系标签与聊天页脚
+### 完成内容
+- 将 Flow 分类和图例统一重命名：`Domestic` → `Domestic systems`、`Adjacent countries` → `Adjacent systems`、`Non-adjacent countries` → `Distant systems`。
+- 同步修改关系判定返回值、旧值归一化、无匹配 fallback、QGIS categorized renderer、PNG 图例标题（`Country relation` → `System relation`）和测试。
+- 继续兼容历史数据中的 `Domestic`、`Adjacent countries`、`Non-adjacent countries` 等旧值，渲染时自动转换为新标签。
+- 在聊天输入框下方新增 `©2026 CSIS Michigan State University, Contact us`；`Contact us` 暂为阻止跳转的空链接占位，等待用户提供正式 URL。
+### 关键变更文件
+- `backend/renderers/telecoupling_classification.py`
+- `backend/renderers/telecoupling_style.py`
+- `backend/tests/test_telecoupling_classification.py`
+- `backend/tests/qgis_telecoupling_style_smoke.py`
+- `frontend/src/App.jsx`
+- `PROJECT_MEMORY.md`
+### 测试状态
+- `test_telecoupling_classification.py`：4/4 通过。
+- Frontend Vite production build 通过；生成 bundle `index-VMleCgSm.js`。
+- `git diff --check` 通过；QGIS smoke 脚本已更新但本机无 QGIS runtime，待 GCP render worker 验证。

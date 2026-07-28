@@ -182,7 +182,7 @@ def _flow_relations(src):
 
     countries = _world_countries_layer()
     if countries is None:
-        return ["Non-adjacent countries"] * len(source_features)
+        return ["Distant systems"] * len(source_features)
     country_features = {feature.id(): feature for feature in countries.getFeatures()}
     country_index = QgsSpatialIndex()
     for country_feature in country_features.values():
@@ -194,7 +194,7 @@ def _flow_relations(src):
         geometry = feature.geometry()
         points = geometry.asMultiPolyline()[0] if geometry.isMultipart() else geometry.asPolyline()
         if len(points) < 2:
-            relations.append("Non-adjacent countries")
+            relations.append("Distant systems")
             continue
         origin = transform.transform(QgsPointXY(points[0]))
         destination = transform.transform(QgsPointXY(points[-1]))
@@ -275,7 +275,7 @@ def style_flows(layer, magnitude_field=None):
         layer.setRenderer(QgsCategorizedSymbolRenderer("tc_relation", categories))
         return layer, {
             "kind": "categorical",
-            "field": "Country relation",
+            "field": "System relation",
             "entries": entries,
         }
 

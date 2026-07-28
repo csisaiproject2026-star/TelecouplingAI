@@ -9,9 +9,9 @@ SYSTEM_STYLES = {
 }
 
 FLOW_RELATION_STYLES = {
-    "Domestic": (255, 209, 102),
-    "Adjacent countries": (0, 213, 255),
-    "Non-adjacent countries": (255, 59, 141),
+    "Domestic systems": (255, 209, 102),
+    "Adjacent systems": (0, 213, 255),
+    "Distant systems": (255, 59, 141),
 }
 
 FLOW_RELATION_FIELDS = (
@@ -50,28 +50,35 @@ def find_flow_relation_field(field_names):
 
 def normalize_flow_relation(value):
     if isinstance(value, bool):
-        return "Adjacent countries" if value else "Non-adjacent countries"
+        return "Adjacent systems" if value else "Distant systems"
     text = str(value or "").strip().lower().replace("_", "-")
     if not text:
-        return "Non-adjacent countries"
-    if text in {"domestic", "same", "same-country", "internal", "within-country"}:
-        return "Domestic"
+        return "Distant systems"
+    if text in {
+        "domestic",
+        "domestic systems",
+        "same",
+        "same-country",
+        "internal",
+        "within-country",
+    }:
+        return "Domestic systems"
     if text in {"1", "true", "yes", "y"}:
-        return "Adjacent countries"
+        return "Adjacent systems"
     if text in {"0", "false", "no", "n"}:
-        return "Non-adjacent countries"
+        return "Distant systems"
     if any(token in text for token in ("non-adjacent", "nonadjacent", "not-adjacent", "distant")):
-        return "Non-adjacent countries"
+        return "Distant systems"
     if any(token in text for token in ("adjacent", "neighbour", "neighbor", "border")):
-        return "Adjacent countries"
-    return "Non-adjacent countries"
+        return "Adjacent systems"
+    return "Distant systems"
 
 
 def country_relation(origin_id, destination_id, touches=False, distance=None):
     if origin_id is None or destination_id is None:
-        return "Non-adjacent countries"
+        return "Distant systems"
     if origin_id == destination_id:
-        return "Domestic"
+        return "Domestic systems"
     if touches or (distance is not None and 0 <= distance <= 0.02):
-        return "Adjacent countries"
-    return "Non-adjacent countries"
+        return "Adjacent systems"
+    return "Distant systems"
