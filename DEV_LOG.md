@@ -7583,6 +7583,8 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - 同步修改关系判定返回值、旧值归一化、无匹配 fallback、QGIS categorized renderer、PNG 图例标题（`Country relation` → `System relation`）和测试。
 - 继续兼容历史数据中的 `Domestic`、`Adjacent countries`、`Non-adjacent countries` 等旧值，渲染时自动转换为新标签。
 - 在聊天输入框下方新增 `©2026 CSIS Michigan State University, Contact us`；`Contact us` 暂为阻止跳转的空链接占位，等待用户提供正式 URL。
+- 源码提交 `8aeba48` 已推送到 `origin/feature/capacity-200`，并热部署到 GCP；仅同步相关宿主机源码、重启 `tele-celery-render`、替换 `tele-frontend` 静态文件，未重建或固化 Docker 镜像，未修改 MSU。
+- GCP 回滚备份：`~/csis-platform/backups/20260728_system_labels_footer_8aeba48/`。
 ### 关键变更文件
 - `backend/renderers/telecoupling_classification.py`
 - `backend/renderers/telecoupling_style.py`
@@ -7593,4 +7595,6 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 ### 测试状态
 - `test_telecoupling_classification.py`：4/4 通过。
 - Frontend Vite production build 通过；生成 bundle `index-VMleCgSm.js`。
-- `git diff --check` 通过；QGIS smoke 脚本已更新但本机无 QGIS runtime，待 GCP render worker 验证。
+- `git diff --check` 通过。
+- GCP `tele-celery-render` QGIS smoke 通过：Flow 图例准确返回 `Domestic systems`、`Adjacent systems`、`Distant systems`，3 条 feature 均成功渲染。
+- GCP 公网页面加载 `index-VMleCgSm.js`，bundle 含版权文字与 `Contact us`，`/health` 返回 HTTP 200；render worker、frontend 和 nginx 均正常运行。

@@ -28,7 +28,7 @@
 
 ## Server facts
 
-- GCP: `ssh csis-gcp`, IP `34.42.83.50`, project root `~/csis-platform/`.
+- GCP: `ssh csis-gcp`, IP `34.42.83.50`, project root `~/csis-platform/telecouplingAI-project/`.
 - MSU: `ssh csis-msu`, IP `35.9.219.33`, project root `~/csis-platform/telecouplingAI-project/`.
 - MSU public URL: `https://ai.telecoupling.msu.edu/` through the MSU WAF.
 - Per-server `.env` and `.env.docker` files must never be copied from local or between servers.
@@ -218,7 +218,7 @@
 
 - User rule clarified: after function changes, first hot-patch and let the user test. Only solidify Docker images when the user explicitly says to solidify; do not eagerly rebuild, commit, retag, or force-recreate images while more hot changes may be coming.
 - MSU and GCP `tele-celery-render` containers were hot-patched for flow/system rendering changes by syncing host source files, copying them into `/app/renderers/`, and restarting only `tele-celery-render`.
-- Current source flow/system behavior uses Domestic systems / Adjacent systems / Distant systems; flow line widths remain half of the previous values. This label rename is not yet deployed to MSU or GCP.
+- Current source flow/system behavior uses Domestic systems / Adjacent systems / Distant systems; flow line widths remain half of the previous values. Commit `8aeba48` was hot-deployed to GCP on 2026-07-28 together with frontend bundle `index-VMleCgSm.js`; it is not yet deployed to MSU or solidified into Docker images. GCP backup: `/home/csisaiproject2026/csis-platform/backups/20260728_system_labels_footer_8aeba48/`.
 - Latest verified hot-patched `telecoupling_style.py` SHA-256 in both running render containers: `b16b79910b413f820faf289e8ed448fc630e5d66d3186cdae3bd29d67f9a671e`.
 - Latest verified hot-patched `_qgis_scene_render_worker.py` SHA-256 in both running render containers after scene legend font alignment: `d8feb9be686da133ef5d251feb06a1179c82bc97e7b64499252ffe734a1087c5`.
 - Backups for the latest flow-width hot patch: MSU `/home/jianan2/csis-platform/backups/20260712_flow_width_half/`; GCP `/home/csisaiproject2026/csis-platform/backups/20260712_flow_width_half/`.
