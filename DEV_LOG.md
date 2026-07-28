@@ -7392,3 +7392,13 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - `DEV_LOG.md`
 ### 测试状态
 - N/A（架构讨论，无代码、配置或服务器改动）。
+
+## 2026-07-28 — 确认错误管理方案的行业成熟度
+### 完成内容
+- 仅讨论、未改业务代码。确认“结构化错误事件 + 集中聚合/检索 + 原始日志兜底 + Admin/工单处理”是成熟的生产网站可观测性与错误管理模式，Sentry、Bugsnag、Rollbar、Datadog、New Relic、ELK/Loki 等产品均体现类似分层。
+- 澄清 error 与 bug 的区别：运行时 error 应自动记录并 fingerprint 聚合；经过 Admin 分诊确认需要修复后，才升级为 bug/issue，避免将用户输入校验错误、404 扫描和正常取消全部当作产品 Bug。
+- 对当前项目，轻量自建 PostgreSQL error registry + JSON logs 比部署完整自托管 Sentry 更符合规模与运维能力；未来需要告警、性能追踪、release 对比和完整 issue workflow 时再接入成熟平台。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- N/A（架构讨论，无代码、配置或服务器改动）。
