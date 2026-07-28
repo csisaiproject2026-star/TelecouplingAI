@@ -7729,3 +7729,26 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - PASS：最终 OLS/CO2/CBA/Food 同时 4/4 成功、0 重试、2.76-3.77 秒、Session 4/4、token 增量严格为 180,000，四条 API 日志均只有 iteration 0。
 - 补充 10 用户 probe：10/10、0 重试、p95 8.8 秒；该轮在修订前用于发现 CBA 别名缺口，不能单独作为最终“四工具全部一次调用”的证据。
 - GCP API healthy、restart count 0、OOM false，最终容器日志无 `ERROR`/`Traceback`；MSU 保持 `capacity-200-v1-ea641be`。
+
+## 2026-07-28 — MSU direct-tool v2 部署与 200 用户对比验收
+### 完成内容
+- 为 MSU v1 运行源码、环境、容器元数据及 running/latest 镜像建立完整回滚点；从已验证 v1 镜像构建薄层，只覆盖修订 `d0a5f95` 的 `agent.py` 和 `config.py`。
+- 启用 `DIRECT_TOOL_COMPLETION_ENABLED=true`，仅重建 `api-server`；Redis、nginx、Celery workers、数据、server-specific 环境文件和原 7 个 Session 均未重启或覆盖。
+- MSU 当前运行 `capacity-200-v2-direct-complete`，API 镜像为 `sha256:f7feb31c8d26cc8005d4003623a30110de03a1236f960824769ca8963b4c1963`。
+- 通过公网 WAF 以与 v1 相同的 200 用户、30 秒到达窗口、OLS/CO2/CBA/Food prompt pool、每人一个持久 Session、0 自动重试口径完成正式对比。
+- v2 为 200/200 成功、200/200 Session 保留、0 重试；wall 195.5s、平均 72.6s、p50 64.7s、p95 160.6s、最大 164.1s、吞吐 61.39 runs/min。
+- 相对 v1：wall 缩短 184.5s（48.6%），p50 缩短 204.8s（76.0%），p95 缩短 185.0s（53.5%），最大完成时间缩短 184.6s（52.9%），吞吐提高 94.4%。
+- 首模型/工具活动 p95 仅从 170.9s 降至 158.2s，说明主要收益确实来自取消成功工具后的第二次 Gemini 总结，而不是消除首轮 TPM 排队。
+- 删除全部 200 个测试 Session 及对应上传/输出，恢复原 7 个 Session；将原始结果、资源汇总、v1/v2 对比和监控日志持久化到 MSU evidence 目录。
+- 测后确认 fast queues 和 active leases 均为 0，维护性重启 Food worker，将内存从接近 512 MiB 上限降至 82.52 MiB。
+### 关键变更文件
+- `docs/reports/MSU_CAPACITY_200_20260728.md`
+- `PROJECT_MEMORY.md`
+- `DEV_LOG.md`
+### 测试状态
+- MSU 公网四工具 smoke：4/4 通过。
+- MSU 公网 WAF 200 用户：200/200 通过，Session 200/200，0 重试。
+- Gemini active/waiting 峰值 8/140，reservation 峰值 2.7M；API 内存峰值 361.7 MiB，最低 free+buffer+cache 46.69 GiB。
+- API/Redis/相关 workers healthy，未见 OOM、异常重启或相关 `ERROR`/`Traceback`；测试后队列和 active leases 均为 0。
+- Food worker 峰值仍达到 512 MiB 上限；长期建议至少提高到 768 MiB、优选 1 GiB，但不要同时提高 concurrency。
+- 限定：本结果只验证小 CSV direct fast tools，不代表 200 个大文件上传、同类重型 InVEST 或不受限 workflow。
