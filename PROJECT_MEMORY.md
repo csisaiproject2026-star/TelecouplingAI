@@ -75,6 +75,16 @@
 - The cumulative ladder grew from 7 to 470/500 sessions, so it did not exercise LRU eviction at or above the 500-session ceiling. Post-test API/Redis were healthy, all relevant restart counts remained zero, OOM flags were false, active leases and tested queues returned to zero, and no backend/worker traceback was found. All 463 generated test sessions and their upload/output directories were removed; MSU returned to 7 pre-existing sessions.
 - Scope remains limited: this does not validate 200 large uploads, 200 heavy/same-InVEST jobs, or unrestricted multi-step workflows. Full report and evidence locations: `docs/reports/MSU_CAPACITY_200_20260728.md` and MSU `~/csis-platform/capacity-results/msu-capacity-200-v1-ea641be-20260728/`. Rollback backup: `~/csis-platform/backups/20260728_capacity_200_ea641be_msu/`.
 
+## Direct single-tool completion candidate (2026-07-28)
+
+- GCP runs release `capacity-200-v2-direct-complete` from validated revision `d0a5f95` / tag `capacity-200-v2-direct-complete-r1`. The exact API image is `sha256:706f791afa41762df369f29fb6274825d3e1a4b519562ec08382e51b66ff3780`.
+- `DIRECT_TOOL_COMPLETION_ENABLED=true` only on the GCP API candidate. Source and templates default the flag to false. MSU remains unchanged on `capacity-200-v1-ea641be`.
+- One explicit normal tool that returns a successful `tool_result` now emits `Analysis completed successfully. N output files were generated.` plus `Please interpret the results.` and ends without the second Gemini summary call. Workflow, multiple/ambiguous tools, render/read tools, missing inputs, failures, and explicit interpretation/summary/render requests keep the original Gemini loop.
+- Real GCP OLS smoke generated three files and moved the Gemini reservation from 0 to exactly 45,000. A follow-up `Please interpret the results.` produced a 2,497-character explanation and used read tools as needed.
+- Final simultaneous OLS/CO2/CBA/Food smoke passed 4/4 without retries in 2.76-3.77 seconds, retained 4/4 sessions, emitted only iteration 0 for each request, and reserved exactly 180,000 tokens total (4 x 45,000). The earlier 10-user probe passed 10/10 at p95 8.8 seconds and exposed the CBA alias gap that revision `d0a5f95` fixed.
+- GCP rollback points: original runtime/image backup `~/csis-platform/backups/20260728_direct_complete_v2_cdd9eac_gcp/` with tag `csic_backend:pre-direct-complete-v2-cdd9eac-running-api`; pre-r1 backup `~/csis-platform/backups/20260728_direct_complete_v2_r1_d0a5f95_gcp/` with tag `csic_backend:pre-direct-complete-v2-r1-d0a5f95-running-api`.
+- All generated direct-smoke and fast-pool sessions were deleted. The 10-user probe began at 499/500 sessions, exercised inactive-LRU eviction while adding ten sessions, and cleanup left 490/500; this was on the GCP test environment.
+
 ## Upload-size evidence checkpoint (2026-07-28)
 
 - nginx currently permits `client_max_body_size 500M` for chat/upload requests, but this is a request-body configuration limit, not a validated safe upload size; multipart overhead also means usable file bytes are slightly lower.

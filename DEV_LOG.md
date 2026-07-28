@@ -7711,3 +7711,21 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - PASS：direct completion 与 Gemini timeout focused tests 29/29。
 - PASS：`agent.py`、`config.py` 和新增测试文件编译检查。
 - 尚未部署；下一步仅在 GCP 启用候选并验证一次调用完成与后续解释，MSU 保持不变。
+
+## 2026-07-28 — GCP 验证 direct-tool v2 并修正 CBA 路由
+### 完成内容
+- 将提交 `cdd9eac` 的默认关闭候选构建为薄镜像并仅重建 GCP `api-server`；真实 10 用户测试发现压测提示 `single cost-benefit function` 未命中 CBA 别名，四个 CBA 请求仍产生 iteration 1。
+- 增加该真实提示词别名与回归测试，提交并推送修订 `d0a5f95`，创建标签 `capacity-200-v2-direct-complete-r1`，构建最终镜像 `sha256:706f791afa41762df369f29fb6274825d3e1a4b519562ec08382e51b66ff3780`。
+- GCP 设置 `RELEASE_VERSION=capacity-200-v2-direct-complete`、`DIRECT_TOOL_COMPLETION_ENABLED=true`；只重建 API，Redis、nginx 和 Celery workers 未重启，MSU 未修改。
+- 建立原 v1、首版 v2 和 r1 前的源码、环境、容器 inspect 与镜像回滚点；所有测试 Session 均通过 API 删除。
+### 关键变更文件
+- `telecouplingAI-project/backend/agent.py`
+- `telecouplingAI-project/backend/tests/test_agent_direct_completion.py`
+- `PROJECT_MEMORY.md`
+- `DEV_LOG.md`
+### 测试状态
+- PASS：本地 direct completion、Gemini timeout 与 capacity tests 34/34。
+- PASS：真实 GCP OLS 生成 3 个文件，确定性文案正确，Gemini reservation 0→45,000；后续 `Please interpret the results.` 返回 2,497 字符解释。
+- PASS：最终 OLS/CO2/CBA/Food 同时 4/4 成功、0 重试、2.76-3.77 秒、Session 4/4、token 增量严格为 180,000，四条 API 日志均只有 iteration 0。
+- 补充 10 用户 probe：10/10、0 重试、p95 8.8 秒；该轮在修订前用于发现 CBA 别名缺口，不能单独作为最终“四工具全部一次调用”的证据。
+- GCP API healthy、restart count 0、OOM false，最终容器日志无 `ERROR`/`Traceback`；MSU 保持 `capacity-200-v1-ea641be`。
