@@ -52,6 +52,9 @@
 - The local fix preassigns the Celery task ID, confirms the Pub/Sub subscription before dispatch, and wraps the whole listener in a real asynchronous timeout. Do not resume 100/200-user testing until this candidate is deployed to GCP and passes small fast-pool runs plus repeated 50-user runs at the 99% gate.
 - GCP candidate `capacity-200-v1-ea641be` deployed and passed the fast-pool ladder: 10/10, 50/50, 100/100, and final 200/200 with complete session retention. At 200 users, p50 was 294.5 seconds, p95 459.5 seconds, maximum 464.5 seconds, CPU peak 19.8%, and RAM peak 6.6/32 GB. Evidence is under `~/csis-platform/capacity-results/capacity-200-v1-ea641be-20260728/`.
 - This validates small inline-CSV fast tools only. It does not validate 200 concurrent large uploads, public WAF upload behavior, disk throughput/capacity, or 200 mixed/heavy InVEST jobs. Keep those as separate capacity gates before claiming unrestricted 200-user capacity.
+- Keep `MAX_SESSIONS=500` when the candidate is promoted; this is a low-cost retention/LRU ceiling, not an execution-concurrency setting. A limit of 50 would evict inactive users during a 200-user burst, while exactly 200 leaves no room for New Chat, reloads, or sessions retained for the 24-hour TTL.
+- Execution remains intentionally bounded separately: eight concurrent Gemini calls with a 500-request wait queue and a 2.7M-token/minute safety budget. The 200-user fast test succeeded by queueing, but p95 was about 7.7 minutes; capacity therefore means no silent loss, not immediate responses.
+- Most heavy InVEST model queues have Celery concurrency 1. If many users choose the same heavy model, those jobs serialize and may approach the 1800/2100-second Celery soft/hard limits. Same-tool bursts, mixed/heavy resources, cancellation, queue ETA/fairness, and the MSU public WAF path remain unvalidated.
 
 ## Upload-size evidence checkpoint (2026-07-28)
 
