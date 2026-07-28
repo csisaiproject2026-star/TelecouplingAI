@@ -7563,3 +7563,16 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 ### 测试状态
 - 本次为只读报告；未修改 GCP/MSU 配置、代码、容器或队列。
 - GCP 当前 Error Registry 仅有 6 条 DEMO / 5 个组，无真实容量错误记录。
+
+## 2026-07-28 — 按 MSU 目标服务器修正容量报告优先级
+### 完成内容
+- 用户指出最终目标是 MSU。确认 GCP 仅余 23 GB 是 GCP 测试环境的硬限制，不能直接等同于 MSU 生产限制。
+- MSU 历史规格为 62 GB RAM、637 GB home；34.70 GB 原始上传从总容量看大概率可容纳，但必须确认 nginx 临时请求体、Docker root、uploads 和 outputs 是否都落在该大盘，且当前真实空闲空间足够。
+- 内存风险仍不能排除：200 个约 162 MiB 文件被 `await uf.read()` 同时完整读入时约占 31.6 GiB，加历史约 14 GB 系统/容器基线已约 45.6 GiB，尚未计 multipart、Python 对象、代理缓冲和模型任务。
+- 对 MSU 的优先级修正为：分块上传内存安全 → WAF/带宽与 170 MB 单请求验证 → Gemini 延迟 → 同工具重型队列；扩容磁盘降为“确认挂载和空闲空间”，不预设必须扩容。
+### 关键变更文件
+- `PROJECT_MEMORY.md`
+- `DEV_LOG.md`
+### 测试状态
+- 尝试只读 SSH 检查 MSU 实时内存、磁盘和 Docker root，但当前未连接 MSU VPN，`35.9.219.33:22` 超时。
+- 本次未修改 GCP/MSU 代码、配置或容器。
