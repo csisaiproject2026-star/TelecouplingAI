@@ -122,8 +122,14 @@ const GUIDE_FILE_OVERRIDES = {
   'Workflow_02_tourism_telecoupling_User_Guide': 'Tourism_Telecoupling_User_Guide.pdf',
 };
 
+const ASSET_VERSION_OVERRIDES = {
+  'Workflow_01_soybean_telecoupling_User_Guide': '20260729-systems-v2',
+};
+
 function encodedDownloadPath(folder, filename) {
-  return `/download/user-guides/${encodeURIComponent(folder)}/${encodeURIComponent(filename)}`;
+  const path = `/download/user-guides/${encodeURIComponent(folder)}/${encodeURIComponent(filename)}`;
+  const version = ASSET_VERSION_OVERRIDES[folder];
+  return version ? `${path}?v=${encodeURIComponent(version)}` : path;
 }
 
 function safeDownloadFilename(name) {

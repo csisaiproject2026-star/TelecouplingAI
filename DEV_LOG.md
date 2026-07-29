@@ -7824,3 +7824,26 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - `DEV_LOG.md`
 ### 测试状态
 - GCP/MSU 权威资产扫描完成；未发现未同步副本。
+
+## 2026-07-29 — 补齐 Soybean Systems 点并完整重做 PDF
+### 完成内容
+- 用户指出仅增加 flow 会导致 `Brazil_Systems_pfm.csv` 仍只有原 5 个点；确认该问题成立。
+- 将 Systems CSV 从 5 行扩为 11 行：保留 Brazil sending 及 China/Spain/Netherlands/Thailand receiving，新增 Cuiaba、Sao Paulo、Rio de Janeiro、Montevideo、Buenos Aires、Asuncion 六个 receiving city points；新增 `Country` 字段。
+- 重新打包 Soybean Sample Data ZIP：20 个文件总数不变，仅 `DrawRadialFlows.csv` 和 `Brazil_Systems_pfm.csv` 两个文件变化，其余 18 个逐字节不变。
+- 在 GCP 真实运行 `run_draw_systems_from_table` 和 `run_draw_radial_flows`，再运行 Systems 单图、Flows 单图及 Systems+Flows composite scene；三张新地图均成功。
+- 完整重做 16 页 Soybean PDF，不再只改文字：嵌入新 Systems、Flows、Combined 三张地图，并保留其余 7 张原指南图片；正文同步更新为 11 systems、10 receiving、10 flows 及三类关系说明。
+- 修复 Markdown 图片路径：将 10 张引用图片直接放在 guide 目录根部，避免 file-server 对二级 `outputs/` 路径返回 403；GCP/MSU 的新 composite 图片公网均返回 200。
+- 用户反馈网页下载到旧 PDF；确认 PDF 响应无显式 `Cache-Control` 且长期使用同名 URL。为 Soybean PDF/ZIP 链接增加 `?v=20260729-systems-v2`，构建并热部署前端 `index-D2cqdaUX.js` 到 GCP/MSU；未重启容器、未固化镜像。
+- 两台服务器在替换前分别备份到 `~/csis-platform/backups/20260729_soybean_system_points/`；旧版原始资产仍在前一备份 `20260729_soybean_flow_categories/`。
+### 关键变更文件
+- `telecouplingAI-project/frontend/src/userGuides.js`
+- 外部资产：Soybean workflow ZIP、Markdown、PDF 及 10 张指南图片
+- `PROJECT_MEMORY.md`
+- `DEV_LOG.md`
+### 测试状态
+- Systems：11/11 生成点，1 sending / 10 receiving。
+- Flows：10/10 生成线，Domestic 3 / Adjacent 3 / Distant 4。
+- QGIS：Systems、Flows、Combined 三张地图真实生成并人工检查正确。
+- PDF：16 页、10 张嵌入图片；公开 GCP/MSU PDF 均包含 `11 systems`、`10 receiving systems`、`10 flows`、城市名和三类关系。
+- GCP/MSU 公开 PDF SHA-256 均为 `ab171bccc70b9e02a363e8202d9b1a9597740de9166c794022efb6217ee86aad`；ZIP 均为 `7d11507b3f636a574c95fea0c92f2fe1255b57272934d255c9c08121abd1f3d6`。
+- 两站公开首页均引用 `index-D2cqdaUX.js`，bundle 含版本参数；两站 `/health` 均返回 `status=ok`。
