@@ -7813,3 +7813,14 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - GCP/MSU 公网下载 ZIP 均含 20 个文件和 10 条 flow；Adjacent 国家严格为 Uruguay、Argentina、Paraguay。
 - GCP/MSU 公网 ZIP SHA-256 均为 `b009136bf98995a31b0dd51e572cbd264badb2f7be1b70f105a04dcb7749faef`；Markdown/PDF 哈希也一致。
 - GCP 和 MSU `/health` 均返回 `status=ok`。
+
+## 2026-07-29 — 核对 Soybean 新 CSV 的全部权威放置位置
+### 完成内容
+- 扫描 GCP `/data/outputs/user-guides/`、MSU `/home/jianan2/csis-data/outputs/user-guides/` 及两台服务器的 `telecouplingAI-project` 源码树，查找所有 `DrawRadialFlows.csv` loose 文件和包含该文件的 ZIP。
+- 两台服务器唯一的当前权威副本均位于 `Workflow_01_soybean_telecoupling_User_Guide/Soybean Telecoupling Workflow sample data.zip` 内，没有遗漏的第二份 workflow 源 CSV。
+- GCP/MSU ZIP 内的 `DrawRadialFlows.csv` 均为 953 bytes，SHA-256 均为 `0357e6c936870286274267e6f21621f5e33c8051212bd2a35564493c28efc0e7`，与本次生成文件完全一致。
+- 当前 Git 工作区按项目既定规则不跟踪 User Guide 测试数据，因此不新增 loose CSV 或 ZIP 到仓库；旧版仅保存在两台服务器的回滚备份目录。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- GCP/MSU 权威资产扫描完成；未发现未同步副本。
