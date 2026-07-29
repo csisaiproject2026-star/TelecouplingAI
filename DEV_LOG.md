@@ -7790,3 +7790,26 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - `DEV_LOG.md`
 ### 测试状态
 - N/A（指标解释，无代码或服务器变更）。
+
+## 2026-07-29 — 扩展 Soybean workflow 的三类 flow 示例数据
+### 完成内容
+- 定位到 GCP/MSU 外部 User Guide 目录中的权威样例包 `Soybean Telecoupling Workflow sample data.zip`；仓库按既定规则不跟踪这类测试数据。
+- 保留原有 Brazil 到 China、Spain、Netherlands、Thailand 的 4 条 Distant systems flow。
+- 在 `DrawRadialFlows.csv` 增加 3 条巴西国内 flow：Cuiaba、Sao Paulo、Rio de Janeiro，标记为 `Domestic systems`。
+- 增加 Brazil 到三个邻国城市的 flow：Montevideo/Uruguay、Buenos Aires/Argentina、Asuncion/Paraguay，标记为 `Adjacent systems`。
+- 新增 `FROM_NAME`、`TO_NAME`、`TO_COUNTRY`、`Flow_Relation` 字段；总计 10 条 flow，所有 `Quantity=1`，明确仅用于演示空间关系类别，不代表真实贸易量。
+- 重新打包 ZIP，保持总文件数 20 且其余 19 个文件逐字节不变；同步更新 Markdown 和 PDF 中旧的 “4 flows” 说明。
+- 将同一 ZIP/Markdown/PDF 发布到 GCP 和 MSU 的公开 User Guide 目录；未修改应用源码、容器或环境配置。
+- 两台服务器均在替换前备份原文件到 `~/csis-platform/backups/20260729_soybean_flow_categories/`。
+### 关键变更文件
+- 外部资产：`Workflow_01_soybean_telecoupling_User_Guide/Soybean Telecoupling Workflow sample data.zip`
+- 外部资产：`Workflow_01_soybean_telecoupling_User_Guide/Soybean_Telecoupling_AI_Driven_User_Guide.md`
+- 外部资产：`Workflow_01_soybean_telecoupling_User_Guide/Soybean_Telecoupling_AI_Driven_User_Guide.pdf`
+- `PROJECT_MEMORY.md`
+- `DEV_LOG.md`
+### 测试状态
+- GCP 真实 `run_draw_radial_flows`：10 条输入全部生成 GeoJSON/SHP，0 条空坐标记录。
+- GCP 真实 QGIS flow 渲染：成功生成预览，分类统计为 Domestic 3、Adjacent 3、Distant 4，三类颜色和图例正确。
+- GCP/MSU 公网下载 ZIP 均含 20 个文件和 10 条 flow；Adjacent 国家严格为 Uruguay、Argentina、Paraguay。
+- GCP/MSU 公网 ZIP SHA-256 均为 `b009136bf98995a31b0dd51e572cbd264badb2f7be1b70f105a04dcb7749faef`；Markdown/PDF 哈希也一致。
+- GCP 和 MSU `/health` 均返回 `status=ok`。

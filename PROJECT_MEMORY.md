@@ -180,6 +180,9 @@
 - Reusable runner and evidence: `feedbacks/MSU_Workflow_Verification_20260704/`.
 - Training manual: `telecouplingAI-project/Systematic_tests/UserSystematicTest_Run3_20260702/CSIS_两个Workflow学习测试手册.md`.
 - Manual images are local to the manual tree in `workflow_manual_images/`; 9/9 links were verified.
+- Soybean guide flow data was expanded on 2026-07-29 without changing workflow code or the other 19 sample files. `DrawRadialFlows.csv` now contains 10 illustrative lines: 4 Distant systems (the original China/Spain/Netherlands/Thailand endpoints), 3 Domestic systems (Cuiaba, Sao Paulo, Rio de Janeiro), and 3 Adjacent systems (Montevideo/Uruguay, Buenos Aires/Argentina, Asuncion/Paraguay). The explicit `Flow_Relation` column makes renderer classification deterministic; all `Quantity` values remain demonstration values of 1.
+- The updated Soybean ZIP, Markdown guide, and PDF are external User Guide assets, not Git-tracked test data. Identical copies are live on GCP and MSU under `outputs/user-guides/Workflow_01_soybean_telecoupling_User_Guide/`. Public ZIP SHA-256: `b009136bf98995a31b0dd51e572cbd264badb2f7be1b70f105a04dcb7749faef`. Server backups: `~/csis-platform/backups/20260729_soybean_flow_categories/`.
+- Targeted GCP validation ran the real radial-flow tool and QGIS renderer: 10/10 rows produced geometry, relation counts were 3 domestic / 3 adjacent / 4 distant, and the rendered legend/colors matched. The unchanged crop and habitat inputs were not rerun.
 
 ## Fast validation commands
 
