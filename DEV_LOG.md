@@ -7847,3 +7847,17 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - PDF：16 页、10 张嵌入图片；公开 GCP/MSU PDF 均包含 `11 systems`、`10 receiving systems`、`10 flows`、城市名和三类关系。
 - GCP/MSU 公开 PDF SHA-256 均为 `ab171bccc70b9e02a363e8202d9b1a9597740de9166c794022efb6217ee86aad`；ZIP 均为 `7d11507b3f636a574c95fea0c92f2fe1255b57272934d255c9c08121abd1f3d6`。
 - 两站公开首页均引用 `index-D2cqdaUX.js`，bundle 含版本参数；两站 `/health` 均返回 `status=ok`。
+
+## 2026-07-29 — 审计 direct completion 对 User Guide 的影响
+### 完成内容
+- 扫描 GCP 权威 User Guide 目录下全部 45 份 Markdown：43 个单工具指南和 2 个 workflow 指南。
+- 核对 `interpret`、`explain`、`summary`、自动 AI 总结、最终自然语言响应、绿色结果卡等关键词；出现的 `interpret` 均用于说明 lookup table 或结果含义，`summary` 均为输出 CSV 文件名/用途。
+- 45 份指南中没有一份声称 Gemini 会在工具成功后自动提供最终解释、总结或自然语言回复。
+- 单工具指南的统一操作仍是“等待 tool card 显示 Completed，然后下载结果文件”，与 direct completion v2 完全一致；截图也以 tool result card 为中心，不依赖旧的二次 Gemini 文案。
+- 两个 workflow 指南不受影响，因为 workflow、多工具和明确解释请求仍保留原 Gemini 循环。
+- 结论：无需重写 45 份指南，也无需重拍全部截图。可选的文档增强仅是在 43 个单工具指南统一增加一句：若需要 AI 解释，输入 `Please interpret the results.`，然后批量重生成 PDF。
+### 关键变更文件
+- `PROJECT_MEMORY.md`
+- `DEV_LOG.md`
+### 测试状态
+- 45/45 Markdown 指南完成只读文本审计；未修改公开指南资产、应用代码或服务器运行状态。

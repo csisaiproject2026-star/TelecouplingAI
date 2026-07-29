@@ -90,6 +90,7 @@
 - The Food worker again reached its 512 MiB hard limit without OOM. After confirming all fast queues and active leases were zero, a maintenance restart reduced it to 82.52 MiB. Raise only its memory limit to at least 768 MiB, preferably 1 GiB; do not simultaneously raise concurrency.
 - All 200 v2 sessions and generated files were removed, restoring the original seven MSU sessions. Evidence: `~/csis-platform/capacity-results/msu-capacity-200-v2-direct-complete-20260728/`. Rollback backup: `~/csis-platform/backups/20260728_direct_complete_v2_r1_d0a5f95_msu/`; v1 image `sha256:e46fad32944c4d5354302aaf40177d3de1bb5dadaf2a39254d124e0a29c6325a`.
 - The v2 result remains limited to small-CSV direct fast tools. It does not validate 200 large uploads, same-model heavy InVEST jobs, or unrestricted workflows.
+- User-guide impact audit on 2026-07-29 scanned all 45 authoritative Markdown guides (43 single tools and 2 workflows). None claims that Gemini automatically supplies a final explanation/summary, and the standard single-tool instructions still correctly tell users to wait for the completed tool card and download outputs. Full guide rewrites and new screenshots are not required. An optional future batch edit may add one standard sentence to the 43 single-tool guides: after direct completion, type `Please interpret the results.` for an AI explanation. Workflow guides are unaffected.
 
 ## Upload-size evidence checkpoint (2026-07-28)
 
