@@ -7984,3 +7984,26 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - `npm run build` 成功。
 - 三个公网入口均引用 `index-Ce83RVT0.js`，bundle 均包含完整问卷 URL。
 - GCP 1、GCP 2、MSU 的公开页面及健康端点正常；问卷目标返回 HTTP 200。
+
+## 2026-07-31 — 部署 MSU Admin Error Registry
+### 完成内容
+- 定位 `/admin/errors` 404 的根因：MSU 只有包含 Admin 页面代码的新静态 bundle，但后端镜像没有 Admin router，Compose 没有 PostgreSQL，frontend nginx 也没有 SPA fallback。
+- 在确认 Gemini/Celery 均空闲后，备份 MSU 的源码、`.env`、`.env.docker`、Compose、nginx、容器状态和前后端镜像。
+- 通过 MSU→GCP 服务器直连传输已验证 Backend 和 `postgres:16-alpine` 镜像；同步当前受控源码与 Compose，不覆盖 MSU 的 key、域名或数据路径。
+- 在 MSU 本地生成随机 PostgreSQL 密码；通过服务器间读取运行容器值复用现有 GCP Admin 用户名和 Argon2id 哈希，未读取或传输明文密码。
+- 启用 `ERROR_REGISTRY_ENABLED=true`、`ADMIN_ENABLED=true`、`ERROR_ENVIRONMENT=msu` 和 Secure Cookie；证据目录位于 `/home/jianan2/csis-data/error-evidence`。
+- 固化当前前端 bundle `index-Ce83RVT0.js` 和 SPA fallback；启动内部 PostgreSQL，并将全部 35 个 API/Celery 服务切换到同一验证镜像。
+### 关键变更文件
+- MSU `telecouplingAI-project/docker-compose.yml`
+- MSU `backend/` Error Registry 相关受控源码
+- MSU `frontend/nginx.conf`、`frontend/src/` 和 `frontend/dist/`
+- MSU 服务器本地 `.env`、`.env.docker`（未进入 Git）
+- `PROJECT_MEMORY.md`
+- `DEV_LOG.md`
+### 测试状态
+- `https://ai.telecoupling.msu.edu/admin/errors` 返回 200；未登录 `/api/admin/session` 正确返回 401；公开 `/health` 返回 200。
+- PostgreSQL healthy，Admin 用户已引导创建；Redis consumer group 正常。
+- 合成部署错误通过 Redis Stream→collector→PostgreSQL 入库，随后清除 occurrence、group 和 stream 项；最终数据库与 pending 均为 0。
+- 35/35 API/Celery 服务使用 Backend `sha256:6971bb9f...`；40/40 Compose 服务运行，0 unhealthy、0 restarting。
+- 公网普通聊天通过，前端继续发送 2.5 兼容标识，后端日志确认实际调用 `gemini-3.5-flash`；测试 Session 已删除。
+- 回滚目录：`~/csis-platform/backups/20260731_msu_error_registry/`；回滚标签：`csic_backend:pre-msu-error-registry-20260731`、`csic_frontend:pre-msu-error-registry-20260731`。
