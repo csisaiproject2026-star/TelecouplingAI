@@ -7944,3 +7944,28 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - 两台 `tele-backend` 健康且无重启循环；`google-genai` 版本均为 2.14.0。
 - `gemini-2.5-flash`：两台均为同一 Google 404，不是拼写、旧 SDK、API 未启用或地区问题。
 - `gemini-3.5-flash`：两台完整平台请求均成功。
+
+## 2026-07-31 — 保留前端 2.5 显示并规范迁移到 Gemini 3.5
+### 完成内容
+- 按用户要求保持前端源码、模型下拉框和默认显示完全不变；浏览器仍发送 `gemini-2.5-flash`。
+- 后端新增集中模型解析：收到该兼容标识时，在调用 Google 前转换为 `gemini-3.5-flash`；后端默认、环境模板和活跃测试默认均迁移到 3.5。
+- 扩展 Thinking 支持判断并在真实 GCP key 上确认 3.5 接受 `ThinkingConfig(include_thoughts=True)`。
+- 从提交 `ddc7355` 为两台 GCP 构建薄层 API 镜像，只重建 `api-server`；未修改前端或其他业务容器，真实 key 未进入源码或日志。
+- 端到端 OLS 验收发现 GCP 2 克隆环境仍把下载地址指向 GCP 1；将其单行旧配置迁移为 `SERVER_BASE_URL=https://34.136.64.176` 后重新验收通过。
+- 清理两台服务器的全部本轮测试 Session、上传和输出文件。
+### 关键变更文件
+- `telecouplingAI-project/backend/config.py`
+- `telecouplingAI-project/backend/main.py`
+- `telecouplingAI-project/backend/agent.py`
+- `telecouplingAI-project/backend/tests/test_model_resolution.py`
+- `telecouplingAI-project/backend/tests/test_api.py`
+- `telecouplingAI-project/.env`、`.env.docker` 及三个环境模板
+- 两个活跃 GCP 测试默认模型文件
+- `PROJECT_MEMORY.md`
+- `DEV_LOG.md`
+### 测试状态
+- 本地模型解析、API chat、direct completion 和 Gemini timeout：38 个针对性测试全部通过；差异只读审查未发现重要问题。
+- 两台均以网页实际发送的 `model=gemini-2.5-flash` 完成普通 SSE 回复，后端日志确认实际模型为 `gemini-3.5-flash`。
+- 两台 OLS 均生成 3 个 CSV 并正常完成；GCP 1 下载返回 200，GCP 2 修复后的自身 HTTPS 下载返回 200。
+- 两台 `tele-backend` 最终均 healthy、restart count 0；运行中的三个后端文件哈希完全一致；前端仍为 `index-xR8BRM1J.js`。
+- 全量 `test_api.py` 中既有容量检查仍因本地 `.env` 的 `MAX_SESSIONS=50` 与测试期望 ≥200 而失败；与本次模型迁移无关，未扩大范围修改。
