@@ -12,12 +12,15 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _PROJECT_ROOT = Path(__file__).parent.parent
 _ENV_FILE = str(_PROJECT_ROOT / ".env")
+MODEL_COMPATIBILITY_ALIASES = {
+    "gemini-2.5-flash": "gemini-3.5-flash",
+}
 
 
 class Settings(BaseSettings):
     # --- AI ---
     GOOGLE_API_KEY: str = ""
-    DEFAULT_MODEL: str = "gemini-2.5-flash"
+    DEFAULT_MODEL: str = "gemini-3.5-flash"
     GEMINI_MAX_CONCURRENT: int = Field(default=8, ge=1)
     GEMINI_MAX_QUEUE: int = Field(default=500, ge=1)
     GEMINI_INPUT_TPM_LIMIT: int = Field(default=3_000_000, ge=0)
@@ -113,3 +116,9 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+
+def resolve_model_name(requested_model: str | None) -> str:
+    """Resolve public compatibility model IDs to the model used by Gemini."""
+    model_name = (requested_model or "").strip() or settings.DEFAULT_MODEL
+    return MODEL_COMPATIBILITY_ALIASES.get(model_name, model_name)

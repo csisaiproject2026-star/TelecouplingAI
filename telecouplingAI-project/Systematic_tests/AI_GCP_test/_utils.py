@@ -20,7 +20,7 @@ DOCKER_EXEC    = os.getenv("CSIS_DOCKER_EXEC", "tele-backend")
 DEMO           = "/data/datainput"   # container-internal data path
 OUTPUTS        = "/data/outputs"     # container-internal output path
 SD             = f"{DEMO}/SampleData"
-DEFAULT_MODEL  = os.getenv("CSIS_MODEL", "gemini-2.5-flash")
+DEFAULT_MODEL  = os.getenv("CSIS_MODEL", "gemini-3.5-flash")
 
 
 def new_sid(prefix: str = "gcp") -> str:

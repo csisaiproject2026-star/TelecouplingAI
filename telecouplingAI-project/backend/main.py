@@ -50,7 +50,7 @@ from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse, ServerSentEvent
 import uvicorn
 
-from config import settings
+from config import resolve_model_name, settings
 from shared.error_events import build_error_event, publish_error_event_async
 
 logging.basicConfig(
@@ -204,6 +204,7 @@ async def chat_endpoint(
     x_session_id: str | None = Header(default=None),
 ):
     sm = get_session_manager()
+    resolved_model = resolve_model_name(model)
 
     # Resolve or create session
     session_id = x_session_id or f"csis_{uuid.uuid4().hex}"
@@ -308,7 +309,7 @@ async def chat_endpoint(
                     session_id=session_id,
                     files=uploaded,
                     event_callback=callback,
-                    model=model,
+                    model=resolved_model,
                     chat_history=chat_history,
                     session_manager=sm,
                 )
@@ -321,7 +322,7 @@ async def chat_endpoint(
                     session_id=session_id,
                     request_id=request.state.request_id,
                     error_code="AGENT_FAILED",
-                    context={"model": model or settings.DEFAULT_MODEL},
+                    context={"model": resolved_model},
                     traceback_text=traceback.format_exc(),
                 )
                 await publish_error_event_async(sm.r, error_event)
@@ -375,7 +376,7 @@ async def chat_endpoint(
                         request_id=request.state.request_id,
                         task_id=event.get("task_id"),
                         error_code=event.get("error_code") or "CHAT_ERROR",
-                        context={"model": model or settings.DEFAULT_MODEL},
+                        context={"model": resolved_model},
                     )
                     await publish_error_event_async(sm.r, error_event)
                     event = {**event, "error_id": error_event["event_id"]}

@@ -13,7 +13,7 @@ import agent  # noqa: E402
 from google.genai import types  # noqa: E402
 
 client = agent._get_client()
-MODEL = os.getenv("CSIS_MODEL", "gemini-2.5-flash")
+MODEL = os.getenv("CSIS_MODEL", "gemini-3.5-flash")
 
 
 def count(contents, config=None):

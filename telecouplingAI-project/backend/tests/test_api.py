@@ -231,6 +231,31 @@ def test_chat_sse_returns_text_chunk(client, mock_session_manager):
     assert "done" in body
 
 
+def test_chat_maps_frontend_25_model_to_supported_backend(
+    client,
+    mock_session_manager,
+):
+    """The unchanged frontend model ID must not reach Google directly."""
+    received_model = None
+
+    async def fake_agent(message, session_id, files, event_callback, model=None,
+                         chat_history=None, session_manager=None):
+        nonlocal received_model
+        received_model = model
+        await event_callback({"type": "done"})
+
+    with patch("agent.run_agent", side_effect=fake_agent):
+        with patch("main.get_session_manager", return_value=mock_session_manager):
+            resp = client.post(
+                "/api/chat",
+                data={"message": "hello", "model": "gemini-2.5-flash"},
+                headers={"X-Session-ID": "chat_model_compat"},
+            )
+
+    assert resp.status_code == 200
+    assert received_model == "gemini-3.5-flash"
+
+
 def test_chat_sse_error_event_on_agent_failure(client, mock_session_manager):
     """If agent raises, SSE should contain an error event (not a 500)."""
 

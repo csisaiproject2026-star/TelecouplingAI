@@ -7929,3 +7929,18 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - 根磁盘 97 GB，已用 76 GB，剩余约 22 GB（78% 已用）。
 - HTTP/HTTPS 首页及 `/health` 均响应成功；40 个容器运行，未发现 unhealthy 或 restarting 容器。
 - GCP 1 `csis-server` 同期实时检查：根磁盘同为 97 GB，已用 76 GB，剩余约 22 GB（78% 已用）。
+
+## 2026-07-31 — 更换并复测两台 GCP Gemini Key
+### 完成内容
+- 分别备份并替换 GCP 1、GCP 2 的 `GOOGLE_API_KEY`，只重建两台的 `api-server`；未记录或提交真实 key。
+- 两把新 key 均可认证并列出模型；显式使用 `gemini-3.5-flash` 时，两台均通过完整平台 SSE 聊天。
+- 按用户提供的官方 Python 示例再次在两台运行 `google-genai` 的 `generate_content(model="gemini-2.5-flash")`，均收到 Google 明确的 404：该模型对新用户不再开放。
+- 当前源码和前端默认仍为 `gemini-2.5-flash`；是否迁移默认模型等待用户决定。
+### 关键变更文件
+- 服务器本地：两台 GCP 的 `.env.docker`（per-server 配置，不进入 Git）
+- `PROJECT_MEMORY.md`
+- `DEV_LOG.md`
+### 测试状态
+- 两台 `tele-backend` 健康且无重启循环；`google-genai` 版本均为 2.14.0。
+- `gemini-2.5-flash`：两台均为同一 Google 404，不是拼写、旧 SDK、API 未启用或地区问题。
+- `gemini-3.5-flash`：两台完整平台请求均成功。

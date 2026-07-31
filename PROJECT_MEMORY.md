@@ -35,6 +35,9 @@
 - MSU public URL: `https://ai.telecoupling.msu.edu/` through the MSU WAF.
 - Per-server `.env` and `.env.docker` files must never be copied from local or between servers.
 - `SERVER_BASE_URL` is the single base URL setting; download URLs are derived by backend configuration.
+- On 2026-07-31, GCP 1 and GCP 2 received separate user-provided Gemini API keys. Each prior `.env.docker` is backed up under `~/csis-platform/backups/20260731_gemini_key_rotation/`; no key value is stored in Git or project documentation.
+- Both new keys authenticate successfully, list models, and complete the full platform SSE path with `gemini-3.5-flash`. However, the exact official `google-genai` 2.14.0 call to `gemini-2.5-flash` returns Google HTTP 404 on both hosts: `This model models/gemini-2.5-flash is no longer available to new users.` This rules out spelling, an old SDK, a disabled API, and host-region differences for these keys.
+- Repository and frontend defaults remain `gemini-2.5-flash` pending an explicit migration decision. Do not assume that model listing means generation access; test `generate_content` with the actual key. Until defaults are migrated or the old keys are restored, ordinary requests that send the current frontend default can fail.
 
 ## MSU Gemini capacity checkpoint (2026-07-27)
 

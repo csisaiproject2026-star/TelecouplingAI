@@ -34,7 +34,7 @@ from google.genai import types
 from google.genai.client import HttpOptions
 import redis.asyncio as aioredis
 
-from config import settings
+from config import resolve_model_name, settings
 from shared.gemini_capacity import gemini_capacity_gate
 from shared.utils import sanitize_error_message, validate_file_params_exist, validate_input_files, CSISError
 from shared.tool_file_specs import TOOL_FILE_SPECS
@@ -47,6 +47,10 @@ _GEMINI_STALL_TIMEOUT = 60
 _GEMINI_ATTEMPT_TIMEOUT = 120
 _TOOL_EVENT_TIMEOUT = 1800
 _PUBSUB_SUBSCRIBE_TIMEOUT = 5
+
+
+def _supports_thinking(model_name: str) -> bool:
+    return model_name.startswith(("gemini-2.5-", "gemini-3.5-"))
 
 
 def _sanitize_visible_thinking_text(text: str) -> str:
@@ -2412,7 +2416,7 @@ async def run_agent(
     }
 
     client = _get_client()
-    model_name = model or settings.DEFAULT_MODEL
+    model_name = resolve_model_name(model)
 
     # Phase 1: build system instruction with PRE_EXECUTION skill sections
     pre_execution_context = _build_pre_execution_context()
@@ -2543,9 +2547,13 @@ async def run_agent(
 
     # Agentic loop
     max_iterations = 10
-    # Gemini 2.5 supports "thinking": ask for thought summaries so the UI can show
-    # a collapsible "Thinking…" block. Older models don't accept the config.
-    thinking_cfg = types.ThinkingConfig(include_thoughts=True) if "2.5" in model_name else None
+    # Supported Gemini reasoning models can stream summaries for the UI's
+    # collapsible "Thinking…" block.
+    thinking_cfg = (
+        types.ThinkingConfig(include_thoughts=True)
+        if _supports_thinking(model_name)
+        else None
+    )
 
     # After a plan card is proposed, run ONE more turn (functions disabled) to write
     # a short plain-language intro shown ABOVE the card (方案A layout). See below.
@@ -2594,7 +2602,7 @@ async def run_agent(
             )
 
         # Disable thinking when we FORCE a function call (mode=ANY): with thinking on,
-        # 2.5 Flash often streams only "thinking" parts and never emits the forced
+        # reasoning models may stream only "thinking" parts and never emit the forced
         # function_call → an answer-less turn that retries fruitlessly (the workflow
         # "卡住 / only Thinking" symptom). No thinking on those turns = the call lands.
         _forcing_now = (iteration == 0 and _forced_fn is not None)
