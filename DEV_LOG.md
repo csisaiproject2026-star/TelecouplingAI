@@ -7969,3 +7969,18 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - 两台 OLS 均生成 3 个 CSV 并正常完成；GCP 1 下载返回 200，GCP 2 修复后的自身 HTTPS 下载返回 200。
 - 两台 `tele-backend` 最终均 healthy、restart count 0；运行中的三个后端文件哈希完全一致；前端仍为 `index-xR8BRM1J.js`。
 - 全量 `test_api.py` 中既有容量检查仍因本地 `.env` 的 `MAX_SESSIONS=50` 与测试期望 ≥200 而失败；与本次模型迁移无关，未扩大范围修改。
+
+## 2026-07-31 — 更新 Contact us 问卷链接
+### 完成内容
+- 将聊天页页脚 `Contact us` 从阻止跳转的占位链接替换为 `https://v.wjx.cn/vm/eRrSxQS.aspx#`。
+- 外部链接在新标签页打开，并使用 `noopener noreferrer`。
+- 构建前端 bundle `index-Ce83RVT0.js`，依次热更新 GCP 1、GCP 2 和 MSU；未重建或重启容器，未固化镜像。
+- 三台服务器均备份原主机源码、`dist` 和运行中静态目录到 `~/csis-platform/backups/20260731_contact_link_a6b2ba1/`。
+### 关键变更文件
+- `telecouplingAI-project/frontend/src/App.jsx`
+- `PROJECT_MEMORY.md`
+- `DEV_LOG.md`
+### 测试状态
+- `npm run build` 成功。
+- 三个公网入口均引用 `index-Ce83RVT0.js`，bundle 均包含完整问卷 URL。
+- GCP 1、GCP 2、MSU 的公开页面及健康端点正常；问卷目标返回 HTTP 200。
