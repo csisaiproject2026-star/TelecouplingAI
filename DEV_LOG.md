@@ -7861,3 +7861,44 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - `DEV_LOG.md`
 ### 测试状态
 - 45/45 Markdown 指南完成只读文本审计；未修改公开指南资产、应用代码或服务器运行状态。
+## 2026-07-29 — 取消单工具指南批量更新
+### 完成内容
+- 按用户要求停止下载 GCP User Guide 资产。
+- 清理本地两个残缺归档及 GCP 上用于传输的临时归档。
+- 未修改或部署 GCP、MSU 现有 User Guide 文件。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- 已确认无相关下载进程运行，残缺归档均已删除。
+
+## 2026-07-30 — 核对本地 Soybean User Guide 版本
+### 完成内容
+- 核对 worktree 中的 Soybean workflow ZIP、Markdown、PDF 与 GCP 线上最新版。
+- 确认本地副本仍是旧版：Systems CSV 为 5 行，Flows CSV 为 4 行，且没有 `Flow_Relation` 等新增字段。
+- 确认本地 Markdown/PDF 未包含 11 systems、10 receiving、10 flows、Domestic 或 Adjacent 等新版内容。
+- 本轮仅审计，没有修改本地或服务器 User Guide 资产。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- GCP 三个核心资产哈希与已记录最新版一致；本地三个核心资产哈希均不一致。
+- MSU SSH 因未连接校园 VPN 超时，本轮未重新读取；此前部署记录确认两站最新版一致。
+
+## 2026-07-30 — 升级 43 份单工具 User Guide
+### 完成内容
+- 将 worktree 中的 Soybean workflow ZIP、Markdown、PDF 和 10 张引用图片恢复为已验证的 11 systems / 10 flows 最新版。
+- 在 43 份单工具 Markdown 的完成说明后统一加入：`To get an AI explanation, type: Please interpret the results.`
+- 使用现有 ReportLab PDF 工具链重新生成 43 份 PDF，保持原章节、提示词、输出说明和截图。
+- 将 Learning Center 的 Guide PDF URL 统一增加缓存版本 `20260730-direct-completion`；Sample Data 不继承该版本，Soybean ZIP 保留独立版本 `20260729-systems-v2`。
+- 从同一部署归档更新 GCP/MSU 的 43 对 Markdown/PDF，并热更新前端静态 bundle `index-xR8BRM1J.js`；未修改 Sample Data ZIP、workflow 指南或服务器环境文件，未重启/重建容器，未固化镜像。
+- 两台服务器替换前均备份到 `~/csis-platform/backups/20260730_direct_completion_guides/`。
+### 关键变更文件
+- `telecouplingAI-project/frontend/src/userGuides.js`
+- 外部资产：`telecouplingAI-project/UserGuide/` 下 43 对单工具 Markdown/PDF，以及恢复后的 Soybean workflow 本地资产
+- `PROJECT_MEMORY.md`
+- `DEV_LOG.md`
+### 测试状态
+- 43/43 Markdown 各包含一次解释提示；43/43 PDF 均可提取该提示。
+- Markdown 引用 76 张图片，43 份 PDF 共嵌入 76 张图片；代表性 2/3/5 页 PDF 版式抽查无裁切或重叠。
+- GCP/MSU 的 86 个更新文件均通过同一本地 SHA-256 manifest；两站公开 PDF 43/43 返回 200。
+- 本地/GCP/MSU Soybean ZIP、Markdown、PDF 三项 SHA-256 完全一致。
+- 两站首页均引用 `index-xR8BRM1J.js`，`/health` 均返回 `status=ok`。

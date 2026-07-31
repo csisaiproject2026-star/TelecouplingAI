@@ -122,13 +122,14 @@ const GUIDE_FILE_OVERRIDES = {
   'Workflow_02_tourism_telecoupling_User_Guide': 'Tourism_Telecoupling_User_Guide.pdf',
 };
 
-const ASSET_VERSION_OVERRIDES = {
+const GUIDE_ASSET_VERSION = '20260730-direct-completion';
+
+const SAMPLE_ASSET_VERSION_OVERRIDES = {
   'Workflow_01_soybean_telecoupling_User_Guide': '20260729-systems-v2',
 };
 
-function encodedDownloadPath(folder, filename) {
+function encodedDownloadPath(folder, filename, version) {
   const path = `/download/user-guides/${encodeURIComponent(folder)}/${encodeURIComponent(filename)}`;
-  const version = ASSET_VERSION_OVERRIDES[folder];
   return version ? `${path}?v=${encodeURIComponent(version)}` : path;
 }
 
@@ -173,8 +174,16 @@ export const USER_GUIDES = GUIDE_FOLDERS.map(folder => {
     type,
     title,
     description: DESCRIPTION_OVERRIDES[folder] || descriptionFor(type),
-    guideUrl: encodedDownloadPath(folder, GUIDE_FILE_OVERRIDES[folder] || 'user guide.pdf'),
+    guideUrl: encodedDownloadPath(
+      folder,
+      GUIDE_FILE_OVERRIDES[folder] || 'user guide.pdf',
+      GUIDE_ASSET_VERSION,
+    ),
     sampleDataFilename,
-    sampleDataUrl: encodedDownloadPath(folder, sampleDataFilename),
+    sampleDataUrl: encodedDownloadPath(
+      folder,
+      sampleDataFilename,
+      SAMPLE_ASSET_VERSION_OVERRIDES[folder],
+    ),
   };
 });
