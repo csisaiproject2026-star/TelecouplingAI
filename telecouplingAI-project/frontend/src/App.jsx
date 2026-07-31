@@ -936,8 +936,9 @@ function App() {
           <p className="mx-auto mt-2 max-w-[800px] text-center text-xs text-gray-500">
             ©2026 CSIS Michigan State University,{' '}
             <a
-              href=""
-              onClick={event => event.preventDefault()}
+              href="https://v.wjx.cn/vm/eRrSxQS.aspx#"
+              target="_blank"
+              rel="noopener noreferrer"
               className="underline decoration-gray-300 underline-offset-2 transition-colors hover:text-blue-600"
             >
               Contact us
