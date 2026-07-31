@@ -20,16 +20,18 @@
 
 ## 服务器信息
 
-平台部署在两台服务器上（结构 1:1 一致，均非 git 仓库）：
+平台现有三台服务器（两台 GCP、一台 MSU，均非 git 仓库）：
 
-| 项目 | GCP（源/主） | MSU（新服务器） |
-|------|-------------|----------------|
-| IP | **34.42.83.50** | **35.9.219.33** |
-| SSH | `ssh csis-gcp`（user `csisaiproject2026`） | `ssh csis-msu`（user `jianan2`，需校园网/VPN） |
-| 访问地址 | http://34.42.83.50/ | http://35.9.219.33/（校园网）<br>https://ai.telecoupling.msu.edu/（公网，经 MSU WAF） |
-| 服务器路径 | `~/csis-platform/` | `~/csis-platform/telecouplingAI-project/` |
+| 项目 | GCP 1（现有验证环境） | GCP 2（新增） | MSU（生产） |
+|------|----------------------|---------------|------------|
+| 主机名 | `csis-server` | `csis-server-2` | MSU host |
+| IP | **34.42.83.50** | **34.136.64.176** | **35.9.219.33** |
+| SSH | `ssh csis-gcp`（user `csisaiproject2026`） | `ssh -i ~/.ssh/id_ed25519_csis csisaiproject2026@34.136.64.176` | `ssh csis-msu`（user `jianan2`，需校园网/VPN） |
+| 访问地址 | http://34.42.83.50/ | https://34.136.64.176/ | http://35.9.219.33/（校园网）<br>https://ai.telecoupling.msu.edu/（公网，经 MSU WAF） |
+| 服务器路径 | `~/csis-platform/` | `~/csis-platform/telecouplingAI-project/` | `~/csis-platform/telecouplingAI-project/` |
 
-- **GCP IP 唯一正确就是 34.42.83.50，不要用其他 IP。**
+- **两台 GCP 都有效**：GCP 1 为 `34.42.83.50`，GCP 2 为 `34.136.64.176`，部署或排查时必须明确目标。
+- GCP 2 于 2026-07-31 验证 SSH、HTTP/HTTPS、`/health` 和 40 个容器正常；在完成源码/环境/数据漂移审计前，不要假定它与 GCP 1 完全一致。
 - **MSU 公网访问经 MSU 的 WAF 转发**：WAF 终结公网 TLS → 连源站 `:443`。源站 nginx 已配 `listen 443 ssl`（自签名证书在 `nginx/certs/`，端口 80/443 均开）。SSH(22) 不走 WAF，管理服务器仍需 VPN。
 - Docker Dockerfile：`~/csis-platform/backend/Dockerfile`（build 必须在 backend/ 目录下执行）。
 

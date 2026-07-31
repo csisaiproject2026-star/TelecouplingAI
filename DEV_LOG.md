@@ -7902,3 +7902,30 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - GCP/MSU 的 86 个更新文件均通过同一本地 SHA-256 manifest；两站公开 PDF 43/43 返回 200。
 - 本地/GCP/MSU Soybean ZIP、Markdown、PDF 三项 SHA-256 完全一致。
 - 两站首页均引用 `index-xR8BRM1J.js`，`/health` 均返回 `status=ok`。
+
+## 2026-07-31 — 说明 GCP 当前并发能力
+### 完成内容
+- 根据既有 GCP 200 用户压测结果，明确当前可承诺范围是约 200 人同时提交轻量、小 CSV 工具任务，而不是 200 个重型模型同时计算。
+- 明确 500 Session 是会话保留上限，不代表 500 人执行并发；大型上传、同一重型 InVEST 工具集中运行仍需单独压测。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- 本轮未执行新压测；结论基于已记录的 GCP 200/200 fast-tool 验证。
+
+## 2026-07-31 — 测试新 GCP 服务器 SSH
+### 完成内容
+- 测试新服务器 `csis-server-2`（`34.136.64.176`）的 SSH 网络与公钥认证。
+- 使用用户 `csisaiproject2026` 及现有 GCP 身份文件 `~/.ssh/id_ed25519_csis` 明确重试。
+- 用户将对应公钥加入新 VM 后，再次连接成功；远端账号为 `csisaiproject2026`，主机名为 `csis-server-2`。
+- 将项目服务器总数更新为三台：GCP 1 `csis-server`、GCP 2 `csis-server-2`、MSU 生产服务器；同步更新 `AGENTS.md`、`CLAUDE.md`、`PROJECT_MEMORY.md` 和 `README.md`。
+### 关键变更文件
+- `AGENTS.md`
+- `CLAUDE.md`
+- `PROJECT_MEMORY.md`
+- `README.md`
+- `DEV_LOG.md`
+### 测试状态
+- SSH 登录成功；系统为 Linux `6.8.0-1064-gcp` x86_64。
+- 根磁盘 97 GB，已用 76 GB，剩余约 22 GB（78% 已用）。
+- HTTP/HTTPS 首页及 `/health` 均响应成功；40 个容器运行，未发现 unhealthy 或 restarting 容器。
+- GCP 1 `csis-server` 同期实时检查：根磁盘同为 97 GB，已用 76 GB，剩余约 22 GB（78% 已用）。

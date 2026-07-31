@@ -28,7 +28,9 @@
 
 ## Server facts
 
-- GCP: `ssh csis-gcp`, IP `34.42.83.50`, project root `~/csis-platform/telecouplingAI-project/`.
+- GCP 1 (`csis-server`): `ssh csis-gcp`, IP `34.42.83.50`, project root `~/csis-platform/telecouplingAI-project/`.
+- GCP 2 (`csis-server-2`): IP `34.136.64.176`; SSH as `csisaiproject2026` with `~/.ssh/id_ed25519_csis` (`ssh -i ~/.ssh/id_ed25519_csis csisaiproject2026@34.136.64.176`); project root `~/csis-platform/telecouplingAI-project/`.
+- GCP 2 was first recorded on 2026-07-31. SSH, HTTP/HTTPS, `/health`, and 40 running containers were reachable; zero unhealthy or restarting containers were observed. Root disk was 97 GB total, 76 GB used, and about 22 GB free. Its source, environment, data, image, and runtime parity with GCP 1 have not yet been audited, so do not promote or deploy by assuming both GCP servers are identical.
 - MSU: `ssh csis-msu`, IP `35.9.219.33`, project root `~/csis-platform/telecouplingAI-project/`.
 - MSU public URL: `https://ai.telecoupling.msu.edu/` through the MSU WAF.
 - Per-server `.env` and `.env.docker` files must never be copied from local or between servers.

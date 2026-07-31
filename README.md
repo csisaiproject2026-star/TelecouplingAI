@@ -5,7 +5,8 @@ telecoupling analysis. The stack combines a React/Vite interface, FastAPI,
 Gemini function calling, Redis/Celery workers, InVEST, R, and QGIS rendering.
 
 - Production: <https://ai.telecoupling.msu.edu/>
-- GCP validation environment: <http://34.42.83.50/>
+- GCP validation environment 1 (`csis-server`): <http://34.42.83.50/>
+- GCP validation environment 2 (`csis-server-2`): <https://34.136.64.176/>
 - Canonical branch: `production`
 
 ## Repository layout
