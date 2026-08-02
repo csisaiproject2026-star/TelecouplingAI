@@ -8143,3 +8143,14 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - `DEV_LOG.md`
 ### 测试状态
 - 最终结论保持工具 37 PASS/6 FAIL、Workflow 0 PASS/2 FAIL、core 13/13 PASS、source audit 43/43、cleanup 全0；本轮未新增或重跑验收。
+
+## 2026-08-02 — 复核三站当前运行状态
+### 完成内容
+- 实时检查 GCP 1、GCP 2、MSU 的公网 health 与 backend 容器状态。
+- 确认 GCP 1 仍运行已通过严格验收的热部署候选，GCP 2 与 MSU 尚未提升该候选。
+- 确认当前候选分支已与远端同步；外部未跟踪 UserGuide 资产继续保持不进入 Git。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- 三站 `/health` 均返回 ok，三个 backend 均 running/healthy、restart count 0。
+- GCP 1 runtime `agent.py`/resolver 哈希仍为已验收值；当前分支 ahead/behind 均为 0。
