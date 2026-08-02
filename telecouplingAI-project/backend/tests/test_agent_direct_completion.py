@@ -351,6 +351,12 @@ async def test_completed_workflow_resolves_output_basename_and_cannot_rerun(monk
                 "read_file_content",
                 {"file_path": "network_stats.csv"},
             )
+        if calls == 3:
+            return _function_response(
+                "render_spatial_file",
+                {"file_path": "workflow-output.tif"},
+            )
+        assert config.tool_config.function_calling_config.mode == "NONE"
         return _text_response()
 
     async def fake_run_plan(*args, **kwargs):
@@ -404,7 +410,7 @@ async def test_completed_workflow_resolves_output_basename_and_cannot_rerun(monk
         session_manager=session_manager,
     )
 
-    assert calls == 3
+    assert calls == 4
     assert session_manager.outputs == [
         {"filename": "network_stats.csv", "path": output_path}
     ]

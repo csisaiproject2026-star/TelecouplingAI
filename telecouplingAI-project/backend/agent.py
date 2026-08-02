@@ -2566,6 +2566,8 @@ async def run_agent(
     # a short plain-language intro shown ABOVE the card (方案A layout). See below.
     explain_only_next = False
     workflow_execution_completed = False
+    workflow_summary_only_next = False
+    workflow_output_reads = 0
 
     for iteration in range(max_iterations):
         logger.info(f"[agent] iteration={iteration} session={session_id} model={model_name}")
@@ -2600,7 +2602,7 @@ async def run_agent(
         # the model can summarize / answer normally. The post-plan "explain" turn
         # disables functions (mode=NONE) so it only writes the intro text.
         _tool_config = None
-        if explain_only_next:
+        if explain_only_next or workflow_summary_only_next:
             _tool_config = types.ToolConfig(
                 function_calling_config=types.FunctionCallingConfig(mode="NONE")
             )
@@ -2621,7 +2623,11 @@ async def run_agent(
             tools=active_tools,
             temperature=base_temperature,
             # The post-plan explain turn (and any forced-call turn) shouldn't think.
-            thinking_config=(None if (explain_only_next or _forcing_now) else thinking_cfg),
+            thinking_config=(
+                None
+                if (explain_only_next or workflow_summary_only_next or _forcing_now)
+                else thinking_cfg
+            ),
             tool_config=_tool_config,
         )
 
@@ -2717,6 +2723,25 @@ async def run_agent(
             tool_name = fc.name
             tool_input = dict(fc.args)
             logger.info(f"[agent] function_call: {tool_name}")
+
+            if workflow_execution_completed and tool_name != "read_file_content":
+                logger.warning(
+                    "[agent] blocked post-workflow function call: %s",
+                    tool_name,
+                )
+                function_response_parts.append(
+                    types.Part.from_function_response(
+                        name=tool_name,
+                        response={
+                            "error": (
+                                "The workflow is complete. Do not run or render more tools; "
+                                "summarize the completed results now."
+                            )
+                        },
+                    )
+                )
+                workflow_summary_only_next = True
+                continue
 
             # ── Workflow planning: validate + surface the plan; do NOT execute.
             # The confirm-gate: the model proposes, the user confirms later.
@@ -2942,8 +2967,12 @@ async def run_agent(
                       "output_file_refs": output_file_refs,
                       "warnings": wf_ctx.get("warnings", []),
                       "mismatches": wf_ctx.get("mismatches", []),
-                      "instruction": ("Summarize for the user which steps ran, key outputs, and any warnings. "
-                                      "Output files are already shown as cards above; do not re-list raw paths.")}
+                      "instruction": (
+                          "Summarize for the user which steps ran, key outputs, and any warnings. "
+                          "You may use read_file_content for relevant CSV or text outputs. Do not "
+                          "rerun the workflow or render spatial files. Output files are already shown "
+                          "as cards above; do not re-list raw paths."
+                      )}
                 function_response_parts.append(types.Part.from_function_response(
                     name=tool_name, response={"result": fr}))
                 continue
@@ -3013,6 +3042,10 @@ async def run_agent(
                         response={"result": result_summary},
                     )
                 )
+                if workflow_execution_completed and tool_name == "read_file_content":
+                    workflow_output_reads += 1
+                    if workflow_output_reads >= 8:
+                        workflow_summary_only_next = True
                 if post_skill_text:
                     function_response_parts.append(
                         types.Part.from_text(text=post_skill_text)
