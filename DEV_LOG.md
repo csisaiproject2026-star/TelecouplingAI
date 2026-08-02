@@ -8033,3 +8033,16 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - 两台 `tele-backend` 均恢复 healthy，容器内 Argon2id 配置格式正确。
 - 两台均使用新密码完成 Admin 登录，随后清除验证 Session。
 - 回滚目录：`~/csis-platform/backups/20260802_gcp_admin_password_reset/`。
+
+## 2026-08-02 — 复核 GCP Admin 的 SSH 隧道访问
+### 完成内容
+- 针对用户在两台 GCP 页面看到 `Request failed` 的反馈，分别复测容器直连、服务器本机 nginx 和本地 SSH 隧道完整路径。
+- 确认密码和数据库哈希均正确；报错来自直接通过公网 IP 打开 Admin SPA，而公网 `/api/admin/*` 按既定安全规则仍被 nginx 阻止。
+- 明确 GCP 1、GCP 2 必须分别通过本地 SSH 端口转发访问，且浏览器地址使用 `http://127.0.0.1:<port>/admin/errors`。
+### 关键变更文件
+- `PROJECT_MEMORY.md`
+- `DEV_LOG.md`
+### 测试状态
+- GCP 1 隧道：SPA 200、login 200、session 200、logout 200。
+- GCP 2 隧道：SPA 200、login 200、session 200、logout 200。
+- 未修改服务器配置、密码、数据库或容器。
