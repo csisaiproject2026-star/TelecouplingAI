@@ -8113,3 +8113,13 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - GCP 1 受影响工具 13/13 PASS，81/81 个工具输出 URL 完整下载；Soybean 4/4 步骤、23/23 下载、自动总结 PASS；Tourism 5/5 步骤、26/26 下载、自动总结 PASS。
 - GCP 1 公网 health/home/Admin SPA/普通 chat 均 200，日志确认 2.5 兼容 ID 实际调用 `gemini-3.5-flash`；40 个容器运行，backend healthy/restart 0，队列与 Error Registry 本前缀均为 0。
 - 当前 GCP 1 仍使用原 API image `sha256:6971bb9f...`；回滚目录：`~/csis-platform/backups/20260802_acceptance_fix_2e03567/`、`~/csis-platform/backups/20260802_workflow_guard_b38e4f3/`。GCP 2/MSU 提升等待用户确认。
+
+## 2026-08-02 — 收妥 GCP 2 验收会话终止说明
+### 完成内容
+- 将 GCP 2 原验收会话的第二次 `error` 定性为最终结果与完成标记之后的会话运行时异常；当前暴露状态无法进一步确定根因。
+- 确认恢复片段没有重新执行工具、Workflow、core、SSH、API 或清理命令，新增可计验收为 0。
+- 保持既有 43 工具、2 Workflow、13 core 的落盘证据与最终矩阵不变，并要求该会话继续停止。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- 本轮未执行新测试；GCP 2 原 artifact 只读保留，未修改、未重跑。
