@@ -4,7 +4,7 @@ import os
 from typing import Any
 
 
-_RENDER_FILE_KEYS = {
+_TOOL_FILE_KEYS = {
     "render_spatial_file": ("file_path",),
     "render_telecoupling_scene": (
         "flows_file",
@@ -12,6 +12,7 @@ _RENDER_FILE_KEYS = {
         "agents_file",
         "causes_file",
     ),
+    "read_file_content": ("file_path",),
 }
 
 
@@ -30,13 +31,13 @@ def _resolve_file_reference(value: Any, candidates: list[dict]) -> Any:
     return value
 
 
-def resolve_render_file_references(
+def resolve_tool_file_references(
     tool_name: str,
     tool_input: dict,
     candidates: list[dict],
 ) -> dict:
     resolved = dict(tool_input)
-    for key in _RENDER_FILE_KEYS.get(tool_name, ()):
+    for key in _TOOL_FILE_KEYS.get(tool_name, ()):
         if key in resolved:
             resolved[key] = _resolve_file_reference(resolved[key], candidates)
 
@@ -49,3 +50,12 @@ def resolve_render_file_references(
         elif isinstance(layers, str):
             resolved["layers"] = _resolve_file_reference(layers, candidates)
     return resolved
+
+
+def resolve_render_file_references(
+    tool_name: str,
+    tool_input: dict,
+    candidates: list[dict],
+) -> dict:
+    """Backward-compatible wrapper for existing render callers."""
+    return resolve_tool_file_references(tool_name, tool_input, candidates)

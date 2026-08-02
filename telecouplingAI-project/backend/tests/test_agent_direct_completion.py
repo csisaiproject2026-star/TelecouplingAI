@@ -24,6 +24,21 @@ import agent
         ),
         ("Run food security with the uploaded table.", "run_food_security"),
         ("Run carbon storage.", "run_carbon_storage"),
+        (
+            "Run FAMD factor analysis on the uploaded CSV. "
+            "quantitative_variables=age,income, qualitative_variables=gender,region.",
+            "run_factor_analysis_mixed_data",
+        ),
+        (
+            "Run Population Density analysis on the uploaded CSV. "
+            "population_field=pop_2020, area_km2_field=area_km2.",
+            "run_population_count_density",
+        ),
+        (
+            "Add agents from the uploaded CSV. "
+            "x_field=longitude, y_field=latitude, name_field=agent_name.",
+            "run_add_agents_interactively",
+        ),
     ],
 )
 def test_detects_unambiguous_direct_tool(message, expected):
@@ -89,6 +104,14 @@ def _tool_response(tool_name: str):
                 args={"input_csv": "/data/uploads/test/input.csv"},
             )
         ],
+    )
+    return SimpleNamespace(candidates=[SimpleNamespace(content=content)])
+
+
+def _function_response(tool_name: str, args: dict):
+    content = types.Content(
+        role="model",
+        parts=[types.Part.from_function_call(name=tool_name, args=args)],
     )
     return SimpleNamespace(candidates=[SimpleNamespace(content=content)])
 
@@ -229,3 +252,160 @@ async def test_failed_tool_keeps_second_gemini_call(monkeypatch):
     )
 
     assert calls == 2
+
+
+@pytest.mark.asyncio
+async def test_custom_direct_tool_limits_first_call_to_detected_function(monkeypatch):
+    events = []
+
+    async def fake_generate(*args, **kwargs):
+        config = args[3]
+        function_names = [
+            declaration.name
+            for tool in config.tools
+            for declaration in tool.function_declarations
+        ]
+        assert function_names == ["run_factor_analysis_mixed_data"]
+        return _tool_response("run_factor_analysis_mixed_data")
+
+    monkeypatch.setattr(agent.settings, "DIRECT_TOOL_COMPLETION_ENABLED", True)
+    monkeypatch.setattr(agent, "_get_client", lambda: object())
+    monkeypatch.setattr(agent, "_generate_streaming", fake_generate)
+    monkeypatch.setattr(agent, "_dispatch_tool_and_relay", _fake_dispatch)
+    monkeypatch.setattr(agent, "validate_file_params_exist", lambda *args: None)
+    monkeypatch.setattr(agent, "validate_input_files", lambda *args: None)
+    monkeypatch.setitem(
+        sys.modules,
+        "workers.task_queue",
+        SimpleNamespace(run_tool_task=object()),
+    )
+
+    await agent.run_agent(
+        "Run FAMD factor analysis on the uploaded CSV. "
+        "quantitative_variables=age,income, qualitative_variables=gender,region.",
+        "session-famd",
+        [],
+        events.append,
+        session_manager=_SessionManager(),
+    )
+
+    assert events[-1] == {"type": "done"}
+
+
+def test_urban_nature_schema_matches_live_invest_enum():
+    decay_schema = (
+        agent._FD_BY_NAME["run_urban_nature_access"]
+        .parameters.properties["decay_function"]
+    )
+
+    assert set(decay_schema.enum) == {
+        "gaussian",
+        "exponential",
+        "dichotomy",
+        "density",
+    }
+    assert "dichotomy" in decay_schema.description
+    assert "density" in decay_schema.description
+    assert "uniform" not in decay_schema.description
+
+
+@pytest.mark.asyncio
+async def test_completed_workflow_resolves_output_basename_and_cannot_rerun(monkeypatch):
+    output_path = "/data/outputs/session/network_stats.csv"
+    calls = 0
+    events = []
+
+    class WorkflowSessionManager:
+        def __init__(self):
+            self.outputs = []
+
+        async def get_uploaded_files(self, session_id):
+            return []
+
+        async def get_output_files(self, session_id):
+            return list(self.outputs)
+
+        async def get_workflow_plan(self, session_id):
+            return {"case_name": "test", "steps": [], "required_inputs": []}
+
+        async def set_workflow_plan(self, session_id, plan):
+            return None
+
+        async def add_output_files(self, session_id, files):
+            self.outputs.extend(files)
+
+    async def fake_generate(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        config = args[3]
+        function_names = [
+            declaration.name
+            for tool in (config.tools or [])
+            for declaration in tool.function_declarations
+        ]
+        if calls == 1:
+            return _function_response("execute_workflow_plan", {})
+        assert function_names == ["read_file_content"]
+        if calls == 2:
+            return _function_response(
+                "read_file_content",
+                {"file_path": "network_stats.csv"},
+            )
+        return _text_response()
+
+    async def fake_run_plan(*args, **kwargs):
+        return {
+            "status": "done",
+            "steps": {"network": {"status": "done"}},
+            "files": [{"filename": "network_stats.csv", "path": output_path}],
+            "warnings": [],
+        }
+
+    async def fake_dispatch(*args, tool_name, tool_input, **kwargs):
+        assert tool_name == "read_file_content"
+        assert tool_input["file_path"] == output_path
+        return "read-task", {
+            "type": "tool_result",
+            "files": [],
+            "content": "metric,value\nnodes,10",
+        }
+
+    monkeypatch.setattr(agent.settings, "DIRECT_TOOL_COMPLETION_ENABLED", True)
+    monkeypatch.setattr(agent, "_get_client", lambda: object())
+    monkeypatch.setattr(agent, "_generate_streaming", fake_generate)
+    monkeypatch.setattr(agent, "_dispatch_tool_and_relay", fake_dispatch)
+    monkeypatch.setattr(agent, "run_plan_async", fake_run_plan)
+    monkeypatch.setattr(
+        agent,
+        "plan_from_dict",
+        lambda plan: SimpleNamespace(input_ids=set()),
+    )
+    monkeypatch.setattr(agent, "_auto_map_inputs", lambda plan, inputs, *args, **kwargs: inputs)
+    monkeypatch.setattr(agent, "validate_file_params_exist", lambda *args: None)
+    monkeypatch.setattr(agent, "validate_input_files", lambda *args: None)
+    monkeypatch.setattr(agent, "_build_pre_execution_context", lambda: "")
+    monkeypatch.setattr(
+        agent.os.path,
+        "isfile",
+        lambda path: path == output_path,
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "workers.task_queue",
+        SimpleNamespace(run_tool_task=object()),
+    )
+
+    session_manager = WorkflowSessionManager()
+    await agent.run_agent(
+        "execute_workflow_plan selected_steps",
+        "workflow-session",
+        [],
+        events.append,
+        session_manager=session_manager,
+    )
+
+    assert calls == 3
+    assert session_manager.outputs == [
+        {"filename": "network_stats.csv", "path": output_path}
+    ]
+    assert events[-1] == {"type": "done"}

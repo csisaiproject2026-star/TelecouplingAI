@@ -921,7 +921,11 @@ TOOLS = [
                     "population_raster_path":   types.Schema(type=types.Type.STRING),
                     "admin_boundaries_vector_path": types.Schema(type=types.Type.STRING, description="Administrative boundary polygons"),
                     "search_radius_mode":       types.Schema(type=types.Type.STRING, description="'uniform radius' (default) | 'radius per population group' | 'radius per urban nature class'"),
-                    "decay_function":           types.Schema(type=types.Type.STRING, description="'gaussian' (default) | 'exponential' | 'linear' | 'power' | 'uniform'"),
+                    "decay_function":           types.Schema(
+                        type=types.Type.STRING,
+                        enum=["gaussian", "exponential", "dichotomy", "density"],
+                        description="'gaussian' (default) | 'exponential' | 'dichotomy' | 'density'",
+                    ),
                     "search_radius":            types.Schema(type=types.Type.INTEGER, description="Radius in meters (required for uniform radius mode)"),
                     "population_group_radii_table": types.Schema(type=types.Type.STRING),
                 },
@@ -1873,7 +1877,7 @@ _TOOL_KEYWORDS: dict[str, list[str]] = {
 }
 
 _TOOL_BY_NAME: dict[str, types.Tool] = {
-    fd.name: tool
+    fd.name: types.Tool(function_declarations=[fd])
     for tool in TOOLS
     for fd in tool.function_declarations
 }
@@ -1948,7 +1952,7 @@ _DIRECT_TOOL_ALIASES: dict[str, tuple[str, ...]] = {
         "ordinary least squares",
         "ols model",
     ),
-    "run_factor_analysis_mixed_data": ("run_famd", "factor analysis mixed data"),
+    "run_factor_analysis_mixed_data": ("famd", "run_famd", "factor analysis mixed data"),
     "run_co2_emissions": ("run_co2", "co2 emissions", "carbon dioxide emissions"),
     "run_cost_benefit_analysis": (
         "run_cba",
@@ -2460,8 +2464,11 @@ async def run_agent(
             for f in output_files
         ]
     user_text = "\n".join(context_lines) + "\n\n" + message if context_lines else message
+    # Deterministic routing is correctness behavior, independent of whether the
+    # optional one-call completion response is enabled.
+    requested_direct_tool = _direct_completion_tool_for_message(message)
     direct_completion_tool = (
-        _direct_completion_tool_for_message(message)
+        requested_direct_tool
         if settings.DIRECT_TOOL_COMPLETION_ENABLED
         else None
     )
@@ -2477,7 +2484,7 @@ async def run_agent(
     contents.append(types.Content(role="user", parts=[types.Part.from_text(text=user_text)]))
 
     # Detect which tool the user is requesting. Used in retry nudge messages.
-    detected_tool_name = _detect_tool_from_message(user_text)
+    detected_tool_name = _detect_tool_from_message(user_text) or requested_direct_tool
     # Direct render request (render/visualize a specific .shp/.tif) → route to
     # render_spatial_file as the single iteration-0 tool, so Flash can't ALSO
     # emit a workflow plan card referencing render_spatial_file. Only when no
@@ -2558,6 +2565,7 @@ async def run_agent(
     # After a plan card is proposed, run ONE more turn (functions disabled) to write
     # a short plain-language intro shown ABOVE the card (方案A layout). See below.
     explain_only_next = False
+    workflow_execution_completed = False
 
     for iteration in range(max_iterations):
         logger.info(f"[agent] iteration={iteration} session={session_id} model={model_name}")
@@ -2582,6 +2590,8 @@ async def run_agent(
             active_tools = TOOLS
         elif iteration == 0 and _single_tool is not None:
             active_tools = _single_tool
+        elif workflow_execution_completed:
+            active_tools = [_TOOL_BY_NAME["read_file_content"]]
         else:
             active_tools = TOOLS
 
@@ -2916,10 +2926,20 @@ async def run_agent(
                 except Exception:
                     pass
 
+                workflow_execution_completed = wf_ctx.get("status") == "done"
+                output_file_refs = [
+                    {
+                        "filename": f.get("filename"),
+                        "internal_path": f.get("path"),
+                    }
+                    for f in wf_ctx.get("files", [])
+                    if f.get("filename") and f.get("path")
+                ]
                 fr = {"status": wf_ctx.get("status"),
                       "steps": {sid: s.get("status") for sid, s in wf_ctx.get("steps", {}).items()},
                       "n_files": len(wf_ctx.get("files", [])),
                       "output_files": [f.get("filename") for f in wf_ctx.get("files", [])],
+                      "output_file_refs": output_file_refs,
                       "warnings": wf_ctx.get("warnings", []),
                       "mismatches": wf_ctx.get("mismatches", []),
                       "instruction": ("Summarize for the user which steps ran, key outputs, and any warnings. "
@@ -2931,14 +2951,18 @@ async def run_agent(
             # ── Step 0: generic pre-flight — catch missing input files before
             # dispatching, so the user gets a friendly "file not found / not
             # uploaded" message instead of a cryptic crash inside the worker.
-            if tool_name in {"render_spatial_file", "render_telecoupling_scene"}:
-                from shared.file_reference_resolver import resolve_render_file_references
+            if tool_name in {
+                "render_spatial_file",
+                "render_telecoupling_scene",
+                "read_file_content",
+            }:
+                from shared.file_reference_resolver import resolve_tool_file_references
 
                 prior_files = (
                     await _sm.get_output_files(session_id)
                     + await _sm.get_uploaded_files(session_id)
                 )
-                tool_input = resolve_render_file_references(
+                tool_input = resolve_tool_file_references(
                     tool_name,
                     tool_input,
                     prior_files,

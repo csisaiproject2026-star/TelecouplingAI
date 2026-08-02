@@ -1,5 +1,8 @@
 from shared import file_reference_resolver
-from shared.file_reference_resolver import resolve_render_file_references
+from shared.file_reference_resolver import (
+    resolve_render_file_references,
+    resolve_tool_file_references,
+)
 
 
 def test_resolves_single_render_basename(monkeypatch):
@@ -54,3 +57,16 @@ def test_preserves_existing_and_unknown_paths(monkeypatch):
     )
 
     assert result["file_path"] == existing
+
+
+def test_resolves_read_file_basename(monkeypatch):
+    output = "/outputs/network_stats.csv"
+    monkeypatch.setattr(file_reference_resolver.os.path, "isfile", lambda path: path == output)
+
+    result = resolve_tool_file_references(
+        "read_file_content",
+        {"file_path": "network_stats.csv"},
+        [{"filename": "network_stats.csv", "path": output}],
+    )
+
+    assert result["file_path"] == output
