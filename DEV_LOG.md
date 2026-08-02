@@ -8072,3 +8072,20 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - 用户分别在新的无痕窗口打开两台 GCP Admin 页面，均确认不再显示红色 `Not secure`；旧提示来自证书替换前标签页保留的旧 TLS 状态。
 - 两台均为 40 个容器运行、0 unhealthy/restarting；backend healthy、restart count 0；证书 timer enabled/active。
 - 回滚目录：`~/csis-platform/backups/20260802_gcp_public_admin_https/`。
+
+## 2026-08-02 — 统一 MSU 公网 Admin 登录密码
+### 完成内容
+- 确认 MSU VPN/SSH 已恢复，公网 WAF 下 `/admin/errors` 为 200，未登录 Admin Session API 为 401，Secure Cookie 已启用。
+- 将 MSU Admin 密码重置为与两台 GCP 相同的操作员凭据；在 MSU 本机重新生成 Argon2id 哈希并按 Compose `$$` 规范写入 `.env.docker`。
+- 只重建 MSU `api-server`，未修改 nginx、WAF、证书、PostgreSQL、Redis、Celery 或其他服务器配置。
+- 清除该账号的旧 Admin Session，避免已有 Cookie 在密码变更后继续有效。
+### 关键变更文件
+- MSU：`~/csis-platform/telecouplingAI-project/.env.docker`（服务器本地）
+- `PROJECT_MEMORY.md`
+- `DEV_LOG.md`
+### 测试状态
+- 公网 `https://ai.telecoupling.msu.edu/admin/errors` 返回 200。
+- 使用新密码通过公网 WAF 完成 login=200、session=200、logout=200。
+- 登录 Cookie 包含 Secure、HttpOnly、SameSite=Strict。
+- `tele-backend` 与 `tele-error-db` 均 healthy、restart count 0。
+- 回滚文件：`~/csis-platform/backups/20260802_msu_admin_password_reset/.env.docker.before`。
