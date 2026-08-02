@@ -1848,7 +1848,7 @@ def _auto_map_inputs(plan, inputs_map: dict[str, str], uploaded: list[dict],
 # ---------------------------------------------------------------------------
 
 _TOOL_KEYWORDS: dict[str, list[str]] = {
-    "run_network_analysis_grouping":        ["network analysis", "run_network_analysis"],
+    "run_network_analysis_grouping":        ["network analysis", "flow network", "run_network_analysis"],
     "run_coastal_blue_carbon_preprocessor": ["coastal blue carbon preprocessor", "cbc preprocessor", "run_coastal_blue_carbon_preprocessor"],
     "run_coastal_blue_carbon":              ["coastal blue carbon main", "run_coastal_blue_carbon"],
     "run_seasonal_water_yield":             ["seasonal water yield", "run_seasonal_water_yield", " swy "],

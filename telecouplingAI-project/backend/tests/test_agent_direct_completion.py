@@ -25,6 +25,10 @@ import agent
         ("Run food security with the uploaded table.", "run_food_security"),
         ("Run carbon storage.", "run_carbon_storage"),
         (
+            "Analyze a flow network and detect community clusters",
+            "run_network_analysis_grouping",
+        ),
+        (
             "Run FAMD factor analysis on the uploaded CSV. "
             "quantitative_variables=age,income, qualitative_variables=gender,region.",
             "run_factor_analysis_mixed_data",
@@ -87,6 +91,13 @@ def test_exact_preprocessor_name_is_not_confused_with_main_tool():
     assert agent._direct_completion_tool_for_message(
         "Call run_coastal_blue_carbon_preprocessor."
     ) == "run_coastal_blue_carbon_preprocessor"
+
+
+def test_homepage_network_prompt_uses_direct_tool_before_workflow():
+    message = "Analyze a flow network and detect community clusters"
+
+    assert agent._looks_like_workflow_goal(message)
+    assert agent._detect_tool_from_message(message) == "run_network_analysis_grouping"
 
 
 class _SessionManager:

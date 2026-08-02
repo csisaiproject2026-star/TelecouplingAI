@@ -29,7 +29,7 @@ const AVAILABLE_MODELS = [
 ];
 
 const SUGGESTED_PROMPTS = [
-  { label: "Analyze a flow network and detect community clusters",  hint: "Network Analysis" },
+  { label: "Run network analysis on a flow network and detect community clusters", hint: "Network Analysis" },
   { label: "Run coastal blue carbon preprocessing",                 hint: "CBC Preprocessor" },
   { label: "Calculate coastal carbon stock and sequestration",      hint: "Coastal Blue Carbon" },
   { label: "Estimate seasonal water yield and baseflow",            hint: "Seasonal Water Yield" },
