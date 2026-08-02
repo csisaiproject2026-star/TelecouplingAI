@@ -8197,3 +8197,13 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - 三站最终均为 40/40 Compose 服务运行、backend healthy、35 个提升服务 restart count 0、Celery active/reserved/scheduled 全 0。
 - 三站本次前缀 Redis/uploads/outputs 全 0；MSU 另有 4 个 Cortex scanner 容器的历史 restart，与本次 Compose 服务无关。
 - 证据目录：`C:\Users\dru18\.copilot\session-state\15769bfa-e8f4-4e0a-b226-90f86a2b3ae0\files\three-site-random20-20260802\`；证据压缩包 SHA-256 `4f9e11c18c6b625d681ac185bb0b30f3280c0d555cf86232357670a36995b73d`。
+
+## 2026-08-02 — 验收修复快进 production
+### 完成内容
+- 三站统一镜像与 60/60 随机公网工具验收通过后，确认候选分支相对 `origin/production` 为纯快进，production 没有独有提交。
+- 将完整已验证源码快进到 GitHub 权威 `production`，并删除已合并的远端短期分支 `zhany1elsevier-reconcile-production-source`。
+- 外部未跟踪 `telecouplingAI-project/UserGuide/` 继续按既定规则不进入 Git。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- `origin/production...HEAD` 最终 ahead/behind 为 `0/0`。
