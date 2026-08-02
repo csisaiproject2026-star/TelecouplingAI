@@ -8007,3 +8007,29 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - 35/35 API/Celery 服务使用 Backend `sha256:6971bb9f...`；40/40 Compose 服务运行，0 unhealthy、0 restarting。
 - 公网普通聊天通过，前端继续发送 2.5 兼容标识，后端日志确认实际调用 `gemini-3.5-flash`；测试 Session 已删除。
 - 回滚目录：`~/csis-platform/backups/20260731_msu_error_registry/`；回滚标签：`csic_backend:pre-msu-error-registry-20260731`、`csic_frontend:pre-msu-error-registry-20260731`。
+
+## 2026-08-02 — 核对 Admin 历史登录凭据
+### 完成内容
+- 从本地会话历史中定位到 2026-07-28 曾交付的临时 Admin 明文凭据；未将明文密码或 Argon2id 哈希写入仓库。
+- 使用该历史凭据验证当前 MSU Admin 登录 API，返回 401，确认临时密码已不再匹配当前数据库中的账号哈希。
+- 检查后续部署记录，只发现 GCP 到 MSU 的现有哈希复制过程，没有发现可恢复的新版明文密码。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- `https://ai.telecoupling.msu.edu/api/admin/login`：历史凭据返回预期的 401；未修改服务器配置、账号或数据库。
+
+## 2026-08-02 — 重置两台 GCP Admin 密码
+### 完成内容
+- 为 GCP 1 和 GCP 2 设置同一个新的易记 Admin 密码；MSU 因当前不可连接而保持不变。
+- 两台服务器分别生成 Argon2id 哈希，并按 Docker Compose 的 `$$` 转义规范更新各自 `.env.docker`；未复制服务器环境文件，也未将明文或哈希写入仓库。
+- 两台服务器都只重建 `api-server`，并清除原有 Admin Session。
+- 在本机 SSH 配置中新增 `csis-gcp-2` 别名，指向 `34.136.64.176` 并复用项目 Ed25519 密钥。
+### 关键变更文件
+- GCP 1、GCP 2：`~/csis-platform/telecouplingAI-project/.env.docker`（服务器本地）
+- 本机：`~/.ssh/config`
+- `PROJECT_MEMORY.md`
+- `DEV_LOG.md`
+### 测试状态
+- 两台 `tele-backend` 均恢复 healthy，容器内 Argon2id 配置格式正确。
+- 两台均使用新密码完成 Admin 登录，随后清除验证 Session。
+- 回滚目录：`~/csis-platform/backups/20260802_gcp_admin_password_reset/`。
