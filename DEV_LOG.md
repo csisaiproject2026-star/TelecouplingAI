@@ -8133,3 +8133,13 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - `DEV_LOG.md`
 ### 测试状态
 - 本轮新增验收为 0；未启动代理、未重跑、未修改 GCP 2 或原证据。
+
+## 2026-08-02 — 更正 GCP 2 最终证据来源
+### 完成内容
+- 明确最终 `REPORT.md` 与合并后的 `reports/tool_matrix.json|csv` 才是权威结果，不再引用首轮快照。
+- 补记 Scenic Quality 仅因 Guide ZIP upload 客户端 write timeout 延长后重跑并 PASS。
+- 补记 FAMD、CO2、Population Density、Add Agents、Food Security 的唯一允许路由重试均已执行且仍 FAIL；首轮与最终证据分别保留。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- 最终结论保持工具 37 PASS/6 FAIL、Workflow 0 PASS/2 FAIL、core 13/13 PASS、source audit 43/43、cleanup 全0；本轮未新增或重跑验收。
