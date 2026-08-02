@@ -8089,3 +8089,27 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - 登录 Cookie 包含 Secure、HttpOnly、SameSite=Strict。
 - `tele-backend` 与 `tele-error-db` 均 healthy、restart count 0。
 - 回滚文件：`~/csis-platform/backups/20260802_msu_admin_password_reset/.env.docker.before`。
+
+## 2026-08-02 — 修复严格 Guide 验收缺陷并通过 GCP 1 候选验证
+### 完成内容
+- 完成 GCP 1、GCP 2、MSU 三站 43 个工具、2 个 Workflow 与核心表面的严格公网 User Guide 验收；基线分别为 32/43、37/43、36/43 工具 PASS，三站共 27/27 个 Workflow 计算步骤成功，但 6/6 严格 Workflow 均在自动输出读取/最终解释阶段失败。
+- 修正命名工具仍暴露全部函数的历史路由缺陷，补充 FAMD 等自定义工具别名，修正 Urban Nature decay enum，并让 Workflow 输出同时保留文件名与内部路径。
+- 将文件引用解析扩展到 `read_file_content`，使自动总结可把 basename 解析到当前 Session 的完整输出路径。
+- 在 Workflow 成功后仅开放输出读取；当 Gemini 幻觉调用未声明的执行/渲染工具时，后端执行期拦截并强制下一轮纯文本总结，防止 Workflow 重跑、无请求渲染和迭代耗尽。
+- 澄清 CBC Guide：运行时明确选择 `transitions_sample.csv` 与 `biophysical_table_sample.csv`，禁止把 `*_template.csv` 当作模型输入；同步重新生成 PDF。
+- 以提交 `2e03567` 和 `b38e4f3` 热部署到 GCP 1，仅更新 host/runtime 代码与 CBC 外部 Guide；未构建、retag 或替换镜像。
+- GCP 1 定向公网复测通过全部 13 个受影响工具与 2 个完整 Workflow；清理全部 23 个本次前缀 Session、Redis key、uploads 和 outputs。
+### 关键变更文件
+- `telecouplingAI-project/backend/agent.py`
+- `telecouplingAI-project/backend/shared/file_reference_resolver.py`
+- `telecouplingAI-project/backend/tests/test_agent_direct_completion.py`
+- `telecouplingAI-project/backend/tests/test_file_reference_resolver.py`
+- `telecouplingAI-project/UserGuide/03_coastal_blue_carbon_User_Guide/user guide.md`（外部未跟踪资产）
+- `telecouplingAI-project/UserGuide/03_coastal_blue_carbon_User_Guide/user guide.pdf`（外部未跟踪资产）
+- `PROJECT_MEMORY.md`
+- `DEV_LOG.md`
+### 测试状态
+- 本地聚焦 Agent/timeout/resolver 测试 40/40 PASS，`git diff --check` 通过。
+- GCP 1 受影响工具 13/13 PASS，81/81 个工具输出 URL 完整下载；Soybean 4/4 步骤、23/23 下载、自动总结 PASS；Tourism 5/5 步骤、26/26 下载、自动总结 PASS。
+- GCP 1 公网 health/home/Admin SPA/普通 chat 均 200，日志确认 2.5 兼容 ID 实际调用 `gemini-3.5-flash`；40 个容器运行，backend healthy/restart 0，队列与 Error Registry 本前缀均为 0。
+- 当前 GCP 1 仍使用原 API image `sha256:6971bb9f...`；回滚目录：`~/csis-platform/backups/20260802_acceptance_fix_2e03567/`、`~/csis-platform/backups/20260802_workflow_guard_b38e4f3/`。GCP 2/MSU 提升等待用户确认。
