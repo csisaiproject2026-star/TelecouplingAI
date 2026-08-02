@@ -8154,3 +8154,46 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 ### 测试状态
 - 三站 `/health` 均返回 ok，三个 backend 均 running/healthy、restart count 0。
 - GCP 1 runtime `agent.py`/resolver 哈希仍为已验收值；当前分支 ahead/behind 均为 0。
+
+## 2026-08-02 — 三站固化提升进行中
+### 完成内容
+- 为三站创建源码、CBC Guide、Compose、环境哈希和容器元数据回滚点；仅同步 5 个运行文件、2 个回归测试及 CBC Guide，未修改 `/api/upload`、nginx 上传配置、`.env.docker`、证书或数据目录。
+- 构建薄层候选并将 GCP 1、GCP 2 的 35 个 backend/worker 服务提升到 image `sha256:3740bf4adf467e6da25ead2b8b2a47c669fcbfda43fb01ad95e7ff74de9e952c`。
+- GCP 1 到 GCP 2 的镜像经开发机二进制流式中转成功；尝试以同法传 MSU 时实测链路约 0.08 MiB/s，已主动中止，未留下半成品 image。
+- 尝试在 MSU 基于相同旧基镜像重现薄层 image；因两站 BuildKit 版本写入的层元数据不同，内容相同但 image ID 不同，未提升 MSU。固定 BuildKit 的临时 builder/registry 实验失败后已全部清理。
+### 关键变更文件
+- `DEV_LOG.md`
+- 三站 `backend/agent.py`、`backend/shared/file_reference_resolver.py`
+- 三站 3 个 telecoupling render 文件及 2 个相关测试
+- 三站 CBC Guide Markdown/PDF
+### 测试状态
+- GCP 1、GCP 2：40/40 Compose 服务运行，backend healthy、restart count 0、Celery active/reserved/scheduled 均为 0，运行文件哈希一致，公网 health 正常。
+- MSU 运行容器尚未提升，仍使用原生产 image；只同步了 host source 与 CBC Guide。临时 builder/registry 已清理。
+- 下一步应恢复历史验证过的 MSU→GCP 服务器直连链路，由 MSU 直接读取 GCP 的 `docker save` 流并 `docker load`，避免经过开发机。
+
+## 2026-08-02 — 三站验收修复统一镜像部署完成
+### 完成内容
+- 将 GCP 1 已验收的 Agent/Workflow 修复和当前 render 热补丁固化为薄层不可变镜像 `csic_backend:acceptance-fixes-b38e4f3-20260802`，最终 image ID 为 `sha256:3740bf4adf467e6da25ead2b8b2a47c669fcbfda43fb01ad95e7ff74de9e952c`。
+- GCP 1、GCP 2、MSU 各自重建了使用 `csic_backend:latest` 的 35 个 API/Celery/render 服务；三站最终运行完全相同的 image ID。
+- 同步三站 host source 与 CBC Guide MD/PDF，没有覆盖或修改任何 `.env`、`.env.docker`、证书、私钥或用户数据。
+- 验证并固化镜像传输规范：由 MSU 使用 `~/.ssh/id_gcp` 直接 SSH 到 GCP 1，将 `docker save` 流直接送入 MSU `docker load`。该路径成功加载精确 image ID；多 GiB 镜像不得再经开发机中转，也不得用 MSU 本地重建替代 exact-image 提升。
+- 为每站建立独立回滚根目录：`~/csis-platform/backups/20260802_acceptance_fixes_b38e4f3_gcp1|gcp2|msu/`，保存源码、Guide、Compose、环境哈希、容器元数据和旧镜像标签。
+- 用 seed `20260802201005` 随机抽取同一组 20 个工具，在 GCP 1、GCP 2、MSU 各运行一次严格公网 Guide 验收；三站合计 60/60 PASS，无结果复制、推定或路由重试。
+- 随机集合为 `8,10,12,13,14,15,16,19,20,21,22,26,27,29,32,33,34,36,39,43`，覆盖 Urban Nature、Scenic Quality、CO2、Add Agents 等原缺陷相关路径。
+- 60 项均重新读取对应站点 Guide MD/PDF 与 Sample ZIP、核验 ZIP hash、调用公共 `/api/upload` 与 `/api/chat` SSE、检查目标 `tool_start`、Worker `tool_result`/`done`，并对 342/342 个输出执行完整下载检查。
+- 清理全部本次前缀 Session、Redis key、uploads 和 outputs；由于 Session DELETE 不删除 root-owned uploads，最终通过服务器 sudo 仅删除 `solidify*` 本次前缀目录。
+### 关键变更文件
+- `PROJECT_MEMORY.md`
+- `DEV_LOG.md`
+- 三站 `backend/agent.py`
+- 三站 `backend/shared/file_reference_resolver.py`
+- 三站 `backend/renderers/telecoupling_style.py`
+- 三站 `backend/renderers/telecoupling_classification.py`
+- 三站 `backend/renderers/_qgis_scene_render_worker.py`
+- 三站 CBC Guide Markdown/PDF
+### 测试状态
+- 三站 FAMD 定向公网 smoke：3/3 PASS，每站命中 `run_factor_analysis_mixed_data` 并生成 4 个可完整下载输出。
+- 随机 20 工具 x 3 站：60/60 PASS；Guide/ZIP 60/60，完整输出下载 342/342。
+- 三站最终均为 40/40 Compose 服务运行、backend healthy、35 个提升服务 restart count 0、Celery active/reserved/scheduled 全 0。
+- 三站本次前缀 Redis/uploads/outputs 全 0；MSU 另有 4 个 Cortex scanner 容器的历史 restart，与本次 Compose 服务无关。
+- 证据目录：`C:\Users\dru18\.copilot\session-state\15769bfa-e8f4-4e0a-b226-90f86a2b3ae0\files\three-site-random20-20260802\`；证据压缩包 SHA-256 `4f9e11c18c6b625d681ac185bb0b30f3280c0d555cf86232357670a36995b73d`。
