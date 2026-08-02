@@ -8207,3 +8207,22 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - `DEV_LOG.md`
 ### 测试状态
 - `origin/production...HEAD` 最终 ahead/behind 为 `0/0`。
+
+## 2026-08-02 — 修复首页 Network Analysis 误弹 Workflow 卡
+### 完成内容
+- 确认首页建议卡点击时只发送 `label`，原文 `Analyze a flow network and detect community clusters` 不包含后端直达关键词 `network analysis`，却由 `Analyze` 命中通用 Workflow 目标检测，因此只有该卡片被强制转换为 Workflow plan。
+- 前端建议文案改为 `Run network analysis on a flow network and detect community clusters`；后端 Network Analysis 关键词增加 `flow network`，使旧缓存中的原文也能优先识别为 `run_network_analysis_grouping`，无需削弱开放式 Workflow 的通用 `analyze` 规则。
+- 增加回归测试，明确原首页文案虽然符合 Workflow 目标外观，但必须先命中 Network Analysis 直接工具。
+- 将 host source、backend 热补丁及同一前端构建热部署到 GCP 1、GCP 2、MSU；三站公共首页均启用 `index-tlV1_xxB.js`。本次未传输大镜像，也未修改任何环境文件、证书或用户数据。
+- 本轮为三站热部署，尚未生成新的不可变镜像；当前固化 backend 镜像仍为 `sha256:3740bf4adf467e6da25ead2b8b2a47c669fcbfda43fb01ad95e7ff74de9e952c`。
+### 关键变更文件
+- `telecouplingAI-project/backend/agent.py`
+- `telecouplingAI-project/backend/tests/test_agent_direct_completion.py`
+- `telecouplingAI-project/frontend/src/App.jsx`
+- `PROJECT_MEMORY.md`
+- `DEV_LOG.md`
+### 测试状态
+- 本地 `test_agent_direct_completion.py`：33/33 PASS；前端 production build PASS。
+- 三站后端容器内原首页文案均确定性路由到 `run_network_analysis_grouping`，backend 均 healthy、restart count 0。
+- 三站公共 `/health` 均为 200；公共首页均包含新文案。
+- 原首页文案分别通过三站公共 `/api/chat` SSE 完成，均收到 `done` 且无 `workflow_plan`/`plan_proposed` 事件；3 个测试 Session 均通过 API 删除。
