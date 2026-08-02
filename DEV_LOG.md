@@ -8123,3 +8123,13 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - `DEV_LOG.md`
 ### 测试状态
 - 本轮未执行新测试；GCP 2 原 artifact 只读保留，未修改、未重跑。
+
+## 2026-08-02 — 核准 GCP 2 严格验收自然检查点
+### 完成内容
+- 核准 GCP 2 最终矩阵为 43/43 工具完成（37 PASS、6 FAIL、0 未测），没有从 tool06 重跑。
+- 核准 2/2 Workflow 严格 FAIL，但全部计算步骤和下载成功；失败层仍为自动最终解释的 basename 解析。
+- 核准 13/13 core PASS、43/43 source audit 与唯一前缀 cleanup 完成，原 artifact 保持只读。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- 本轮新增验收为 0；未启动代理、未重跑、未修改 GCP 2 或原证据。
