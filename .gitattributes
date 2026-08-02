@@ -1,0 +1,3 @@
+telecouplingAI-project/nginx/nginx.conf text eol=lf
+telecouplingAI-project/scripts/*.sh text eol=lf
+telecouplingAI-project/deploy/systemd/* text eol=lf

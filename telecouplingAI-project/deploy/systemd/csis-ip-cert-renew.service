@@ -1,0 +1,9 @@
+[Unit]
+Description=Renew the CSIS GCP public IP TLS certificate
+Wants=network-online.target docker.service
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/default/csis-ip-cert-renew
+ExecStart=/usr/local/sbin/csis-renew-ip-cert

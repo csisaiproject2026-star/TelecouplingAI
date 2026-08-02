@@ -8046,3 +8046,29 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - GCP 1 隧道：SPA 200、login 200、session 200、logout 200。
 - GCP 2 隧道：SPA 200、login 200、session 200、logout 200。
 - 未修改服务器配置、密码、数据库或容器。
+
+## 2026-08-02 — 公开两台 GCP 的可信 HTTPS Admin 登录
+### 完成内容
+- 在没有域名的条件下，使用 Certbot 5.4 和 Let's Encrypt `shortlived` profile，分别为 `34.42.83.50`、`34.136.64.176` 签发浏览器信任的公网 IPv4 证书，替换原自签名证书。
+- 将 nginx Admin 路由改为仅当 `$scheme=https` 时代理到后端；公网 HTTP Admin API 保持 403。
+- 两台 GCP 均启用 `ADMIN_COOKIE_SECURE=true`，只重建 `api-server`；重建 nginx 使 bind-mounted 新配置重新挂载。
+- HTTP 访问 `/admin/errors` 强制 301 跳转到同 IP 的 HTTPS 页面，避免在明文页面展示或提交登录表单。
+- 新增通用证书续期脚本和 systemd service/timer。Timer 每 12 小时检查一次，证书剩余不足三天时短暂停止 nginx 完成 HTTP-01 续期并自动恢复。
+- 两台本地部署目录均同步脚本、systemd unit 和 nginx 源文件；未复制服务器环境文件，未提交证书、私钥、Admin 密码或哈希。
+### 关键变更文件
+- `telecouplingAI-project/nginx/nginx.conf`
+- `telecouplingAI-project/scripts/renew_gcp_ip_certificate.sh`
+- `telecouplingAI-project/deploy/systemd/csis-ip-cert-renew.service`
+- `telecouplingAI-project/deploy/systemd/csis-ip-cert-renew.timer`
+- `.gitattributes`
+- GCP 1、GCP 2：服务器本地 `.env.docker`、`nginx/certs/`、systemd 配置
+- `PROJECT_MEMORY.md`
+- `DEV_LOG.md`
+### 测试状态
+- 两个 IP 均通过系统 CA 信任验证，TLS 1.3，SAN 与各自 IPv4 一致；首批证书有效至 2026-08-08 19:00 UTC 左右。
+- 两个公网 Admin 页面均 200；HTTPS 下 unauthenticated=401、login=200、session=200、logout=200。
+- 两站登录 Cookie 均包含 Secure、HttpOnly、SameSite=Strict；HTTP Admin API 均为 403。
+- 两站 HTTP `/admin/errors` 均返回 301，并跳转到对应 `https://<IP>/admin/errors`。
+- 用户分别在新的无痕窗口打开两台 GCP Admin 页面，均确认不再显示红色 `Not secure`；旧提示来自证书替换前标签页保留的旧 TLS 状态。
+- 两台均为 40 个容器运行、0 unhealthy/restarting；backend healthy、restart count 0；证书 timer enabled/active。
+- 回滚目录：`~/csis-platform/backups/20260802_gcp_public_admin_https/`。
