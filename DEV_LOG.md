@@ -8235,3 +8235,14 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - `DEV_LOG.md`
 ### 测试状态
 - 无代码改动；未运行测试。
+
+## 2026-08-03 — 规划两个 Workflow 增加 Add Agents
+### 完成内容
+- 核对 `run_add_agents_interactively` 的真实契约、当前 Workflow catalog、Tourism 固定计划、两份 Workflow Guide 和两个 Sample ZIP。
+- 确认不能只修改 Prompt 或 Sample Data：当前 catalog 的 Agents 部分仅暴露 `run_draw_agents_from_table`，客户要求的 `run_add_agents_interactively` 还需加入规划能力和两个 few-shot。
+- 形成完整实施计划：为 Soybean/Tourism 各增加一份明确标注为教学虚拟数据的 agents CSV，Workflow 分别扩展为 5/6 步，并覆盖计划、Prompt、ZIP、Guide/PDF、截图、缓存版本、回归测试、GCP 验收、三站固化和清理。
+### 关键变更文件
+- `DEV_LOG.md`
+- Session `plan.md`
+### 测试状态
+- 本轮仅完成设计和现状核对，未修改运行代码、Sample ZIP 或服务器。
