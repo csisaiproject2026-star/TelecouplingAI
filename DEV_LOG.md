@@ -8246,3 +8246,15 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - Session `plan.md`
 ### 测试状态
 - 本轮仅完成设计和现状核对，未修改运行代码、Sample ZIP 或服务器。
+
+## 2026-08-03 — 简化 Workflow Agent 示例数据方案
+### 完成内容
+- 按用户决定取消 Agent CSV 的 `synthetic_teaching_demo`/`data_status` 标记字段。
+- 将每个 Workflow 的 Agent 数据收窄为 4 条直观记录、5 个字段：`agent_name,agent_type,longitude,latitude,description`。
+- Soybean 使用农户、出口商、进口商、加工商；Tourism 使用保护区管理处、当地居民、旅游经营者、旅行社，优先复用现有 Systems/Flows 中的地点以保证地图清晰。
+- 两份 CSV 的文件名、表头、名称、类别和描述全部使用英文，并在打包前检查不存在中文/CJK 字符。
+### 关键变更文件
+- `DEV_LOG.md`
+- Session `plan.md`
+### 测试状态
+- 本轮仅调整设计计划，未修改代码、数据包或服务器。
