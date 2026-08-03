@@ -8226,3 +8226,12 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - 三站后端容器内原首页文案均确定性路由到 `run_network_analysis_grouping`，backend 均 healthy、restart count 0。
 - 三站公共 `/health` 均为 200；公共首页均包含新文案。
 - 原首页文案分别通过三站公共 `/api/chat` SSE 完成，均收到 `done` 且无 `workflow_plan`/`plan_proposed` 事件；3 个测试 Session 均通过 API 删除。
+
+## 2026-08-03 — 核对当前两个 Workflow 的工具组成
+### 完成内容
+- 对照当前 `backend/workflow/catalog.py`、Tourism 固定计划和两份 Workflow User Guide，确认 Soybean 为 4 个工具、Tourism 为 5 个工具。
+- 本轮仅核对现行工具组成，未修改 Workflow 实现或部署。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- 无代码改动；未运行测试。
