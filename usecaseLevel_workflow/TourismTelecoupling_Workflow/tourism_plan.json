@@ -1,8 +1,9 @@
 {
   "case_name": "wolong_tourism_telecoupling",
-  "description": "Tourists flow from Chinese provinces (and the world) to Wolong Nature Reserve. Map systems, group the global arrival network, draw tourist flows, estimate transport CO2, and find the factors behind visitation (FAMD).",
+  "description": "Tourists flow from Chinese provinces (and the world) to Wolong Nature Reserve. Map systems and agents, group the global arrival network, draw tourist flows, estimate transport CO2, and find the factors behind visitation (FAMD).",
   "required_inputs": [
     { "id": "systems_table",  "label": "Systems coordinate table", "file_kind": "table",  "description": "name/role/lon/lat per system (Wolong=Receiving, provinces=Sending)" },
+    { "id": "agents_table",   "label": "Tourism agents table",     "file_kind": "table",  "description": "agent_name/agent_type/longitude/latitude/description" },
     { "id": "network_nodes",  "label": "Network nodes",            "file_kind": "table",  "description": "country code + arrivals (sender/receiver)" },
     { "id": "network_links",  "label": "Network links",            "file_kind": "table",  "description": "sender,receiver,arrivals edges" },
     { "id": "world_countries","label": "World countries layer",    "file_kind": "vector", "description": "country polygons with ISO_3_CODE" },
@@ -35,7 +36,19 @@
       "produces": ["network_stats.csv", "network_plot.pdf"]
     },
     {
-      "id": "s3_flows", "component": "flows", "tool": "run_draw_radial_flows",
+      "id": "s3_agents", "component": "agents", "tool": "run_add_agents_interactively",
+      "rationale": "Map representative people and organizations enabling tourism flows.",
+      "inputs": {
+        "input_csv":  { "source": "input", "ref": "agents_table" },
+        "x_field":    { "source": "literal", "value": "longitude" },
+        "y_field":    { "source": "literal", "value": "latitude" },
+        "name_field": { "source": "literal", "value": "agent_name" },
+        "text_field": { "source": "literal", "value": "description" }
+      },
+      "produces": ["agents.geojson", "agents.shp", "agents_table.csv"]
+    },
+    {
+      "id": "s4_flows", "component": "flows", "tool": "run_draw_radial_flows",
       "rationale": "Draw geodesic tourist flow lines from each origin to Wolong.",
       "inputs": {
         "input_csv":    { "source": "input", "ref": "flows_table" },
@@ -47,7 +60,7 @@
       "produces": ["radial_flows.shp"]
     },
     {
-      "id": "s4_co2", "component": "effects", "tool": "run_co2_emissions",
+      "id": "s5_co2", "component": "effects", "tool": "run_co2_emissions",
       "rationale": "Estimate transport CO2 per flow (Boeing-777 factor 29 kg/km).",
       "inputs": {
         "input_csv":           { "source": "input", "ref": "flows_with_distance" },
@@ -59,7 +72,7 @@
       "produces": ["co2_emissions_results.csv"]
     },
     {
-      "id": "s5_famd", "component": "causes", "tool": "run_factor_analysis_mixed_data",
+      "id": "s6_famd", "component": "causes", "tool": "run_factor_analysis_mixed_data",
       "rationale": "Find latent factors behind tourist visitation (affinity, GDP, distance).",
       "inputs": {
         "input_csv":               { "source": "input", "ref": "famd_table" },

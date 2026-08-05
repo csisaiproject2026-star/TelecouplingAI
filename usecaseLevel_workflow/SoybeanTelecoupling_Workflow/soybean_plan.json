@@ -1,0 +1,81 @@
+{
+  "case_name": "brazil_china_soybean_telecoupling",
+  "description": "Map soybean systems, agents, and flows, then assess crop production and habitat quality effects in Mato Grosso.",
+  "required_inputs": [
+    { "id": "systems_table", "label": "Soybean systems table", "file_kind": "table", "description": "System names, roles, and coordinates" },
+    { "id": "agents_table", "label": "Soybean agents table", "file_kind": "table", "description": "agent_name/agent_type/longitude/latitude/description" },
+    { "id": "flows_table", "label": "Soybean flows table", "file_kind": "table", "description": "Origin and destination coordinates with Quantity" },
+    { "id": "crop_lulc", "label": "Crop land-cover raster", "file_kind": "raster", "description": "Land-cover raster for crop production" },
+    { "id": "crop_table", "label": "Crop lookup table", "file_kind": "table", "description": "lucode and crop_name columns" },
+    { "id": "aggregate_polygons", "label": "Mato Grosso study plots", "file_kind": "vector", "description": "Polygons used to aggregate crop results" },
+    { "id": "habitat_lulc", "label": "Habitat land-cover raster", "file_kind": "raster", "description": "Current land-cover raster for habitat quality" },
+    { "id": "threats_table", "label": "Habitat threats table", "file_kind": "table", "description": "Threat definitions and raster paths" },
+    { "id": "sensitivity_table", "label": "Habitat sensitivity table", "file_kind": "table", "description": "Land-cover habitat and threat sensitivities" }
+  ],
+  "steps": [
+    {
+      "id": "s1_systems",
+      "component": "systems",
+      "tool": "run_draw_systems_from_table",
+      "rationale": "Map soybean sending and receiving systems.",
+      "inputs": {
+        "input_csv": { "source": "input", "ref": "systems_table" },
+        "x_field": { "source": "literal", "value": "LON" },
+        "y_field": { "source": "literal", "value": "LAT" }
+      },
+      "produces": ["systems_from_table.shp"]
+    },
+    {
+      "id": "s2_agents",
+      "component": "agents",
+      "tool": "run_add_agents_interactively",
+      "rationale": "Map representative actors enabling soybean production and trade.",
+      "inputs": {
+        "input_csv": { "source": "input", "ref": "agents_table" },
+        "x_field": { "source": "literal", "value": "longitude" },
+        "y_field": { "source": "literal", "value": "latitude" },
+        "name_field": { "source": "literal", "value": "agent_name" },
+        "text_field": { "source": "literal", "value": "description" }
+      },
+      "produces": ["agents.geojson", "agents.shp", "agents_table.csv"]
+    },
+    {
+      "id": "s3_flows",
+      "component": "flows",
+      "tool": "run_draw_radial_flows",
+      "rationale": "Draw soybean flow lines between origin and destination systems.",
+      "inputs": {
+        "input_csv": { "source": "input", "ref": "flows_table" },
+        "from_x_field": { "source": "literal", "value": "FROM_X" },
+        "from_y_field": { "source": "literal", "value": "FROM_Y" },
+        "to_x_field": { "source": "literal", "value": "TO_X" },
+        "to_y_field": { "source": "literal", "value": "TO_Y" }
+      },
+      "produces": ["radial_flows.shp"]
+    },
+    {
+      "id": "s4_crop",
+      "component": "effects",
+      "tool": "run_crop_production_percentile",
+      "rationale": "Estimate soybean production effects across the study plots.",
+      "inputs": {
+        "landcover_raster_path": { "source": "input", "ref": "crop_lulc" },
+        "landcover_to_crop_table_path": { "source": "input", "ref": "crop_table" },
+        "aggregate_polygon_path": { "source": "input", "ref": "aggregate_polygons" }
+      },
+      "produces": ["soybean production outputs"]
+    },
+    {
+      "id": "s5_habitat",
+      "component": "effects",
+      "tool": "run_habitat_quality",
+      "rationale": "Assess habitat quality and degradation associated with land cover and threats.",
+      "inputs": {
+        "lulc_cur_path": { "source": "input", "ref": "habitat_lulc" },
+        "threats_table_path": { "source": "input", "ref": "threats_table" },
+        "sensitivity_table_path": { "source": "input", "ref": "sensitivity_table" }
+      },
+      "produces": ["quality_c.tif", "deg_sum_c.tif"]
+    }
+  ]
+}

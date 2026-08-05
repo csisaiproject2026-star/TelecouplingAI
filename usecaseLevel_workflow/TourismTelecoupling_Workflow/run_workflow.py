@@ -6,7 +6,7 @@ Usage:
     python run_workflow.py --check    # validate only (no tool execution, no heavy deps)
 
 Outputs go to ./_run_outputs/ (override via SHARED_DIR env). Network + FAMD steps
-need R (Rscript + igraph/FactoMineR); the other three need only geopandas/pandas.
+need R (Rscript + igraph/FactoMineR); the other four need only geopandas/pandas.
 """
 import os
 import sys
@@ -42,6 +42,7 @@ def unzip_shp(rel_zip: str) -> str:
 def build_inputs() -> dict:
     return {
         "systems_table":      os.path.join(SAMPLE, "Systems-UploadSystems", "tourism_Systems.csv"),
+        "agents_table":       os.path.join(HERE, "tourism_agents.csv"),
         "network_nodes":      os.path.join(SAMPLE, "Systems-NetworkGrouping", "nodes.csv"),
         "network_links":      os.path.join(SAMPLE, "Systems-NetworkGrouping", "links.csv"),
         "world_countries":    unzip_shp("Systems-NetworkGrouping/World_countries_2002.zip"),
@@ -70,15 +71,15 @@ def main():
         sys.exit(1)
     print("VALIDATION: OK (all tools exist, all required inputs satisfied, order consistent)")
 
+    if args.check:
+        print("--check done (no execution).")
+        return
+
     inputs = build_inputs()
     missing = {k: v for k, v in inputs.items() if not os.path.exists(v)}
     if missing:
         print("MISSING INPUT FILES:", missing)
         sys.exit(1)
-
-    if args.check:
-        print("--check done (no execution).")
-        return
 
     from workflow import run_plan
 
