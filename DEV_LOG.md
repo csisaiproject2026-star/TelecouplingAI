@@ -8488,3 +8488,23 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - 三站 Guide 完整目录指纹统一为 `4ce17cc31c203ab91661454349188dec01a81f23cdb2a149e65dc9a3949b8919`。
 - GCP1/GCP2/MSU 均为 40/40 Compose 服务运行、0 unhealthy、0 restarting；本地与公网 `/health` 正常。
 - 未运行 Gemini 或真实 Workflow，等待用户手工验收。
+
+## 2026-08-05 — 补齐 Agents 配套源码并重新固化 Frontend
+### 完成内容
+- 从原始 `df104da` Agents 提交恢复 Soybean/Tourism 固定 Plan、Tourism 离线复现脚本和专门回归测试，避免 Git 源码缺少昨晚已完成的配套工件。
+- 将两个 Workflow 的 Guide PDF 和 Sample Data ZIP 缓存版本统一为 `20260804-agents-v1`，防止浏览器继续显示缓存的旧版 4/5 步资料。
+- 在 GCP2 构建 Frontend 镜像 `sha256:4b4c5e1279df2bae26ab452a06c9fdd8ec7404447d1b513183664f0b8485ddbd`，服务器直传至 GCP1 和 MSU，仅重建三站 frontend 服务，Backend 容器保持不变。
+- 三站 host source 的 `userGuides.js` 统一为 SHA-256 `616d28258cac4816c01aba07e6a8da71bfb222789e02fb9896dfd180ed9777bc`；旧 Frontend 镜像保留为 `csic_frontend:rollback-pre-c30a300`。
+### 关键变更文件
+- `telecouplingAI-project/frontend/src/userGuides.js`
+- `telecouplingAI-project/backend/tests/test_workflow_agent_examples.py`
+- `usecaseLevel_workflow/SoybeanTelecoupling_Workflow/soybean_plan.json`
+- `usecaseLevel_workflow/TourismTelecoupling_Workflow/tourism_plan.json`
+- `usecaseLevel_workflow/TourismTelecoupling_Workflow/run_workflow.py`
+- `PROJECT_MEMORY.md`
+- `DEV_LOG.md`
+### 测试状态
+- Workflow 聚焦测试 62/62 PASS；Tourism `run_workflow.py --check` 确认 6 steps、validation OK。
+- Frontend production build 通过；最终 bundle 为 `index-ChA5rZZn.js`，SHA-256 `aa12dac4854767ebdf54fee286f0bf40f2e8b18ddd3a819ff24354ee74325700`。
+- GCP1/GCP2/MSU 公网均返回新 bundle，包含 `20260804-agents-v1`，`/health` 正常；三站各 40/40 Compose 服务运行。
+- 未运行 Gemini 或真实 Workflow，等待用户手工验收。
