@@ -8428,3 +8428,42 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - `DEV_LOG.md`
 ### 测试状态
 - 本轮未修改 GCP1、GCP2、MSU、容器、镜像或环境，未执行测试。
+
+## 2026-08-05 — 固化镜像改用服务器直传
+### 完成内容
+- 将项目级发布纪律固定为：大体积 Docker 镜像只允许服务器之间直接传输，本地工作站只发命令和中转小型公钥/校验和；禁止使用同样会经本地中转的 `scp -3` 传镜像。
+- MSU 继续使用已验证的 `~/.ssh/id_gcp` 从 GCP1 直接拉取；GCP1/GCP2 无永久互信时，在源站生成一次性 Ed25519 密钥，只把公钥临时加入目标站，传输并核对完整 SHA-256 后立即删除两端密钥/授权。
+- 本次停止了速度过慢的本地中转；改为 GCP2 直接传 GCP1，1.8GB 镜像包 SHA-256 两端一致：`d54ac6c7b3362d0c13879bf55c10bbcccb4b5531cea23185c7c256bf1696b353`。临时密钥及目标授权已清理。
+- 发布切换前保留旧镜像回滚标签；仅在 GCP/MSU 验收完成后删除回滚镜像和临时镜像包。
+### 关键变更文件
+- `PROJECT_MEMORY.md`
+- `DEV_LOG.md`
+### 测试状态
+- GCP2→GCP1 服务器直传成功，目标镜像包 SHA-256 与源站一致。
+- MSU→GCP1 直连 SSH 已确认可用；未通过本地工作站传输镜像字节。
+
+## 2026-08-05 — Workflow/Chat 隔离候选固化并提升三站
+### 完成内容
+- 审计本地、GCP1、GCP2 的关键 Backend/Workflow/frontend 漂移，选择唯一权威版本：Backend 使用干净 fail-fast 基线；Frontend 保留每 Chat 独立 Session/运行状态，并合入 GCP1 已验证的 Plan 按钮锁定和 Warning UI。
+- 发布审查补齐新 Workflow 替换边界：当前请求新上传文件归入新 scope；普通运行/总结保留旧计划；只有明确新建/替换/从头开始才替换；否定替换不会清空；`Run the analysis now` 可确定性执行已存计划。
+- 固定权威提交 `86927113de50777315c101752700d8f33c4271d0`，从无 `.env` 发布包构建不可变 Backend/Frontend 镜像。
+- 先在 GCP2 切换验证，再将同一镜像直接传到 GCP1 和 MSU；三站均保存旧镜像回滚标签，服务器本地 `.env`/`.env.docker` 哈希前后不变。
+- GCP2→GCP1 使用一次性 Ed25519 服务器直传，完成后删除源端密钥和目标授权；MSU 使用 `~/.ssh/id_gcp` 直接从 GCP1 拉取。三站验证后删除 1.8GB 临时传输包，保留版本镜像、回滚镜像、源码包和切换前备份。
+### 关键变更文件
+- `telecouplingAI-project/backend/agent.py`
+- `telecouplingAI-project/backend/workflow/catalog.py`
+- `telecouplingAI-project/backend/workflow/engine.py`
+- `telecouplingAI-project/backend/shared/session_manager.py`
+- `telecouplingAI-project/backend/tests/test_workflow_scope.py`
+- `telecouplingAI-project/backend/tests/test_agent_direct_completion.py`
+- `telecouplingAI-project/frontend/src/App.jsx`
+- `telecouplingAI-project/frontend/src/lib/session.js`
+- `telecouplingAI-project/frontend/src/components/WorkflowPlanCard.jsx`
+- `telecouplingAI-project/frontend/src/components/ToolStatusCard.jsx`
+- `PROJECT_MEMORY.md`
+- `DEV_LOG.md`
+### 测试状态
+- 本地：72 个聚焦 Backend 测试通过；Frontend production build 通过；最终独立代码审查无阻断问题。
+- 镜像：Backend `sha256:19bf93f520db4620d5c6709357c71956bc34ea00b2304bce284dfc7499edf5e7`；Frontend `sha256:8225d5485f937867403195579449bc204173d2ccc43cad3538a24b863bcf3492`，三站完全一致。
+- GCP1/GCP2/MSU：各 40/40 Compose 服务运行，0 unhealthy，0 restarting，关键源码哈希一致，本地与公网 `/health` 正常；MSU 公网 WAF `/health` 正常。
+- 未主动运行 Gemini、真实 Workflow 或网站业务测试；保留给用户手工验收。
