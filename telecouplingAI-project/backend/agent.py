@@ -554,11 +554,11 @@ Users often provide parameters across multiple messages. Follow this pattern:
 
 ## Image / Map Output Rules (CRITICAL)
 - NEVER write inline image data in your text response. Specifically: do NOT emit `![...](data:image/png;base64,...)`, do NOT emit any `data:image/*;base64,...` URLs, and do NOT emit fake/fabricated base64 byte strings.
-- The ONLY way to show a rendered map or image is to call the `render_spatial_file` tool. The frontend will display the resulting PNG automatically — you do not need to embed it in your reply.
-- NEVER claim, state, or imply that you rendered/showed/displayed a map or image (e.g. "Here is the rendered map", "the image is shown above", "you can download this image") UNLESS you actually called `render_spatial_file` for that exact file. Describing or announcing a render you did not perform is a hard error — it produces NO image for the user.
+- The ONLY ways to show a rendered map or image are `render_spatial_file` for ONE layer, or `render_telecoupling_scene` for a combined Systems + Agents + Flows map. The frontend displays the resulting image automatically.
+- NEVER claim, state, or imply that you rendered/showed/displayed a map or image unless you actually called the appropriate render tool in that response.
 - When the user asks to show / render / display / visualize / 可视化 ANY spatial file (.tif, .tiff, .shp, .geojson, .gpkg — including point layers like agents/systems and line layers like flows), you MUST call `render_spatial_file` on that file. Never answer with text alone claiming it is done.
-- There is NO exception and NO shortcut. EVERY time the user asks to show/render/display/visualize a file, call `render_spatial_file` for it AGAIN, even if you or an earlier turn already rendered it. Re-rendering is cheap, fast, and safe. You must NEVER say "already shown above", "rendered in the previous turn", "the map is displayed", or anything implying an image exists, UNLESS you are calling `render_spatial_file` in THIS same response. Claiming a prior render instead of calling the tool is a hard error that leaves the user with no image.
-- You cannot draw images yourself and you cannot remember/reuse a previous render. If asked to "show a map" or "visualize", call `render_spatial_file` on the relevant file in this very turn — no matter how many times it has been rendered before.
+- When the user asks to combine/overlay Systems, Agents, and Flows into one telecoupling map, you MUST call `render_telecoupling_scene`; rendering only one of those layers with `render_spatial_file` does not satisfy the request.
+- Re-render on every explicit request. Do not claim a prior image is still displayed instead of calling the appropriate render tool in the current response.
 """
 
 # ---------------------------------------------------------------------------
@@ -1528,6 +1528,25 @@ def _format_plan_summary(plan_dict: dict) -> str:
     return "\n".join(lines)
 
 
+def _public_workflow_plan(plan_dict: dict) -> dict:
+    """Remove backend-only workflow scope metadata before emitting a plan card."""
+    return {
+        key: value
+        for key, value in plan_dict.items()
+        if not key.startswith("_")
+    }
+
+
+def _workflow_scoped_uploads(plan_dict: dict | None, uploaded: list[dict]) -> list[dict]:
+    """Return only uploads belonging to the active workflow generation."""
+    scope = (plan_dict or {}).get("_workflow_scope") or {}
+    try:
+        start = max(0, int(scope.get("upload_start_index", 0)))
+    except (TypeError, ValueError):
+        start = 0
+    return uploaded[start:]
+
+
 def _subset_plan_dict(plan_dict: dict, selected_ids: list[str]) -> dict:
     """Filter a plan dict down to the user-chosen steps (plan card multi-select).
 
@@ -1651,6 +1670,7 @@ def _merge_added_steps(base: dict, added: dict) -> dict:
                 known.add(ref)
 
     return {
+        **base,
         "case_name": base.get("case_name", "workflow"),
         "description": base.get("description", ""),
         "required_inputs": merged_inputs,
@@ -1796,6 +1816,7 @@ def _auto_map_inputs(plan, inputs_map: dict[str, str], uploaded: list[dict],
     by_id = {ri.id: ri for ri in plan.required_inputs}
     expected_cols = _expected_cols_by_input(plan)
     _hdr_cache: dict[str, set[str]] = {}
+    explicit_paths = {p for p in inputs_map.values() if p}
     used = {p for p in inputs_map.values() if p}
     need = [iid for iid in plan.input_ids
             if not (inputs_map.get(iid) and os.path.exists(inputs_map[iid]))]
@@ -1814,7 +1835,14 @@ def _auto_map_inputs(plan, inputs_map: dict[str, str], uploaded: list[dict],
         for f in uploaded:
             path = f.get("path", "")
             if (os.path.splitext(f.get("filename", ""))[1].lower() not in exts
-                    or path in used or not os.path.exists(path)):
+                    or not os.path.exists(path)):
+                continue
+            can_share = False
+            if path in explicit_paths and kind == "table" and want_cols:
+                if path not in _hdr_cache:
+                    _hdr_cache[path] = _csv_header_cols(path)
+                can_share = bool(_hdr_cache[path] and want_cols <= _hdr_cache[path])
+            if path in used and not can_share:
                 continue
             stem = os.path.splitext(os.path.basename(f["filename"]))[0]
             ft = _name_tokens(stem)
@@ -1829,17 +1857,19 @@ def _auto_map_inputs(plan, inputs_map: dict[str, str], uploaded: list[dict],
                 if fcols:
                     col_match = 1 if want_cols <= fcols else -1
             recent = 1 if path in prefer_paths else 0
-            pairs.append(((col_match, recent, inter, jacc, ratio), iid, path))
+            pairs.append(((col_match, recent, inter, jacc, ratio), iid, path, can_share))
 
     pairs.sort(key=lambda x: x[0], reverse=True)   # best matches first
     done_inputs: set[str] = set()
-    for _score, iid, path in pairs:
-        if iid in done_inputs or path in used:
+    for _score, iid, path, can_share in pairs:
+        if iid in done_inputs or (path in used and not can_share):
             continue
+        reused = path in used
         inputs_map[iid] = path
         done_inputs.add(iid)
         used.add(path)
-        logger.info(f"[agent] auto-mapped input '{iid}' -> {os.path.basename(path)}")
+        action = "reused explicit upload for" if reused else "auto-mapped input"
+        logger.info(f"[agent] {action} '{iid}' -> {os.path.basename(path)}")
     return inputs_map
 
 
@@ -1938,6 +1968,22 @@ def _enrich_plan_for_ui(plan_dict: dict) -> dict:
 def _detect_tool_from_message(message: str) -> str | None:
     """Return the function name that best matches the user message, or None."""
     msg_lower = message.lower()
+    scene_components = all(term in msg_lower for term in ("systems", "agents", "flows"))
+    scene_action = any(
+        term in msg_lower
+        for term in ("combine", "combined", "overlay", "composite")
+    )
+    if (
+        "render_telecoupling_scene" in msg_lower
+        or "combined telecoupling map" in msg_lower
+        or "combined telecoupling scene" in msg_lower
+        or (
+            scene_components
+            and scene_action
+            and any(term in msg_lower for term in ("map", "scene", "layer"))
+        )
+    ):
+        return "render_telecoupling_scene"
     for tool_name, keywords in _TOOL_KEYWORDS.items():
         if any(kw.lower() in msg_lower for kw in keywords):
             return tool_name
@@ -2122,6 +2168,87 @@ def _looks_like_workflow_goal(message: str) -> bool:
     return any(kw.replace(" ", "") in m for kw in _WORKFLOW_GOAL_KEYWORDS)
 
 
+def _looks_like_explicit_telecoupling_goal(message: str) -> bool:
+    """A named telecoupling goal is multi-step even when it mentions direct tools."""
+    compact = message.lower().replace(" ", "")
+    return (
+        ("telecoupling" in compact or "telecouple" in compact)
+        and _looks_like_workflow_goal(message)
+    )
+
+
+_WORKFLOW_REPLACEMENT_PATTERNS = (
+    re.compile(
+        r"\b(?:new|different|another|replacement)\b.{0,80}"
+        r"\b(?:workflow|pipeline)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(?:workflow|pipeline|analysis|case\s+study)\b.{0,80}"
+        r"\b(?:from\s+scratch|from\s+the\s+beginning|start\s+over|replace)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(?:start|begin|create|build|launch)\b.{0,40}"
+        r"\b(?:new|different|another|replacement)\b.{0,80}"
+        r"\b(?:analysis|case\s+study)\b",
+        re.IGNORECASE,
+    ),
+)
+_WORKFLOW_REPLACEMENT_NEGATIONS = (
+    re.compile(
+        r"\b(?:do\s+not|don't|dont|not|never)\s+(?:replace|restart|rebuild)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(r"\bwithout\s+(?:replacing|restarting|rebuilding)\b", re.IGNORECASE),
+    re.compile(r"\bkeep\s+(?:the\s+)?(?:current|existing)\b", re.IGNORECASE),
+)
+_WORKFLOW_REPLACEMENT_MARKERS = (
+    "fromscratch",
+    "startover",
+    "重新开始",
+    "从头开始",
+    "从头创建",
+    "新工作流",
+    "新的工作流",
+    "另一个工作流",
+    "不同的工作流",
+    "替换工作流",
+    "换一个工作流",
+)
+_WORKFLOW_REPLACEMENT_NEGATION_MARKERS = (
+    "不要替换",
+    "不替换",
+    "不要重建",
+    "不要重新开始",
+    "保留当前",
+    "保留现有",
+    "继续当前",
+)
+_WORKFLOW_REPLACEMENT_CHINESE_PATTERN = re.compile(
+    r"(?:开始|新建|创建|做一个|做个).{0,20}"
+    r"(?:新|另一个|不同).{0,20}"
+    r"(?:分析|案例)"
+)
+
+
+def _looks_like_workflow_replacement(message: str) -> bool:
+    """True only for an explicit request to replace the current workflow."""
+    if not _looks_like_workflow_goal(message):
+        return False
+    compact = message.lower().replace(" ", "")
+    if (
+        any(pattern.search(message) for pattern in _WORKFLOW_REPLACEMENT_NEGATIONS)
+        or any(marker in compact for marker in _WORKFLOW_REPLACEMENT_NEGATION_MARKERS)
+    ):
+        return False
+    return (
+        any(pattern.search(message) for pattern in _WORKFLOW_REPLACEMENT_PATTERNS)
+        or any(marker in compact for marker in _WORKFLOW_REPLACEMENT_MARKERS)
+        or _WORKFLOW_REPLACEMENT_CHINESE_PATTERN.search(compact) is not None
+    )
+
+
 # Markers the plan card puts in its "confirm & run" message — used to FORCE
 # execute_workflow_plan so a confirmation deterministically runs (instead of the
 # model narrating "running it…" without calling the function).
@@ -2131,6 +2258,15 @@ _WORKFLOW_CONFIRM_MARKERS = ["execute_workflow_plan", "selected_steps", "确认�
 def _looks_like_workflow_confirm(message: str) -> bool:
     m = message.lower()
     return any(x.lower() in m for x in _WORKFLOW_CONFIRM_MARKERS)
+
+
+def _workflow_files_not_uploaded(message: str) -> bool:
+    """The Plan card explicitly says this turn must not execute."""
+    return re.search(
+        r"\bi\s+have\s+not\s+uploaded\s+the\s+files\s+yet\b",
+        message,
+        flags=re.IGNORECASE,
+    ) is not None
 
 
 # Markers the plan card's "Add & re-plan" button puts in its message — used to FORCE
@@ -2178,6 +2314,10 @@ def _looks_like_files_attached(message: str) -> bool:
 # "run the workflow" and send → this fires execute against the already-uploaded files.
 _RUN_INTENT_KEYWORDS = [
     "run the workflow", "run the full workflow", "run the plan", "run all the steps",
+    "run the telecoupling analysis", "execute the telecoupling analysis",
+    "start the telecoupling analysis",
+    "run the analysis", "run this analysis", "execute the analysis",
+    "execute this analysis", "start the analysis",
     "run it", "run my", "run all", "execute the workflow", "execute the plan",
     "start the workflow", "go ahead and run", "运行", "执行", "开始跑", "跑起来", "跑工作流",
 ]
@@ -2508,7 +2648,8 @@ async def run_agent(
     #  * a card "confirm & run" message  -> force execute_workflow_plan
     #  * a high-level analysis goal       -> force propose_workflow_plan (renders the card)
     # Confirm takes precedence; single-tool keyword hits opt out of both.
-    _force_confirm = _looks_like_workflow_confirm(user_text)
+    _force_confirm = _looks_like_workflow_confirm(message)
+    _files_not_uploaded = _workflow_files_not_uploaded(message)
     # Only FORCE a brand-new plan card for the FIRST analysis goal in a session.
     # Once a plan has already been proposed this session, follow-up turns (uploading
     # files, "run any analysis you can", "complete the workflow") must NOT spawn a
@@ -2518,13 +2659,82 @@ async def run_agent(
     # answers; the supplement/"change the plan" box still re-proposes (its message
     # names a tool / explicitly asks to re-propose), and WORKFLOW_PROMPT tells the
     # model to call execute (not re-propose) on follow-ups.
-    _has_plan = await _sm.get_workflow_plan(session_id) is not None
+    _stored_plan = await _sm.get_workflow_plan(session_id)
+    _stored_scope = await _sm.get_workflow_scope(session_id)
+    _has_plan = _stored_plan is not None
     # The "Add & re-plan" button explicitly asks for a new plan card. Force propose
     # regardless of _has_plan / single-tool detection (it's a deliberate refinement).
-    _force_replan = (not _force_confirm) and _looks_like_workflow_replan(user_text)
-    _force_workflow = (not _force_confirm and not _force_replan and detected_tool_name is None
-                       and not _has_plan
-                       and _looks_like_workflow_goal(user_text))
+    _force_replan = (not _force_confirm) and _looks_like_workflow_replan(message)
+    _explicit_telecoupling_goal = _looks_like_explicit_telecoupling_goal(message)
+    _explicit_replacement_goal = (
+        (
+            _has_plan
+            and _looks_like_workflow_replacement(message)
+        )
+        or (
+            not _has_plan
+            and _explicit_telecoupling_goal
+        )
+    )
+    _force_workflow = (
+        not _force_confirm
+        and not _force_replan
+        and (
+            _explicit_replacement_goal
+            or (
+                detected_tool_name is None
+                and not _has_plan
+                and _looks_like_workflow_goal(message)
+            )
+        )
+    )
+    _all_uploaded = await _sm.get_uploaded_files(session_id)
+    _current_batch_files = [
+        file
+        for file in (files or [])
+        if file.get("current_batch")
+    ]
+    _new_workflow_scope = None
+    if _force_workflow:
+        if (
+            not _has_plan
+            and _stored_scope
+            and _stored_scope.get("status") == "pending"
+        ):
+            _new_workflow_scope = dict(_stored_scope)
+        else:
+            _new_workflow_scope = {
+                "id": uuid.uuid4().hex,
+                "upload_start_index": (
+                    max(0, len(_all_uploaded) - len(_current_batch_files))
+                    if _has_plan
+                    else 0
+                ),
+            }
+        _new_workflow_scope["status"] = "pending"
+        await _sm.set_workflow_scope(session_id, _new_workflow_scope)
+        if _has_plan:
+            # A failed replacement must not leave the previous plan executable.
+            await _sm.set_workflow_plan(session_id, None)
+        # Preserve visible history, but make planning depend only on this objective
+        # and files attached with the replacement request.
+        replacement_context = [
+            f"Uploaded file: {file.get('filename', 'unknown')} at {file.get('path', '')}"
+            for file in _current_batch_files
+        ]
+        user_text = (
+            "\n".join(replacement_context) + "\n\n" + message
+            if replacement_context
+            else message
+        )
+        contents = [
+            types.Content(
+                role="user",
+                parts=[types.Part.from_text(text=user_text)],
+            )
+        ]
+        _single_tool = None
+        direct_completion_tool = None
     # Run flow: confirm the plan -> AI lists the files to upload -> the user uploads
     # files (+ states any column/param values) and sends. The frontend tags a send that
     # carries freshly-attached files with a marker; with a plan already stored (and not a
@@ -2535,11 +2745,15 @@ async def run_agent(
     # Trigger execute when EITHER: the send carried fresh files (marker), OR it's a
     # plain "run it" with files already uploaded this session (text-only run — lets the
     # run sidestep the file-attached send entirely if that handoff flaked).
-    _has_uploads = bool(await _sm.get_uploaded_files(session_id))
-    _force_execute_on_upload = (_has_plan and not _force_confirm and not _force_replan
+    _has_uploads = bool(_workflow_scoped_uploads(_stored_plan, _all_uploaded))
+    _force_execute_on_upload = (_has_plan and not _force_workflow
+                                and not _files_not_uploaded
+                                and not _force_confirm and not _force_replan
                                 and (_looks_like_files_attached(user_text)
                                      or (_has_uploads and _looks_like_run_intent(user_text))))
-    _forced_fn = ("execute_workflow_plan" if (_force_confirm or _force_execute_on_upload)
+    _forced_fn = ("execute_workflow_plan"
+                  if ((_force_confirm and not _files_not_uploaded)
+                      or _force_execute_on_upload)
                   else "add_workflow_steps" if _force_replan
                   else "propose_workflow_plan" if _force_workflow else None)
     if _forced_fn:
@@ -2567,7 +2781,8 @@ async def run_agent(
     explain_only_next = False
     workflow_execution_completed = False
     workflow_summary_only_next = False
-    workflow_output_reads = 0
+    plan_validation_attempts = 0
+    plan_retry_only_next = False
 
     for iteration in range(max_iterations):
         logger.info(f"[agent] iteration={iteration} session={session_id} model={model_name}")
@@ -2588,12 +2803,14 @@ async def run_agent(
         # function must be in scope, so never narrow to a single tool when forcing
         # (e.g. a re-plan message that also mentions "cost-benefit" must still be able
         # to call propose_workflow_plan).
-        if iteration == 0 and _forced_fn:
+        if plan_retry_only_next:
+            active_tools = [_TOOL_BY_NAME["propose_workflow_plan"]]
+        elif iteration == 0 and _forced_fn:
             active_tools = TOOLS
         elif iteration == 0 and _single_tool is not None:
             active_tools = _single_tool
         elif workflow_execution_completed:
-            active_tools = [_TOOL_BY_NAME["read_file_content"]]
+            active_tools = []
         else:
             active_tools = TOOLS
 
@@ -2606,6 +2823,13 @@ async def run_agent(
             _tool_config = types.ToolConfig(
                 function_calling_config=types.FunctionCallingConfig(mode="NONE")
             )
+        elif plan_retry_only_next:
+            _tool_config = types.ToolConfig(
+                function_calling_config=types.FunctionCallingConfig(
+                    mode="ANY",
+                    allowed_function_names=["propose_workflow_plan"],
+                )
+            )
         elif iteration == 0 and _forced_fn:
             _tool_config = types.ToolConfig(
                 function_calling_config=types.FunctionCallingConfig(
@@ -2617,7 +2841,10 @@ async def run_agent(
         # reasoning models may stream only "thinking" parts and never emit the forced
         # function_call → an answer-less turn that retries fruitlessly (the workflow
         # "卡住 / only Thinking" symptom). No thinking on those turns = the call lands.
-        _forcing_now = (iteration == 0 and _forced_fn is not None)
+        _forcing_now = (
+            (iteration == 0 and _forced_fn is not None)
+            or plan_retry_only_next
+        )
         gen_cfg = types.GenerateContentConfig(
             system_instruction=system_instruction,
             tools=active_tools,
@@ -2668,7 +2895,8 @@ async def run_agent(
                     system_instruction=system_instruction,
                     tools=active_tools,
                     temperature=retry_temp,
-                    thinking_config=thinking_cfg,
+                    thinking_config=None if _tool_config is not None else thinking_cfg,
+                    tool_config=_tool_config,
                 )
                 resp2 = await _generate_streaming(
                     client,
@@ -2724,7 +2952,7 @@ async def run_agent(
             tool_input = dict(fc.args)
             logger.info(f"[agent] function_call: {tool_name}")
 
-            if workflow_execution_completed and tool_name != "read_file_content":
+            if workflow_execution_completed:
                 logger.warning(
                     "[agent] blocked post-workflow function call: %s",
                     tool_name,
@@ -2734,8 +2962,9 @@ async def run_agent(
                         name=tool_name,
                         response={
                             "error": (
-                                "The workflow is complete. Do not run or render more tools; "
-                                "summarize the completed results now."
+                                "The workflow is complete. Do not call any more tools. Summarize "
+                                "the execution metadata now; output files may be read only after "
+                                "the user explicitly requests one in a later message."
                             )
                         },
                     )
@@ -2746,6 +2975,22 @@ async def run_agent(
             # ── Workflow planning: validate + surface the plan; do NOT execute.
             # The confirm-gate: the model proposes, the user confirms later.
             if tool_name == "propose_workflow_plan":
+                if workflow_proposed:
+                    logger.warning("[agent] ignored duplicate valid plan proposal")
+                    function_response_parts.append(types.Part.from_function_response(
+                        name=tool_name,
+                        response={"error": "A valid workflow card was already accepted for this turn."},
+                    ))
+                    continue
+                if plan_validation_attempts >= 3:
+                    logger.warning("[agent] ignored plan proposal beyond retry limit")
+                    function_response_parts.append(types.Part.from_function_response(
+                        name=tool_name,
+                        response={"error": "Workflow plan retry limit reached."},
+                    ))
+                    workflow_summary_only_next = True
+                    continue
+                plan_validation_attempts += 1
                 try:
                     plan_dict = plan_from_llm_args(tool_input)
                     plan = plan_from_dict(plan_dict)
@@ -2753,32 +2998,63 @@ async def run_agent(
                 except Exception as pe:  # malformed plan args
                     plan_dict = tool_input
                     plan_errors = [f"could not parse plan: {pe}"]
-                # Enrich with the tools' real param contracts + complete the DAG
-                # (depends_on ∪ source=step edges) so the card can show structure +
-                # authoritative per-tool files/params.
-                try:
-                    tool_specs = _enrich_plan_for_ui(plan_dict)
-                except Exception:
-                    logger.exception("[agent] plan UI enrich failed")
-                    tool_specs = {}
-                await _maybe_await(event_callback({
-                    "type": "workflow_plan",
-                    "plan": plan_dict,
-                    "valid": not plan_errors,
-                    "errors": plan_errors,
-                    "tool_specs": tool_specs,
-                }))
                 if plan_errors:
-                    fr = {"status": "invalid_plan", "errors": plan_errors,
-                          "instruction": "Fix these issues and call propose_workflow_plan again."}
+                    logger.warning(
+                        "[agent] rejected invalid workflow plan attempt %s: %s",
+                        plan_validation_attempts,
+                        "; ".join(plan_errors),
+                    )
+                    if plan_validation_attempts < 3:
+                        plan_retry_only_next = True
+                        fr = {
+                            "status": "invalid_plan",
+                            "errors": plan_errors,
+                            "instruction": (
+                                "Correct the plan and call propose_workflow_plan again. "
+                                "Use source=input with ref, source=step with ref, and "
+                                "source=literal with value."
+                            ),
+                        }
+                    else:
+                        plan_retry_only_next = False
+                        workflow_summary_only_next = True
+                        fr = {
+                            "status": "plan_generation_failed",
+                            "errors": plan_errors,
+                            "instruction": (
+                                "Explain that a valid plan could not be generated and ask "
+                                "the user to send the analysis goal again. Do not call a tool."
+                            ),
+                        }
                 else:
+                    plan_retry_only_next = False
+                    active_scope = dict(_new_workflow_scope or {
+                        "id": uuid.uuid4().hex,
+                        "upload_start_index": len(_all_uploaded) if _has_plan else 0,
+                    })
+                    active_scope["status"] = "active"
+                    plan_dict["_workflow_scope"] = active_scope
+                    public_plan = _public_workflow_plan(plan_dict)
+                    try:
+                        tool_specs = _enrich_plan_for_ui(public_plan)
+                    except Exception:
+                        logger.exception("[agent] plan UI enrich failed")
+                        tool_specs = {}
+                    await _maybe_await(event_callback({
+                        "type": "workflow_plan",
+                        "plan": public_plan,
+                        "valid": True,
+                        "errors": [],
+                        "tool_specs": tool_specs,
+                    }))
                     # Stash the valid plan so a later confirm turn can execute it.
                     try:
                         await _sm.set_workflow_plan(session_id, plan_dict)
+                        await _sm.set_workflow_scope(session_id, active_scope)
                     except Exception:
                         logger.exception("[agent] failed to stash workflow plan")
                     workflow_proposed = True
-                    plan_summary_fallback = _format_plan_summary(plan_dict)
+                    plan_summary_fallback = _format_plan_summary(public_plan)
                     fr = {"status": "plan_proposed", "n_steps": len(plan_dict.get("steps", [])),
                           "files_needed": [ri.get("label", ri.get("id"))
                                            for ri in plan_dict.get("required_inputs", [])],
@@ -2793,6 +3069,13 @@ async def run_agent(
             # ── Deterministic re-plan: keep the user's chosen steps EXACTLY, take only
             # the LLM's NEW step(s), and merge. The model cannot re-add deselected steps.
             if tool_name == "add_workflow_steps":
+                if workflow_proposed:
+                    logger.warning("[agent] ignored duplicate workflow card proposal")
+                    function_response_parts.append(types.Part.from_function_response(
+                        name=tool_name,
+                        response={"error": "A valid workflow card was already accepted for this turn."},
+                    ))
+                    continue
                 stored = await _sm.get_workflow_plan(session_id)
                 keep_ids = _parse_replan_keep(user_text)   # None = token absent → keep all
                 try:
@@ -2812,19 +3095,24 @@ async def run_agent(
                 except Exception as pe:
                     plan_dict = tool_input
                     plan_errors = [f"could not build updated plan: {pe}"]
-                try:
-                    tool_specs = _enrich_plan_for_ui(plan_dict)
-                except Exception:
-                    logger.exception("[agent] plan UI enrich failed")
-                    tool_specs = {}
-                await _maybe_await(event_callback({
-                    "type": "workflow_plan", "plan": plan_dict,
-                    "valid": not plan_errors, "errors": plan_errors, "tool_specs": tool_specs,
-                }))
                 if plan_errors:
                     fr = {"status": "invalid_plan", "errors": plan_errors,
-                          "instruction": "Fix these issues and call add_workflow_steps again with corrected new step(s)."}
+                          "instruction": (
+                              "Explain that the requested plan update was invalid and ask the "
+                              "user to submit the added analysis again. Do not call a tool."
+                          )}
+                    workflow_summary_only_next = True
                 else:
+                    public_plan = _public_workflow_plan(plan_dict)
+                    try:
+                        tool_specs = _enrich_plan_for_ui(public_plan)
+                    except Exception:
+                        logger.exception("[agent] plan UI enrich failed")
+                        tool_specs = {}
+                    await _maybe_await(event_callback({
+                        "type": "workflow_plan", "plan": public_plan,
+                        "valid": True, "errors": [], "tool_specs": tool_specs,
+                    }))
                     try:
                         await _sm.set_workflow_plan(session_id, plan_dict)
                     except Exception:
@@ -2843,6 +3131,19 @@ async def run_agent(
 
             # ── Workflow execution: run the confirmed plan (reconcile + stream each step).
             if tool_name == "execute_workflow_plan":
+                if _files_not_uploaded:
+                    function_response_parts.append(types.Part.from_function_response(
+                        name=tool_name,
+                        response={"result": {
+                            "status": "need_files",
+                            "instruction": (
+                                "List the files required by the saved plan and wait for the "
+                                "user to upload them. Do not execute the workflow."
+                            ),
+                        }},
+                    ))
+                    workflow_summary_only_next = True
+                    continue
                 stored = await _sm.get_workflow_plan(session_id)
                 if not stored:
                     function_response_parts.append(types.Part.from_function_response(
@@ -2885,20 +3186,33 @@ async def run_agent(
                 # LLM's `inputs` arg is used only as a last-resort fallback for any input
                 # auto-map still couldn't fill.
                 llm_inputs = input_map_from_llm_args(tool_input)
-                inputs_map = dict(extra_inputs)   # file_overrides (explicit) win
-                # Files attached to THIS run message = the current workflow's batch; prefer
-                # them over leftovers from an earlier workflow in the same session.
-                _cur_batch = {f.get("path") for f in files
-                              if isinstance(f, dict) and f.get("current_batch")}
+                uploaded_files = _workflow_scoped_uploads(
+                    stored,
+                    await _sm.get_uploaded_files(session_id),
+                )
+                scoped_paths = {
+                    f.get("path")
+                    for f in uploaded_files
+                    if isinstance(f, dict) and f.get("path")
+                }
+                inputs_map = {
+                    input_id: path
+                    for input_id, path in extra_inputs.items()
+                    if path in scoped_paths
+                }
+                _cur_batch = scoped_paths
                 try:
-                    uploaded_files = await _sm.get_uploaded_files(session_id)
                     inputs_map = _auto_map_inputs(wf_plan, inputs_map,
                                                   uploaded_files,
                                                   prefer_paths=_cur_batch)
                 except Exception:
                     logger.exception("[agent] auto-map inputs failed")
                 for k, v in llm_inputs.items():   # fallback only where still unmapped
-                    if k not in inputs_map and v and os.path.exists(v):
+                    if (
+                        k not in inputs_map
+                        and v in scoped_paths
+                        and os.path.exists(v)
+                    ):
                         inputs_map[k] = v
                 unmapped = sorted(wf_plan.input_ids - set(inputs_map))
                 missing = sorted([p for p in inputs_map.values() if not os.path.exists(p)])
@@ -2907,6 +3221,7 @@ async def run_agent(
                         name=tool_name, response={"result": {
                             "status": "need_files", "unmapped_inputs": unmapped, "missing_files": missing,
                             "instruction": "Ask the user to provide the missing files, then call execute_workflow_plan again."}}))
+                    workflow_summary_only_next = True
                     continue
 
                 # Bridge engine events -> the tool-card events the frontend already renders.
@@ -2952,6 +3267,8 @@ async def run_agent(
                     pass
 
                 workflow_execution_completed = wf_ctx.get("status") == "done"
+                if workflow_execution_completed:
+                    workflow_summary_only_next = True
                 output_file_refs = [
                     {
                         "filename": f.get("filename"),
@@ -2969,9 +3286,10 @@ async def run_agent(
                       "mismatches": wf_ctx.get("mismatches", []),
                       "instruction": (
                           "Summarize for the user which steps ran, key outputs, and any warnings. "
-                          "You may use read_file_content for relevant CSV or text outputs. Do not "
-                          "rerun the workflow or render spatial files. Output files are already shown "
-                          "as cards above; do not re-list raw paths."
+                          "Do not call any more tools or read output files automatically. Output "
+                          "files are already shown as cards above; summarize from this execution "
+                          "metadata and do not re-list raw paths. Read a file only if the user "
+                          "explicitly requests it in a later message."
                       )}
                 function_response_parts.append(types.Part.from_function_response(
                     name=tool_name, response={"result": fr}))
@@ -3042,10 +3360,6 @@ async def run_agent(
                         response={"result": result_summary},
                     )
                 )
-                if workflow_execution_completed and tool_name == "read_file_content":
-                    workflow_output_reads += 1
-                    if workflow_output_reads >= 8:
-                        workflow_summary_only_next = True
                 if post_skill_text:
                     function_response_parts.append(
                         types.Part.from_text(text=post_skill_text)

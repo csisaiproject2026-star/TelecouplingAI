@@ -8258,3 +8258,173 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - Session `plan.md`
 ### 测试状态
 - 本轮仅调整设计计划，未修改代码、数据包或服务器。
+
+## 2026-08-04 — 接管 GCP1 Workflow Scope 隔离修复
+### 完成内容
+- 完整读取 `PROJECT_MEMORY.md`、根目录 `DEV_LOG.md` 和上一 Session 的 Workflow Scope 隔离交接文件。
+- 确认 GCP1 已热部署四文件候选，当前仅等待用户手工验收；后续问题须先按对应 Session 检查 GCP1 日志，再基于已部署候选做最小修复。
+- 确认不主动运行网站、Gemini 或 Workflow 测试，不修改 GCP2/MSU，不 force-recreate GCP1 Backend，也不直接部署仓库中包含旧 Confirm/Execute 大候选的 `agent.py`。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- 未连接服务器、未运行网站/Gemini/Workflow 测试；未修改候选代码或部署状态。
+
+## 2026-08-04 — GCP1 Workflow Scope 单次手工初验
+### 完成内容
+- 用户完成一次手工测试并反馈未发现问题，当前四文件热部署候选记为单次手工初验通过。
+- 未将该反馈扩大为完整回归结论，也未执行镜像固化或向 GCP2/MSU 推广。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- 用户手工测试：单次初验通过；本 Session 未主动运行网站、Gemini 或 Workflow 测试。
+
+## 2026-08-04 — Workflow Scope 隔离修复推广至 GCP2
+### 完成内容
+- 核对 GCP1 已部署候选、候选基线和 GCP2 当前源码/运行容器，确认 GCP2 与仓库一致，但 GCP1 候选基线包含已回滚的旧 Confirm/Execute 大候选，禁止直接四文件覆盖。
+- 将 Workflow Scope 隔离最小增量重放到 GCP2/仓库干净基线：替代 Plan 清除旧执行态，规划仅使用当前目标，上传映射受 Plan scope 边界限制，首次 Plan 保留规划前上传兼容，Plan source/step 校验收紧，无效 Plan 不发送卡片且重试有上限。
+- 修复审查发现的两个边界：已有 Plan 时自由输入 `run the telecoupling analysis` 不再误清旧 Plan；AUTO 模式产生的首次 Plan 仍包含规划前上传。
+- 在 GCP2 `~/csis-platform/backups/20260804_workflow_scope_isolation_gcp2/` 保存宿主/容器四文件、部署前后哈希、镜像身份、环境哈希和 Compose 状态。
+- 仅同步 GCP2 宿主源码及 `tele-backend` 容器四文件并重启 `tele-backend`；未 recreate、未构建/替换镜像、未修改环境、GCP1 或 MSU。
+- GCP2 部署后宿主/容器 SHA-256：`agent.py 962e9cbeb0531753a661eb00f829505b3f15f0e940f85b08df3e3a34c7e3ae49`、`workflow/catalog.py 278cc0e5469a67e4c9f967b24d950c32e9729c555878d982928121ed0bf0b0f8`、`workflow/engine.py fd857aa25dbeed1995244f2bc16c13b68166069e519aa932c9fa24adb3c91ce4`、`shared/session_manager.py 798a59078f635c6aa9388c77efead2c9fd2c9c98714268abfeb551f568bfb5a2`。
+### 关键变更文件
+- `telecouplingAI-project/backend/agent.py`
+- `telecouplingAI-project/backend/workflow/catalog.py`
+- `telecouplingAI-project/backend/workflow/engine.py`
+- `telecouplingAI-project/backend/shared/session_manager.py`
+- `telecouplingAI-project/backend/tests/test_workflow_scope.py`
+- `telecouplingAI-project/backend/tests/test_agent_direct_completion.py`
+- `telecouplingAI-project/backend/tests/test_session_manager.py`
+- `PROJECT_MEMORY.md`
+- `DEV_LOG.md`
+### 测试状态
+- 离线定向测试 50/50 通过；未访问网站、Gemini、Redis 服务、Celery Worker，也未执行真实 Workflow。
+- GCP2 四模块导入通过；40/40 Compose 服务运行，0 unhealthy、0 restarting；公开 `https://34.136.64.176/health` 返回 `{"status":"ok"}`。
+- 部署前后 `.env.docker` 哈希和 Backend 镜像 ID 均未变化；`tele-backend` 健康、restart count 0，近期日志无 `Traceback`/`ERROR`/导入错误。
+- 当前仍是容器可写层热补丁，尚未固化进镜像；force-recreate 会丢失本次 GCP2 修复。
+
+## 2026-08-04 — 修复多 Chat 上传进度与 Session 串线
+### 完成内容
+- 定位前端根因：所有侧栏 Chat 共用单一 `uploadProgress`、`isLoading`、输入/待上传文件状态和可变 Backend `sessionId`；切换 Chat 仅切换消息列表，导致其他 Chat 显示上传进度/加载动画，并存在 Backend Session 串线风险。
+- 将运行态改为按 Chat ID 保存：输入、待上传文件、加载状态和上传进度只属于发起请求的 Chat；上传/SSE 异步回调捕获原始 Chat ID。
+- 为每个 Chat 持久化独立 Backend Session ID；兼容迁移已有 localStorage Chat，最近旧 Chat 保留原 sessionStorage ID，其余旧 Chat 分配新 ID。
+- 修复删除最后一个 Chat 后 `activeId` 残留、后续发送无法落入新 Chat 的既有边界。
+- 审计发现 GCP1/GCP2 当前运行前端基线不同：GCP1 保留较新的 Plan-card 提交状态/Warning UI，GCP2 使用干净生产 UI；分别从各自真实基线重放隔离修复并单独构建，未互相覆盖。
+- GCP1 热部署 `index-DWsAsj_A.js`，GCP2 热部署 `index-D2QiV1yN.js`；同步对应宿主 `App.jsx`/`session.js` 和 `dist`，未重启/recreate 容器、未修改镜像、Backend、环境、GCP 数据或 MSU。
+- 首次静态核验发现 Windows 构建目录经 `docker cp` 后 `assets/` 为 `0700`，nginx 无权进入而回退首页；已将两站宿主/候选/容器静态目录修正为 `0755`，随后公网返回完整 JS 字节。
+- 回滚目录：GCP1 `~/csis-platform/backups/20260804_chat_upload_progress_isolation_gcp1/`；GCP2 `~/csis-platform/backups/20260804_chat_upload_progress_isolation_gcp2/`。
+### 关键变更文件
+- `telecouplingAI-project/frontend/src/App.jsx`
+- `telecouplingAI-project/frontend/src/lib/session.js`
+- `PROJECT_MEMORY.md`
+- `DEV_LOG.md`
+### 测试状态
+- 当前仓库前端 production build 通过；GCP1、GCP2 各自基线的 production build 均通过。
+- GCP1 公网首页引用 `index-DWsAsj_A.js`，完整 JS 为 345335 bytes、SHA-256 `76122838eaf68182a82df865c7aab7ec0289df366aac1a1ede139c757e23efde`。
+- GCP2 公网首页引用 `index-D2QiV1yN.js`，完整 JS 为 344257 bytes、SHA-256 `a5123143eb7a973646a984a7f7dbf55b22053653f4fd7ae5e53b59e89bebc64a`。
+- 两站 `/health` 均返回 OK；均为 40/40 Compose 服务运行、0 unhealthy、0 restarting，frontend restart count 0，镜像 ID 未变化。
+- 未运行 Gemini、Workflow 或真实上传测试；多 Chat 切换场景等待用户在 GCP1/GCP2 手工验收。MSU 未修改。
+
+## 2026-08-04 — 定位 GCP1/GCP2 同请求执行差异
+### 完成内容
+- 只读对比两站对应 Session 的 Backend 日志、Redis Chat/Plan/上传/输出状态和 GCP1 Celery task metadata；未重跑网站、Gemini 或 Workflow。
+- 确认两站并非运行同一完整 `agent.py`：GCP1 为旧 Confirm/Execute 候选加 Scope 补丁，GCP2 为 production 干净基线重放 Scope 补丁，运行哈希分别为 `d0333e87...` 与 `962e9cbe...`。
+- GCP2 Plan 让 radial flows 与 CO2 共用 `flows_csv`，自动映射 `flows_with_distance.csv` 后六步成功。
+- GCP1 将 CO2 文件指令转成 `_ovr__s5_co2__input_csv`，贪心映射把同一文件视为已占用，导致 radial-flow 的 `flows_csv` 未映射，完整 Workflow 未执行。
+- GCP1 旧循环在 `need_files` 后仍继续让 Gemini 调用工具，随后重复执行 `run_draw_systems_from_table`；相关四个 Celery task 均为 `SUCCESS`，用户看到的是 Systems Skill 的通用 troubleshooting，不是实际坐标、投影或编码错误。
+### 关键变更文件
+- `PROJECT_MEMORY.md`
+- `DEV_LOG.md`
+### 测试状态
+- 只读诊断完成；未修改 GCP1/GCP2/MSU 运行代码、容器、镜像或环境，未执行新请求。
+
+## 2026-08-04 — 归一化两台 GCP 的 Agent 并修复 Workflow 文件复用
+### 完成内容
+- 以 production/GCP2 干净 Agent 为统一基线，保留 Confirm/Execute 和 Workflow Scope 隔离，淘汰 GCP1 旧 Confirm/Execute 大候选的 Agent 独有逻辑。
+- 修复同一 CSV 的安全复用：显式分配给一个步骤的文件，只有在表头完整覆盖另一输入所需列时才允许重复使用；旅游 Workflow 的 `flows_with_distance.csv` 可同时供 radial flows 与 CO2 使用。
+- 修复 `need_files` 后的工具越权：缺文件后强制纯文本响应；Gemini 空响应重试继续继承原 `mode=NONE`，不再在重试时重新开放工具调用。
+- 静态确认 GCP1 当前 Plan-card 前端继续兼容标准 `workflow_plan`、`selected_steps` 和可选 `warning` 事件。
+- 将完全相同的 `agent.py` 热部署到 GCP1、GCP2 的 host source 和运行容器，统一 SHA-256 为 `5bdf8d9a5877c89170236b51acfdff85b86d066bfdb34095190239539fbf5583`；两站均只重启 `tele-backend`。
+- 本次只归一化 `agent.py`；两站此前各自重放的 `workflow/catalog.py`、`workflow/engine.py` 保持不变，MSU 未修改。
+### 关键变更文件
+- `telecouplingAI-project/backend/agent.py`
+- `telecouplingAI-project/backend/tests/test_workflow_scope.py`
+- `PROJECT_MEMORY.md`
+- `DEV_LOG.md`
+### 测试状态
+- 离线聚焦测试 53/53 PASS，覆盖共享 CSV、列不匹配时拒绝复用、`need_files` 和空响应重试的 no-tools 约束。
+- GCP1/GCP2 host 与容器 `agent.py` 哈希均为 `5bdf8d9a...`；两站均为 40/40 Compose 服务运行、0 unhealthy、0 restarting，Backend healthy、restart count 0。
+- 两站 Backend 镜像仍为 `sha256:3740bf4a...`，各自 `.env.docker` 部署前后哈希未变化，近期启动日志无 Traceback/ERROR/ImportError/SyntaxError，公开 `/health` 均返回 `{"status":"ok"}`。
+- 未运行网站聊天、Gemini 或真实 Workflow；等待用户手工验收。回滚目录：`~/csis-platform/backups/20260804_agent_normalization_gcp1/`、`~/csis-platform/backups/20260804_agent_normalization_gcp2/`。
+
+## 2026-08-04 — 拦截 Workflow 后处理的空文件读取
+### 完成内容
+- 用户在 GCP1、GCP2 同时手工执行 soybean Workflow 后，页面出现 `read_file_content` 10% 卡片和 `file_path is required`。
+- 日志与 Redis 证据确认两站 Workflow 均已完成并各自保存 60 个输出；错误只来自完成后的 Gemini 后处理，模型连续调用 `read_file_content({})`，没有提供 `file_path`。
+- 在统一 Agent 中恢复并强化最小保护：Workflow 完成后若 `read_file_content` 没有路径，在分派 Worker、发送工具卡之前拦截，随后强制纯文本总结已有执行结果。
+- 将同一修复热部署至 GCP1、GCP2，两站 host/runtime `agent.py` SHA-256 统一为 `e2732500a15cc7917f495bd83afa06a3419063be9f9be8b3cb2cdf47686ac437`；均只重启 `tele-backend`。
+### 关键变更文件
+- `telecouplingAI-project/backend/agent.py`
+- `telecouplingAI-project/backend/tests/test_agent_direct_completion.py`
+- `PROJECT_MEMORY.md`
+- `DEV_LOG.md`
+### 测试状态
+- 离线聚焦测试 54/54 PASS；新增测试确认空 `file_path` 不会分派 `read_file_content`，下一轮强制 `mode=NONE`。
+- 两站 40/40 Compose 服务运行、0 unhealthy、0 restarting，Backend healthy、restart count 0；公开 `/health` 均正常。
+- 两站 Backend 镜像未变，各自 `.env.docker` 部署前后哈希未变，重启后的新日志无 Traceback/ERROR/ImportError/SyntaxError。
+- 修复后未主动重跑 Gemini 或 Workflow；回滚目录：`~/csis-platform/backups/20260804_read_file_path_guard_gcp1/`、`~/csis-platform/backups/20260804_read_file_path_guard_gcp2/`。
+
+## 2026-08-04 — 固化 Workflow 输出仅按用户指令读取
+### 完成内容
+- 用户确认期望行为：Workflow 执行完成后不允许 LLM 自动读取任何生成文件，只有用户后续明确点名文件时才读取。
+- 将这一偏好从偶然行为升级为确定性 Backend 规则：Workflow 成功后立即设置纯文本总结模式、清空可用工具，并拦截任何模型幻觉的后续函数调用。
+- 更新执行结果指令，禁止自动 `read_file_content`、重跑或渲染；最终回复只依据步骤状态、输出文件名和 warning 等执行元数据。
+- 后续用户新消息明确要求读取文件时，属于新的 Agent turn，不受上一轮 Workflow 完成锁影响，仍可正常使用 `read_file_content`。
+- 将同一 Agent 热部署到 GCP1、GCP2，两站 host/runtime SHA-256 均为 `0a4e8f69a5517569d7d2cd1e9b291eebc784603b95fa20053eae7fd0debe1b96`；均只重启 `tele-backend`，MSU 未修改。
+### 关键变更文件
+- `telecouplingAI-project/backend/agent.py`
+- `telecouplingAI-project/backend/tests/test_agent_direct_completion.py`
+- `PROJECT_MEMORY.md`
+- `DEV_LOG.md`
+### 测试状态
+- 离线聚焦测试 54/54 PASS；覆盖 Workflow 输出持久化、完成后 tools 为空且 `mode=NONE`、即使模型幻觉函数调用也不分派 Worker。
+- 两站 40/40 Compose 服务运行、0 unhealthy、0 restarting，Backend healthy、restart count 0；公开 `/health` 均正常。
+- 两站 Backend 镜像未变，各自 `.env.docker` 部署前后哈希未变，重启后无新 Traceback/ERROR/ImportError/SyntaxError。
+- 未主动运行 Gemini 或 Workflow；回滚目录：`~/csis-platform/backups/20260804_explicit_output_read_gcp1/`、`~/csis-platform/backups/20260804_explicit_output_read_gcp2/`。
+
+## 2026-08-04 — 固定多图层合并地图路由
+### 完成内容
+- 定位 GCP2 偶发未 combine all layers：相同明确提示有时调用 `render_telecoupling_scene`，有时误选 `render_spatial_file` 只渲染 Flows；Worker 和前端均无故障。
+- 根因是系统提示把 `render_spatial_file` 描述为唯一地图工具，同时没有为 Systems + Agents + Flows 合并请求设置确定性关键词路由。
+- 区分单层与合并渲染规则：单层继续使用 `render_spatial_file`；明确 combine/overlay Systems、Agents、Flows 时固定使用 `render_telecoupling_scene`。
+- 合并请求第一轮只开放 scene renderer，避免 Gemini 在两个渲染工具之间随机选择。
+- 同一 Agent 热部署至 GCP1、GCP2，host/runtime SHA-256 均为 `5469de8233b8d5a51ff4c2941e65bb98fc05bbe50f82c50878e6230cd8141a25`；均只重启 `tele-backend`，MSU 未修改。
+### 关键变更文件
+- `telecouplingAI-project/backend/agent.py`
+- `telecouplingAI-project/backend/tests/test_agent_direct_completion.py`
+- `PROJECT_MEMORY.md`
+- `DEV_LOG.md`
+### 测试状态
+- 离线聚焦测试 59/59 PASS，覆盖三种合并表达和非合并请求排除。
+- 两站 40/40 Compose 服务运行、0 unhealthy、0 restarting，Backend healthy、restart count 0；公开 `/health` 均正常。
+- 两站镜像及各自 `.env.docker` 哈希未变；未主动重跑 Gemini 或真实 combine 请求。
+- 回滚目录：`~/csis-platform/backups/20260804_scene_routing_gcp1/`、`~/csis-platform/backups/20260804_scene_routing_gcp2/`。
+
+## 2026-08-05 — 明确 GCP 到 MSU 的固化提升顺序
+### 完成内容
+- 明确发布顺序应为：先整理唯一权威发布源码并完成 GCP 验收，再构建不可变镜像，最后将同一镜像提升到 MSU。
+- 当前不能只按已统一的 `agent.py` 直接固化；需先归一仍有差异的 Workflow 配套文件及确认本次是否包含 GCP 前端隔离修复。
+- 禁止先在 MSU 热部署再单独固化，避免生产运行内容与最终镜像不一致。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- 本轮仅确认发布策略；未修改服务器、容器、镜像或环境，未执行测试。
+
+## 2026-08-05 — 将两台 GCP 当前可用状态设为受保护基线
+### 完成内容
+- 用户确认 GCP1、GCP2 当前状态可用，后续固化工作必须谨慎保护两站现状。
+- 固化前先进行只读逐文件漂移审计；不得整目录或整套运行文件从一站覆盖另一站。
+- 所有归一改动需明确来源、逐项重放、离线验证、服务器备份和 GCP 手工验收后才可固化或提升 MSU。
+### 关键变更文件
+- `DEV_LOG.md`
+### 测试状态
+- 本轮未修改 GCP1、GCP2、MSU、容器、镜像或环境，未执行测试。

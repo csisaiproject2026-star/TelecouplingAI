@@ -253,3 +253,18 @@ async def test_overlapping_stream_leases_release_independently(monkeypatch, tmp_
     assert await manager.get_session("shared") is not None
     assert await manager.get_session("other") is None
     assert second_lease in client.zsets[session_module._ACTIVE_SESSION_KEY]
+
+
+@pytest.mark.asyncio
+async def test_workflow_scope_and_plan_can_be_replaced(monkeypatch, tmp_path):
+    monkeypatch.setattr(settings, "SHARED_DIR", str(tmp_path))
+    manager = SessionManager(redis_client=FakeAsyncRedis())
+    await manager.create_session("workflow")
+
+    scope = {"id": "scope-2", "upload_start_index": 4, "status": "active"}
+    await manager.set_workflow_scope("workflow", scope)
+    await manager.set_workflow_plan("workflow", {"case_name": "old"})
+    await manager.set_workflow_plan("workflow", None)
+
+    assert await manager.get_workflow_scope("workflow") == scope
+    assert await manager.get_workflow_plan("workflow") is None

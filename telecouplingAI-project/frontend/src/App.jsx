@@ -7,7 +7,7 @@ import {
   FileText, ArrowLeft, Database,
 } from 'lucide-react';
 import { streamChat } from './lib/streaming';
-import { getOrCreateSessionId, resetSessionId } from './lib/session';
+import { createSessionId, getOrCreateSessionId, resetSessionId } from './lib/session';
 import { USER_GUIDES } from './userGuides';
 import ToolStatusCard from './components/ToolStatusCard';
 import CsvRenderer from './components/CsvRenderer';
@@ -98,7 +98,7 @@ function ThinkingBlock({ content, done }) {
   );
 }
 
-function MessageContent({ msg, sessionId, onPlanConfirm }) {
+function MessageContent({ msg, sessionId, onPlanConfirm, planActionsDisabled = false }) {
   if (msg.role === 'user') {
     return (
       <div className="bg-[#f0f4f9] px-6 py-4 rounded-3xl max-w-[85%] ml-auto">
@@ -162,7 +162,7 @@ function MessageContent({ msg, sessionId, onPlanConfirm }) {
                 </div>
               );
             case 'tool_status':
-              return <ToolStatusCard key={i} tool={block.tool} message={block.message} progress={block.progress} />;
+              return <ToolStatusCard key={i} tool={block.tool} message={block.message} progress={block.progress} status={block.status} />;
             case 'warning':
               return <WarningCard key={i} message={block.message} />;
             case 'csv_table':
@@ -181,7 +181,11 @@ function MessageContent({ msg, sessionId, onPlanConfirm }) {
                   valid={block.valid}
                   errors={block.errors}
                   toolSpecs={block.toolSpecs}
-                  onConfirm={onPlanConfirm}
+                  actionState={block.actionState}
+                  disabled={planActionsDisabled}
+                  onConfirm={(message, action) =>
+                    onPlanConfirm(message, block, action)
+                  }
                 />
               );
             default:
@@ -360,20 +364,28 @@ function LearningCenter({ onBack }) {
 // ---------------------------------------------------------------------------
 
 function App() {
-  const sessionId = useRef(getOrCreateSessionId());
-
   const [chats, setChats] = useState(() => {
     const saved = localStorage.getItem('csis_chats');
     const restored = saved ? JSON.parse(saved) : [];
+    const legacySessionId = getOrCreateSessionId();
+    const restoredWithSessions = restored.map((chat, index) => ({
+      ...chat,
+      sessionId: chat.sessionId || (index === 0 ? legacySessionId : createSessionId()),
+    }));
     // Always open on a fresh empty chat; keep prior conversations as history
     // in the sidebar (Gemini/ChatGPT-style). Reuse an already-empty top chat
     // so we don't stack duplicate "New Chat" entries on every reload.
-    const top = restored[0];
+    const top = restoredWithSessions[0];
     if (top && (!top.messages || top.messages.length === 0)) {
-      return restored;
+      return restoredWithSessions;
     }
-    const fresh = { id: `chat_${Date.now()}`, title: 'New Chat', messages: [] };
-    return [fresh, ...restored];
+    const fresh = {
+      id: `chat_${Date.now()}`,
+      sessionId: resetSessionId(),
+      title: 'New Chat',
+      messages: [],
+    };
+    return [fresh, ...restoredWithSessions];
   });
   const [activeId, setActiveId] = useState(chats[0].id);
   const [appSettings, setAppSettings] = useState(() => {
@@ -384,12 +396,9 @@ function App() {
     };
   });
 
-  const [input, setInput] = useState('');
-  const [selectedFiles, setSelectedFiles] = useState([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => window.innerWidth >= 768);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(null);  // {loaded, total, percent} | null
+  const [chatRuntime, setChatRuntime] = useState({});
   const [editingId, setEditingId] = useState(null);
   const [tempTitle, setTempTitle] = useState('');
   const [activeView, setActiveView] = useState('chat');
@@ -400,6 +409,11 @@ function App() {
   const fileInputRef = useRef(null);
   const folderInputRef = useRef(null);
   const currentChat = chats.find(c => c.id === activeId) || chats[0];
+  const currentRuntime = chatRuntime[activeId] || {};
+  const input = currentRuntime.input || '';
+  const selectedFiles = currentRuntime.selectedFiles || [];
+  const isLoading = Boolean(currentRuntime.isLoading);
+  const uploadProgress = currentRuntime.uploadProgress || null;
 
   useEffect(() => { localStorage.setItem('csis_chats', JSON.stringify(chats)); }, [chats]);
   useEffect(() => { localStorage.setItem('csis_settings', JSON.stringify(appSettings)); }, [appSettings]);
@@ -408,6 +422,32 @@ function App() {
   // ---------------------------------------------------------------------------
   // State mutation helpers
   // ---------------------------------------------------------------------------
+
+  const updateChatRuntime = (chatId, updater) => {
+    setChatRuntime(prev => {
+      const current = prev[chatId] || {};
+      const next = typeof updater === 'function'
+        ? updater(current)
+        : { ...current, ...updater };
+      return { ...prev, [chatId]: next };
+    });
+  };
+
+  const setInput = (value) => {
+    updateChatRuntime(activeId, runtime => ({
+      ...runtime,
+      input: typeof value === 'function' ? value(runtime.input || '') : value,
+    }));
+  };
+
+  const setSelectedFiles = (value) => {
+    updateChatRuntime(activeId, runtime => ({
+      ...runtime,
+      selectedFiles: typeof value === 'function'
+        ? value(runtime.selectedFiles || [])
+        : value,
+    }));
+  };
 
   const updateLastAssistantBlock = (chatId, updater) => {
     setChats(prev => prev.map(c => {
@@ -486,6 +526,28 @@ function App() {
     }));
   };
 
+  const updatePlanBlock = (chatId, targetBlock, updates) => {
+    setChats(prev => prev.map(c => {
+      if (c.id !== chatId) return c;
+      return {
+        ...c,
+        messages: c.messages.map(msg => {
+          if (!msg.blocks) return msg;
+          return {
+            ...msg,
+            blocks: msg.blocks.map(block => {
+              const sameInstance = targetBlock.planInstanceId
+                && block.planInstanceId === targetBlock.planInstanceId;
+              return block.type === 'workflow_plan' && (block === targetBlock || sameInstance)
+                ? { ...block, ...updates }
+                : block;
+            }),
+          };
+        }),
+      };
+    }));
+  };
+
   // ---------------------------------------------------------------------------
   // Send handler
   // ---------------------------------------------------------------------------
@@ -497,20 +559,25 @@ function App() {
     const currentInput = text;
     const currentFiles = [...selectedFiles];
     const chatId = activeId;
+    const backendSessionId = currentChat.sessionId;
     // Tag a send that carries freshly-attached files so the backend can deterministically
     // RUN a confirmed workflow on the "upload files + send" turn (it strips the marker).
     // The marker is NOT shown in the chat bubble (userMsg.content stays clean).
     const sentText = currentFiles.length > 0 ? `${currentInput}\n\n[[FILES_ATTACHED]]` : currentInput;
 
-    setInput('');
-    setSelectedFiles([]);
-    setIsLoading(true);
+    updateChatRuntime(chatId, runtime => ({
+      ...runtime,
+      input: '',
+      selectedFiles: [],
+      isLoading: true,
+    }));
 
     const userMsg = {
       role: 'user',
       content: currentInput,
       file: currentFiles.length > 0 ? currentFiles.map(f => f.name).join(', ') : null,
     };
+
     setChats(prev => prev.map(c =>
       c.id === chatId
         ? {
@@ -529,10 +596,15 @@ function App() {
       await streamChat(
         sentText,
         currentFiles,
-        sessionId.current,
+        backendSessionId,
         appSettings.selectedModel,
         (event) => handleSSEEvent(chatId, event),
-        { onUploadProgress: setUploadProgress },
+        {
+          onUploadProgress: progress => updateChatRuntime(chatId, runtime => ({
+            ...runtime,
+            uploadProgress: progress,
+          })),
+        },
       );
     } catch (err) {
       // Network errors are now handled silently inside streamChat (transparent
@@ -542,9 +614,18 @@ function App() {
       // toast or "Connection error" banner per UX preference.
       console.warn('[chat] stream ended with error:', err);
     } finally {
-      setIsLoading(false);
-      setUploadProgress(null);  // hide progress bar when chat fully done (or errored)
+      updateChatRuntime(chatId, runtime => ({
+        ...runtime,
+        isLoading: false,
+        uploadProgress: null,
+      }));
     }
+  };
+
+  const handlePlanConfirm = (message, planBlock, actionState) => {
+    if (isLoading) return;
+    updatePlanBlock(activeId, planBlock, { actionState });
+    handleSend(message);
   };
 
   // ---------------------------------------------------------------------------
@@ -619,6 +700,8 @@ function App() {
         finalizeThinking(chatId);
         appendBlock(chatId, {
           type: 'workflow_plan',
+          planInstanceId: `${chatId}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+          actionState: null,
           plan: event.plan,
           valid: event.valid,
           errors: event.errors,
@@ -627,6 +710,13 @@ function App() {
         break;
 
       case 'warning':
+        if (event.task_id) {
+          updateToolBlock(chatId, event.task_id, {
+            progress: 100,
+            status: 'warning',
+            message: 'Completed with a warning',
+          });
+        }
         appendBlock(chatId, { type: 'warning', message: event.message });
         break;
 
@@ -635,7 +725,18 @@ function App() {
         break;
 
       case 'error':
-        appendBlock(chatId, { type: 'text', content: `❌ Error: ${event.message}` });
+        if (event.recoverable) {
+          if (event.task_id) {
+            updateToolBlock(chatId, event.task_id, {
+              progress: 100,
+              status: 'warning',
+              message: 'Completed with a warning',
+            });
+          }
+          appendBlock(chatId, { type: 'warning', message: event.message });
+        } else {
+          appendBlock(chatId, { type: 'text', content: `❌ Error: ${event.message}` });
+        }
         break;
 
       case 'done':
@@ -651,26 +752,38 @@ function App() {
   // ---------------------------------------------------------------------------
 
   const createNewChat = () => {
-    // Mint a fresh backend session_id so the new chat doesn't drag along the
-    // previous conversation's chat_history (which makes the LLM replay old
-    // tool errors instead of actually re-dispatching tools).
-    sessionId.current = resetSessionId();
-
     const newId = Date.now().toString();
-    setChats([{ id: newId, title: 'New Chat', messages: [] }, ...chats]);
+    const newChat = {
+      id: newId,
+      sessionId: resetSessionId(),
+      title: 'New Chat',
+      messages: [],
+    };
+    setChats(prev => [newChat, ...prev]);
     setActiveId(newId);
     setActiveView('chat');
-    setIsLoading(false);
   };
 
   const deleteChat = (id, e) => {
     e.stopPropagation();
     if (chats.length === 1) {
-      setChats([{ id: 'default', title: 'New Chat', messages: [] }]);
+      setChats([{
+        id: 'default',
+        sessionId: resetSessionId(),
+        title: 'New Chat',
+        messages: [],
+      }]);
+      setChatRuntime({});
+      setActiveId('default');
       return;
     }
     const newChats = chats.filter(c => c.id !== id);
     setChats(newChats);
+    setChatRuntime(prev => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
     if (activeId === id) setActiveId(newChats[0].id);
   };
 
@@ -743,7 +856,7 @@ function App() {
         <div className="flex-1 overflow-y-auto px-3">
           <p className="text-xs font-semibold text-gray-500 px-4 py-3">Recent</p>
           {chats.map(chat => (
-            <div key={chat.id} onClick={() => { setActiveId(chat.id); setActiveView('chat'); setIsLoading(false); }}
+            <div key={chat.id} onClick={() => { setActiveId(chat.id); setActiveView('chat'); }}
               className={`group flex items-center justify-between px-4 py-2 rounded-full cursor-pointer mb-1 transition-all ${activeId === chat.id ? 'bg-[#d3e3fd] text-[#041e49]' : 'hover:bg-[#e6eaf1] text-[#444746]'}`}>
               <div className="flex items-center gap-3 truncate flex-1">
                 <MessageSquare size={16} />
@@ -850,7 +963,12 @@ function App() {
             <div className="space-y-8 pb-20">
               {currentChat.messages.map((msg, idx) => (
                 <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : ''}`}>
-                  <MessageContent msg={msg} sessionId={sessionId.current} onPlanConfirm={handleSend} />
+                  <MessageContent
+                    msg={msg}
+                    sessionId={currentChat.sessionId}
+                    onPlanConfirm={handlePlanConfirm}
+                    planActionsDisabled={isLoading}
+                  />
                 </div>
               ))}
               {isLoading && (

@@ -22,13 +22,21 @@ function generateUUID() {
 const SESSION_KEY = "csis_session_id";
 
 /**
+ * Mint a backend session ID without changing the legacy sessionStorage pointer.
+ * Each sidebar chat owns one of these IDs.
+ */
+export function createSessionId() {
+  return `csis_${generateUUID()}`;
+}
+
+/**
  * Get or create a session ID stored in sessionStorage.
  * @returns {string} Session ID of the form "csis_<uuid>"
  */
 export function getOrCreateSessionId() {
   let id = sessionStorage.getItem(SESSION_KEY);
   if (!id) {
-    id = `csis_${generateUUID()}`;
+    id = createSessionId();
     sessionStorage.setItem(SESSION_KEY, id);
   }
   return id;
@@ -42,7 +50,7 @@ export function getOrCreateSessionId() {
  * @returns {string} The new session ID
  */
 export function resetSessionId() {
-  const id = `csis_${generateUUID()}`;
+  const id = createSessionId();
   sessionStorage.setItem(SESSION_KEY, id);
   return id;
 }

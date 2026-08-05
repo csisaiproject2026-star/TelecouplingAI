@@ -100,10 +100,39 @@ def test_homepage_network_prompt_uses_direct_tool_before_workflow():
     assert agent._detect_tool_from_message(message) == "run_network_analysis_grouping"
 
 
+@pytest.mark.parametrize(
+    "message",
+    [
+        (
+            "Combine the Systems, Agents, and Flows outputs into one telecoupling "
+            "map. Use Quantity as the flow magnitude field."
+        ),
+        "Create a combined telecoupling map from the available layers.",
+        "Call render_telecoupling_scene with the Systems, Agents, and Flows outputs.",
+    ],
+)
+def test_combined_telecoupling_map_routes_to_scene_renderer(message):
+    assert agent._detect_tool_from_message(message) == "render_telecoupling_scene"
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "Render radial_flows.shp.",
+        "Combine the crop production tables.",
+    ],
+)
+def test_non_scene_requests_do_not_route_to_scene_renderer(message):
+    assert agent._detect_tool_from_message(message) != "render_telecoupling_scene"
+
+
 class _SessionManager:
     get_uploaded_files = AsyncMock(return_value=[])
     get_output_files = AsyncMock(return_value=[])
     get_workflow_plan = AsyncMock(return_value=None)
+    get_workflow_scope = AsyncMock(return_value=None)
+    set_workflow_plan = AsyncMock()
+    set_workflow_scope = AsyncMock()
 
 
 def _tool_response(tool_name: str):
@@ -321,10 +350,11 @@ def test_urban_nature_schema_matches_live_invest_enum():
 
 
 @pytest.mark.asyncio
-async def test_completed_workflow_resolves_output_basename_and_cannot_rerun(monkeypatch):
+async def test_completed_workflow_persists_outputs_and_disables_follow_up_tools(monkeypatch):
     output_path = "/data/outputs/session/network_stats.csv"
     calls = 0
     events = []
+    dispatch = AsyncMock(side_effect=AssertionError("post-workflow tools are disabled"))
 
     class WorkflowSessionManager:
         def __init__(self):
@@ -339,7 +369,13 @@ async def test_completed_workflow_resolves_output_basename_and_cannot_rerun(monk
         async def get_workflow_plan(self, session_id):
             return {"case_name": "test", "steps": [], "required_inputs": []}
 
+        async def get_workflow_scope(self, session_id):
+            return None
+
         async def set_workflow_plan(self, session_id, plan):
+            return None
+
+        async def set_workflow_scope(self, session_id, scope):
             return None
 
         async def add_output_files(self, session_id, files):
@@ -349,24 +385,8 @@ async def test_completed_workflow_resolves_output_basename_and_cannot_rerun(monk
         nonlocal calls
         calls += 1
         config = args[3]
-        function_names = [
-            declaration.name
-            for tool in (config.tools or [])
-            for declaration in tool.function_declarations
-        ]
         if calls == 1:
             return _function_response("execute_workflow_plan", {})
-        assert function_names == ["read_file_content"]
-        if calls == 2:
-            return _function_response(
-                "read_file_content",
-                {"file_path": "network_stats.csv"},
-            )
-        if calls == 3:
-            return _function_response(
-                "render_spatial_file",
-                {"file_path": "workflow-output.tif"},
-            )
         assert config.tool_config.function_calling_config.mode == "NONE"
         return _text_response()
 
@@ -378,19 +398,10 @@ async def test_completed_workflow_resolves_output_basename_and_cannot_rerun(monk
             "warnings": [],
         }
 
-    async def fake_dispatch(*args, tool_name, tool_input, **kwargs):
-        assert tool_name == "read_file_content"
-        assert tool_input["file_path"] == output_path
-        return "read-task", {
-            "type": "tool_result",
-            "files": [],
-            "content": "metric,value\nnodes,10",
-        }
-
     monkeypatch.setattr(agent.settings, "DIRECT_TOOL_COMPLETION_ENABLED", True)
     monkeypatch.setattr(agent, "_get_client", lambda: object())
     monkeypatch.setattr(agent, "_generate_streaming", fake_generate)
-    monkeypatch.setattr(agent, "_dispatch_tool_and_relay", fake_dispatch)
+    monkeypatch.setattr(agent, "_dispatch_tool_and_relay", dispatch)
     monkeypatch.setattr(agent, "run_plan_async", fake_run_plan)
     monkeypatch.setattr(
         agent,
@@ -398,14 +409,7 @@ async def test_completed_workflow_resolves_output_basename_and_cannot_rerun(monk
         lambda plan: SimpleNamespace(input_ids=set()),
     )
     monkeypatch.setattr(agent, "_auto_map_inputs", lambda plan, inputs, *args, **kwargs: inputs)
-    monkeypatch.setattr(agent, "validate_file_params_exist", lambda *args: None)
-    monkeypatch.setattr(agent, "validate_input_files", lambda *args: None)
     monkeypatch.setattr(agent, "_build_pre_execution_context", lambda: "")
-    monkeypatch.setattr(
-        agent.os.path,
-        "isfile",
-        lambda path: path == output_path,
-    )
     monkeypatch.setitem(
         sys.modules,
         "workers.task_queue",
@@ -421,8 +425,85 @@ async def test_completed_workflow_resolves_output_basename_and_cannot_rerun(monk
         session_manager=session_manager,
     )
 
-    assert calls == 4
+    assert calls == 2
+    dispatch.assert_not_awaited()
     assert session_manager.outputs == [
         {"filename": "network_stats.csv", "path": output_path}
     ]
     assert events[-1] == {"type": "done"}
+
+
+@pytest.mark.asyncio
+async def test_completed_workflow_blocks_output_read_without_path(monkeypatch):
+    calls = 0
+    dispatch = AsyncMock(side_effect=AssertionError("read tool must not be dispatched"))
+
+    class WorkflowSessionManager:
+        async def get_uploaded_files(self, session_id):
+            return []
+
+        async def get_output_files(self, session_id):
+            return []
+
+        async def get_workflow_plan(self, session_id):
+            return {"case_name": "test", "steps": [], "required_inputs": []}
+
+        async def get_workflow_scope(self, session_id):
+            return None
+
+        async def set_workflow_plan(self, session_id, plan):
+            return None
+
+        async def set_workflow_scope(self, session_id, scope):
+            return None
+
+        async def add_output_files(self, session_id, files):
+            return None
+
+    async def fake_generate(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        config = args[3]
+        if calls == 1:
+            return _function_response("execute_workflow_plan", {})
+        if calls == 2:
+            assert config.tool_config.function_calling_config.mode == "NONE"
+            return _function_response("read_file_content", {})
+        assert config.tool_config.function_calling_config.mode == "NONE"
+        return _text_response()
+
+    async def fake_run_plan(*args, **kwargs):
+        return {
+            "status": "done",
+            "steps": {"network": {"status": "done"}},
+            "files": [{"filename": "network_stats.csv", "path": "/outputs/network_stats.csv"}],
+            "warnings": [],
+        }
+
+    monkeypatch.setattr(agent, "_get_client", lambda: object())
+    monkeypatch.setattr(agent, "_generate_streaming", fake_generate)
+    monkeypatch.setattr(agent, "_dispatch_tool_and_relay", dispatch)
+    monkeypatch.setattr(agent, "run_plan_async", fake_run_plan)
+    monkeypatch.setattr(
+        agent,
+        "plan_from_dict",
+        lambda plan: SimpleNamespace(input_ids=set()),
+    )
+    monkeypatch.setattr(agent, "_auto_map_inputs", lambda plan, inputs, *args, **kwargs: inputs)
+    monkeypatch.setattr(agent, "_build_pre_execution_context", lambda: "")
+    monkeypatch.setitem(
+        sys.modules,
+        "workers.task_queue",
+        SimpleNamespace(run_tool_task=object()),
+    )
+
+    await agent.run_agent(
+        "execute_workflow_plan selected_steps",
+        "workflow-missing-read-path",
+        [],
+        lambda event: None,
+        session_manager=WorkflowSessionManager(),
+    )
+
+    assert calls == 3
+    dispatch.assert_not_awaited()

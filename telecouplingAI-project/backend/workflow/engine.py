@@ -52,10 +52,26 @@ def validate_plan(plan: WorkflowPlan, available_tools: set[str]) -> list[str]:
     errors: list[str] = []
     seen_steps: set[str] = set()
 
-    order = _topological_order(plan)
-    if order is None:
-        errors.append("Plan has a dependency cycle (depends_on).")
-        order = plan.steps  # fall back so we still report per-step issues
+    step_ids = [step.id for step in plan.steps]
+    if not step_ids:
+        errors.append("Plan must contain at least one step.")
+    if any(not step_id for step_id in step_ids):
+        errors.append("Every plan step must have a non-empty id.")
+    duplicate_ids = sorted({
+        step_id
+        for step_id in step_ids
+        if step_id and step_ids.count(step_id) > 1
+    })
+    if duplicate_ids:
+        errors.append(f"Plan has duplicate step ids: {', '.join(duplicate_ids)}.")
+
+    if not step_ids or any(not step_id for step_id in step_ids) or duplicate_ids:
+        order = plan.steps
+    else:
+        order = _topological_order(plan)
+        if order is None:
+            errors.append("Plan has a dependency cycle (depends_on).")
+            order = plan.steps  # fall back so we still report per-step issues
 
     for step in order:
         # tool exists
@@ -71,15 +87,20 @@ def validate_plan(plan: WorkflowPlan, available_tools: set[str]) -> list[str]:
         # each input source resolves to something real
         for param, src in step.inputs.items():
             if src.source == "input":
-                if src.ref not in plan.input_ids:
+                if not src.ref:
+                    errors.append(f"[{step.id}] input '{param}' with source=input is missing ref.")
+                elif src.ref not in plan.input_ids:
                     errors.append(f"[{step.id}] input '{param}' references unknown upload '{src.ref}'.")
             elif src.source == "step":
-                if src.ref not in plan.step_ids:
+                if not src.ref:
+                    errors.append(f"[{step.id}] input '{param}' with source=step is missing ref.")
+                elif src.ref not in plan.step_ids:
                     errors.append(f"[{step.id}] input '{param}' references unknown step '{src.ref}'.")
                 elif src.ref not in seen_steps:
                     errors.append(f"[{step.id}] input '{param}' uses output of '{src.ref}' which runs later (order/depends_on).")
             elif src.source == "literal":
-                pass
+                if src.value is None:
+                    errors.append(f"[{step.id}] input '{param}' with source=literal is missing value.")
             else:
                 errors.append(f"[{step.id}] input '{param}' has invalid source '{src.source}'.")
 

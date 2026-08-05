@@ -249,11 +249,18 @@ class SessionManager:
         raw = await self.r.hget(f"{_SESSION_PREFIX}{session_id}", "output_files")
         return json.loads(raw) if raw else []
 
-    async def set_workflow_plan(self, session_id: str, plan: dict) -> None:
+    async def set_workflow_plan(self, session_id: str, plan: dict | None) -> None:
         await self._set_json_field(session_id, "workflow_plan", plan)
 
     async def get_workflow_plan(self, session_id: str) -> dict | None:
         raw = await self.r.hget(f"{_SESSION_PREFIX}{session_id}", "workflow_plan")
+        return json.loads(raw) if raw else None
+
+    async def set_workflow_scope(self, session_id: str, scope: dict) -> None:
+        await self._set_json_field(session_id, "workflow_scope", scope)
+
+    async def get_workflow_scope(self, session_id: str) -> dict | None:
+        raw = await self.r.hget(f"{_SESSION_PREFIX}{session_id}", "workflow_scope")
         return json.loads(raw) if raw else None
 
     async def add_chat_turn(self, session_id: str, role: str, text: str) -> None:

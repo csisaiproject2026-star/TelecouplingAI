@@ -179,7 +179,11 @@ _INPUT_ITEM = types.Schema(
     type=types.Type.OBJECT,
     properties={
         "param":  types.Schema(type=types.Type.STRING, description="The tool parameter name."),
-        "source": types.Schema(type=types.Type.STRING, description="'input', 'literal', or 'step'."),
+        "source": types.Schema(
+            type=types.Type.STRING,
+            enum=["input", "literal", "step"],
+            description="'input', 'literal', or 'step'.",
+        ),
         "ref":    types.Schema(type=types.Type.STRING, description="required_inputs id (source=input) or step id (source=step)."),
         "value":  types.Schema(type=types.Type.STRING, description="The literal value: a column name or a number-as-string (source=literal)."),
         "file":   types.Schema(type=types.Type.STRING, description="Optional: which produced file to take (source=step)."),
@@ -397,7 +401,21 @@ def plan_from_llm_args(args: dict) -> dict:
             param = item.get("param")
             if not param:
                 continue
-            src = {"source": item.get("source", "literal")}
+            source = item.get("source")
+            if source not in {"input", "literal", "step"}:
+                raise ValueError(
+                    f"input '{param}' has invalid source {source!r}; "
+                    "expected input, literal, or step"
+                )
+            if source in {"input", "step"} and not item.get("ref"):
+                raise ValueError(
+                    f"input '{param}' with source={source} requires ref"
+                )
+            if source == "literal" and item.get("value") is None:
+                raise ValueError(
+                    f"input '{param}' with source=literal requires value"
+                )
+            src = {"source": source}
             if item.get("ref") is not None:
                 src["ref"] = item["ref"]
             if item.get("value") is not None:

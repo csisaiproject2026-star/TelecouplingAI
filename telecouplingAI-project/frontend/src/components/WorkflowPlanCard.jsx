@@ -16,19 +16,27 @@ const FILE_KIND = { table: 'CSV', vector: 'Vector', raster: 'Raster', html: 'HTM
  * Interactive workflow plan card (② structure diagram + ③ tools & example inputs + ④ selection).
  * The high-level intro text (①) is a separate text block rendered above this card.
  *
- * @param {{plan:object, valid:boolean, errors:string[], toolSpecs:object, onConfirm:(msg:string)=>void}} props
+ * @param {{plan:object, valid:boolean, errors:string[], toolSpecs:object, actionState:string|null, disabled:boolean, onConfirm:(msg:string, action:string)=>void}} props
  */
-export default function WorkflowPlanCard({ plan, valid = true, errors = [], toolSpecs = {}, onConfirm }) {
+export default function WorkflowPlanCard({
+  plan,
+  valid = true,
+  errors = [],
+  toolSpecs = {},
+  actionState = null,
+  disabled = false,
+  onConfirm,
+}) {
   const steps = plan?.steps || [];
   const requiredInputs = plan?.required_inputs || [];
 
   const [checked, setChecked] = useState(() => new Set(steps.map(s => s.id)));
   const [supplement, setSupplement] = useState('');
-  const [submitted, setSubmitted] = useState(false);   // Confirm & run was clicked
-  const [replanning, setReplanning] = useState(false); // Add & re-plan was clicked (NOT a submit)
+  const submitted = actionState === 'submitted';
+  const replanning = actionState === 'replanning';
   // Either action supersedes this card, so it stops accepting input — but only a
   // real Confirm shows "Submitted". Re-plan just spawns a fresh card below.
-  const locked = submitted || replanning;
+  const locked = disabled || submitted || replanning;
 
   // Re-sync selection whenever the plan's step set changes (e.g. a re-plan reuses
   // this component instance). Without this, stale ids from a previous plan could
@@ -36,8 +44,6 @@ export default function WorkflowPlanCard({ plan, valid = true, errors = [], tool
   const stepKey = useMemo(() => steps.map(s => s.id).join('|'), [steps]);
   useEffect(() => {
     setChecked(new Set(steps.map(s => s.id)));
-    setSubmitted(false);
-    setReplanning(false);
   }, [stepKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const stepById = useMemo(() => Object.fromEntries(steps.map(s => [s.id, s])), [steps]);
@@ -115,8 +121,7 @@ export default function WorkflowPlanCard({ plan, valid = true, errors = [], tool
       `I have NOT uploaded the files yet. First reply with the EXACT list of files I need ` +
       `to upload for these steps, and the column/parameter values I can set for each step. ` +
       `Then I'll upload the files (and state any parameters) and send to run.`;
-    setSubmitted(true);
-    onConfirm(msg);
+    onConfirm(msg, 'submitted');
   };
 
   // "Add & re-plan" is a refinement, NOT a submit: it sends the user's CURRENT
@@ -136,8 +141,7 @@ export default function WorkflowPlanCard({ plan, valid = true, errors = [], tool
       `[[REPLAN_KEEP=${keepIds.join(',')}]]\n` +
       `Call add_workflow_steps to generate ONLY the new step(s) for that analysis; do NOT re-list ` +
       `my kept steps (they are kept automatically). Don't run it — show me a new plan card to confirm.`;
-    setReplanning(true);
-    onConfirm(msg);
+    onConfirm(msg, 'replanning');
   };
 
   // Render the inputs of one step (③), source-aware + contract-driven.
@@ -330,7 +334,13 @@ export default function WorkflowPlanCard({ plan, valid = true, errors = [], tool
         <span className="text-xs text-gray-500">Selected {nChecked} / {steps.length}</span>
         <button type="button" onClick={confirm} disabled={locked || !valid || nChecked === 0}
           className="inline-flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-xl bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed">
-          <Sparkles size={15} /> {submitted ? 'Submitted' : `Confirm & run ${nChecked} step${nChecked === 1 ? '' : 's'}`}
+          <Sparkles size={15} /> {
+            submitted
+              ? 'Submitted'
+              : disabled
+                ? 'Preparing plan…'
+                : `Confirm & run ${nChecked} step${nChecked === 1 ? '' : 's'}`
+          }
         </button>
       </div>
     </div>
