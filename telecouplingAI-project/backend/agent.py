@@ -2177,78 +2177,6 @@ def _looks_like_explicit_telecoupling_goal(message: str) -> bool:
     )
 
 
-_WORKFLOW_REPLACEMENT_PATTERNS = (
-    re.compile(
-        r"\b(?:new|different|another|replacement)\b.{0,80}"
-        r"\b(?:workflow|pipeline)\b",
-        re.IGNORECASE,
-    ),
-    re.compile(
-        r"\b(?:workflow|pipeline|analysis|case\s+study)\b.{0,80}"
-        r"\b(?:from\s+scratch|from\s+the\s+beginning|start\s+over|replace)\b",
-        re.IGNORECASE,
-    ),
-    re.compile(
-        r"\b(?:start|begin|create|build|launch)\b.{0,40}"
-        r"\b(?:new|different|another|replacement)\b.{0,80}"
-        r"\b(?:analysis|case\s+study)\b",
-        re.IGNORECASE,
-    ),
-)
-_WORKFLOW_REPLACEMENT_NEGATIONS = (
-    re.compile(
-        r"\b(?:do\s+not|don't|dont|not|never)\s+(?:replace|restart|rebuild)\b",
-        re.IGNORECASE,
-    ),
-    re.compile(r"\bwithout\s+(?:replacing|restarting|rebuilding)\b", re.IGNORECASE),
-    re.compile(r"\bkeep\s+(?:the\s+)?(?:current|existing)\b", re.IGNORECASE),
-)
-_WORKFLOW_REPLACEMENT_MARKERS = (
-    "fromscratch",
-    "startover",
-    "重新开始",
-    "从头开始",
-    "从头创建",
-    "新工作流",
-    "新的工作流",
-    "另一个工作流",
-    "不同的工作流",
-    "替换工作流",
-    "换一个工作流",
-)
-_WORKFLOW_REPLACEMENT_NEGATION_MARKERS = (
-    "不要替换",
-    "不替换",
-    "不要重建",
-    "不要重新开始",
-    "保留当前",
-    "保留现有",
-    "继续当前",
-)
-_WORKFLOW_REPLACEMENT_CHINESE_PATTERN = re.compile(
-    r"(?:开始|新建|创建|做一个|做个).{0,20}"
-    r"(?:新|另一个|不同).{0,20}"
-    r"(?:分析|案例)"
-)
-
-
-def _looks_like_workflow_replacement(message: str) -> bool:
-    """True only for an explicit request to replace the current workflow."""
-    if not _looks_like_workflow_goal(message):
-        return False
-    compact = message.lower().replace(" ", "")
-    if (
-        any(pattern.search(message) for pattern in _WORKFLOW_REPLACEMENT_NEGATIONS)
-        or any(marker in compact for marker in _WORKFLOW_REPLACEMENT_NEGATION_MARKERS)
-    ):
-        return False
-    return (
-        any(pattern.search(message) for pattern in _WORKFLOW_REPLACEMENT_PATTERNS)
-        or any(marker in compact for marker in _WORKFLOW_REPLACEMENT_MARKERS)
-        or _WORKFLOW_REPLACEMENT_CHINESE_PATTERN.search(compact) is not None
-    )
-
-
 # Markers the plan card puts in its "confirm & run" message — used to FORCE
 # execute_workflow_plan so a confirmation deterministically runs (instead of the
 # model narrating "running it…" without calling the function).
@@ -2316,8 +2244,6 @@ _RUN_INTENT_KEYWORDS = [
     "run the workflow", "run the full workflow", "run the plan", "run all the steps",
     "run the telecoupling analysis", "execute the telecoupling analysis",
     "start the telecoupling analysis",
-    "run the analysis", "run this analysis", "execute the analysis",
-    "execute this analysis", "start the analysis",
     "run it", "run my", "run all", "execute the workflow", "execute the plan",
     "start the workflow", "go ahead and run", "运行", "执行", "开始跑", "跑起来", "跑工作流",
 ]
@@ -2667,13 +2593,13 @@ async def run_agent(
     _force_replan = (not _force_confirm) and _looks_like_workflow_replan(message)
     _explicit_telecoupling_goal = _looks_like_explicit_telecoupling_goal(message)
     _explicit_replacement_goal = (
-        (
+        _explicit_telecoupling_goal
+        and not (
             _has_plan
-            and _looks_like_workflow_replacement(message)
-        )
-        or (
-            not _has_plan
-            and _explicit_telecoupling_goal
+            and (
+                _looks_like_run_intent(message)
+                or _looks_like_files_attached(message)
+            )
         )
     )
     _force_workflow = (
@@ -2689,11 +2615,6 @@ async def run_agent(
         )
     )
     _all_uploaded = await _sm.get_uploaded_files(session_id)
-    _current_batch_files = [
-        file
-        for file in (files or [])
-        if file.get("current_batch")
-    ]
     _new_workflow_scope = None
     if _force_workflow:
         if (
@@ -2705,32 +2626,19 @@ async def run_agent(
         else:
             _new_workflow_scope = {
                 "id": uuid.uuid4().hex,
-                "upload_start_index": (
-                    max(0, len(_all_uploaded) - len(_current_batch_files))
-                    if _has_plan
-                    else 0
-                ),
+                "upload_start_index": len(_all_uploaded) if _has_plan else 0,
             }
         _new_workflow_scope["status"] = "pending"
         await _sm.set_workflow_scope(session_id, _new_workflow_scope)
         if _has_plan:
             # A failed replacement must not leave the previous plan executable.
             await _sm.set_workflow_plan(session_id, None)
-        # Preserve visible history, but make planning depend only on this objective
-        # and files attached with the replacement request.
-        replacement_context = [
-            f"Uploaded file: {file.get('filename', 'unknown')} at {file.get('path', '')}"
-            for file in _current_batch_files
-        ]
-        user_text = (
-            "\n".join(replacement_context) + "\n\n" + message
-            if replacement_context
-            else message
-        )
+        # Preserve visible history, but make planning depend only on this objective.
+        user_text = message
         contents = [
             types.Content(
                 role="user",
-                parts=[types.Part.from_text(text=user_text)],
+                parts=[types.Part.from_text(text=message)],
             )
         ]
         _single_tool = None
