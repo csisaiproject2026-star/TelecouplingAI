@@ -10,7 +10,7 @@ from google.genai import types
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import agent
-from workflow.catalog import plan_from_llm_args
+from workflow.catalog import CAPABILITY_CATALOG, plan_from_llm_args
 from workflow.engine import validate_plan
 from workflow.schema import plan_from_dict
 
@@ -29,6 +29,24 @@ def test_first_workflow_scope_defaults_to_all_uploads():
     uploaded = [{"filename": "input.csv", "path": "/uploads/input.csv"}]
 
     assert agent._workflow_scoped_uploads({}, uploaded) == uploaded
+
+
+def test_guide_workflows_keep_agents_steps_in_planner_catalog():
+    tourism = CAPABILITY_CATALOG.split(
+        "## Few-shot: tourism telecoupling", 1
+    )[1].split("## Few-shot: soybean telecoupling", 1)[0]
+    soybean = CAPABILITY_CATALOG.split(
+        "## Few-shot: soybean telecoupling", 1
+    )[1]
+
+    assert "up to 6 steps" in tourism
+    assert tourism.index("run_add_agents_interactively") < tourism.index(
+        "run_draw_radial_flows"
+    )
+    assert "up to 5 steps" in soybean
+    assert soybean.index("run_add_agents_interactively") < soybean.index(
+        "run_draw_radial_flows"
+    )
 
 
 @pytest.mark.parametrize(

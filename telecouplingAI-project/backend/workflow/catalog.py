@@ -49,6 +49,9 @@ NOT from any single example dataset. Concretely:
   clustering_algorithm (literal: 'walktrap' or 'spin_glass').
 
 ## Agents (map the people/orgs enabling a flow)
+- run_add_agents_interactively — point layer from an agent coordinate table.
+  inputs: input_csv(file); x_field, y_field (literal); name_field and text_field
+  (literal, optional); crs (literal, optional, default 'EPSG:4326').
 - run_draw_agents_from_table — point layer from an agent coordinate table.
   inputs: input_csv(file); x_field, y_field (literal).
 
@@ -82,33 +85,37 @@ NOT from any single example dataset. Concretely:
 This shows the typical STEP STRUCTURE with the column names from the Wolong tourism sample
 data as a CONCRETE EXAMPLE. Use these exact names ONLY if the user's columns match; otherwise
 replace each with the ACTUAL column in the user's uploaded file (or the name the user states).
-Goal "analyze a tourism telecoupling" (however phrased — e.g. "旅游生态分析") → up to 5 steps:
+Goal "analyze a tourism telecoupling" (however phrased — e.g. "旅游生态分析") → up to 6 steps:
   1) run_draw_systems_from_table  (systems coordinate table; x_field=LON, y_field=LAT)
   2) run_network_analysis_grouping(nodes, links, a country-polygon shapefile;
        nodes_join_attri=CODE, layer_join_attri=ISO_3_CODE, clustering_algorithm=walktrap)
-  3) run_draw_radial_flows        (flows table; from_x_field=FROM_X, from_y_field=FROM_Y,
+  3) run_add_agents_interactively (dedicated tourism agent table; x_field=longitude,
+       y_field=latitude, name_field=agent_name, text_field=description)
+  4) run_draw_radial_flows        (flows table; from_x_field=FROM_X, from_y_field=FROM_Y,
        to_x_field=TO_X, to_y_field=TO_Y)
-  4) run_co2_emissions            (a route/trip table with per-route counts + a distance column —
+  5) run_co2_emissions            (a route/trip table with per-route counts + a distance column —
        the flows table already carrying a length_km column works; if the user has a SEPARATE
        co2/route file, use file_overrides to point this step at it; animal_count_field=Quantity,
        length_km_field=length_km, capacity_per_trip=1, co2_per_km_per_trip=29)
-  5) run_factor_analysis_mixed_data (causes/survey table; quantitative_variables="affin,gdplog,dist")
+  6) run_factor_analysis_mixed_data (causes/survey table; quantitative_variables="affin,gdplog,dist")
 (These column names are the Wolong example — adapt them to the user's actual data. Add or drop
 steps to fit the user's goal and the files they actually have.)
 
 ## Few-shot: soybean telecoupling — STRUCTURE + column EXAMPLES (Brazil→China dataset)
-Goal "analyze the Brazil-China soybean telecoupling" (however phrased) → up to 4 steps. This
-case pairs the spatial components (systems + flows) with InVEST EFFECTS models on land cover:
-  1) run_draw_systems_from_table   (systems table; x_field=X, y_field=Y;
+Goal "analyze the Brazil-China soybean telecoupling" (however phrased) → up to 5 steps. This
+case pairs the spatial components (systems + agents + flows) with InVEST EFFECTS models:
+  1) run_draw_systems_from_table   (systems table; x_field=LON, y_field=LAT;
        Brazil=Sending, China/Spain/Netherlands/Thailand=Receiving via a 'Role' column)
-  2) run_draw_radial_flows         (flows table; from_x_field=FROM_X, from_y_field=FROM_Y,
+  2) run_add_agents_interactively  (dedicated soybean agent table; x_field=longitude,
+       y_field=latitude, name_field=agent_name, text_field=description)
+  3) run_draw_radial_flows         (flows table; from_x_field=FROM_X, from_y_field=FROM_Y,
        to_x_field=TO_X, to_y_field=TO_Y; magnitude column e.g. Quantity)
-  3) run_crop_production_percentile (Effects: a land-cover raster + a 'lucode,crop_name' table;
+  4) run_crop_production_percentile (Effects: a land-cover raster + a 'lucode,crop_name' table;
        OPTIONAL aggregate_polygon_path = the study-plot polygons to summarize yield over)
-  4) run_habitat_quality           (Effects: a current land-cover raster + a threats table
+  5) run_habitat_quality           (Effects: a current land-cover raster + a threats table
        'threat,max_dist,weight,decay,cur_path' + a sensitivity table 'lulc,name,habitat,<threat>...';
        the threat rasters named in cur_path must be uploaded alongside the threats table)
-(Effects steps 3-4 take RASTERS + TABLES, not coordinate columns — map each file by the role
+(Effects steps 4-5 take RASTERS + TABLES, not coordinate columns — map each file by the role
 described above, using the user's actual filenames. Adapt or drop steps to the user's data.)
 """
 
