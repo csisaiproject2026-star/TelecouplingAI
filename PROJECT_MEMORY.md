@@ -353,6 +353,7 @@
 
 ## Workflow/session immutable release (2026-08-05)
 
+- This release was superseded later the same day by the recovered evening release below because its Backend catalog omitted the previously validated Agents steps.
 - Commit `86927113de50777315c101752700d8f33c4271d0` (`Stabilize workflow session isolation`) is the authoritative release source for the 2026-08-04 Workflow scope, explicit output-read, deterministic scene routing, and per-chat frontend isolation work.
 - The release retires GCP 1's old large Confirm/Execute behavior while retaining Confirm/Execute itself. Backend behavior is the clean fail-fast GCP 2/local baseline with strict plan validation, column-validated shared CSV reuse, fail-closed missing-file handling, no automatic post-Workflow file reads, and deterministic combined-scene routing.
 - Existing plans are preserved for run/upload/summary turns. A plan is replaced only for explicit new/different/another/from-scratch Workflow intent or an explicit start/create-new-analysis request; negated replacement requests preserve the plan. Replacement planning excludes old history/uploads but includes files attached with the current request.
@@ -364,3 +365,14 @@
 - Per-server `.env` and `.env.docker` SHA-256 values were compared before/after source synchronization and did not change. Source bundle SHA-256 is `392e297c2fbde4eaf2356895930a997878d221deed48c913133a7732b62b5e67`.
 - Rollback tags on each site are `csic_backend:rollback-pre-8692711` and `csic_frontend:rollback-pre-8692711`. Backend rollback ID is `sha256:3740bf4adf467e6da25ead2b8b2a47c669fcbfda43fb01ad95e7ff74de9e952c`; GCP frontend rollback ID is `sha256:fb5aaec367272d1331876b6b521aa705f07eb083bccf6aae1d52c92f7686afb6`; MSU frontend rollback ID is `sha256:4a9c5213d9a4758b06926a98a414e94ffaa4688836f475909a1ea63886bd47eb`.
 - Release records and pre-switch key-file/environment-hash backups are under `~/csis-platform/releases/8692711/` on each site. The 1.8 GB transfer archives were deleted after three-site validation; versioned images and rollback tags remain.
+
+## Recovered evening Workflow release (2026-08-05)
+
+- The authoritative Backend behavior is the Beijing-time 2026-08-04 evening GCP baseline: normalized Agent `5469de8233b8d5a51ff4c2941e65bb98fc05bbe50f82c50878e6230cd8141a25`, GCP 1 Agents catalog `39ffe91eb98b4b95c6d5e9de50ca1ce1aa967fad0066b4d41fb3e1fea6fb3a40`, GCP 2 fail-fast engine `fd857aa25dbeed1995244f2bc16c13b68166069e519aa932c9fa24adb3c91ce4`, and session manager `798a59078f635c6aa9388c77efead2c9fd2c9c98714268abfeb551f568bfb5a2`.
+- Commits `cd7649b` and `b42cfd3` restore the omitted Agents planning and the exact evening Agent into Git. The focused evening regression suite passes 59/59, including a guard that requires Soybean 5 steps and Tourism 6 steps with `run_add_agents_interactively`.
+- GCP 2 built immutable Backend image `sha256:678c07da5346ef9ebb0b056e72c44fb4e65cb714333c73f97671d123ec8aa896`. The same image was streamed directly GCP 2 -> GCP 1 with a deleted one-time key and then GCP 1 -> MSU using MSU's existing `~/.ssh/id_gcp`; no image bytes passed through the local workstation.
+- GCP 1, GCP 2, and MSU all run this exact Backend image with 40/40 Compose services, zero unhealthy/restarting containers, and healthy local/public `/health`. The Frontend remains the previously solidified image `sha256:8225d5485f937867403195579449bc204173d2ccc43cad3538a24b863bcf3492`.
+- Host source on all three servers matches the image for the four authoritative Backend files. Per-server `.env` and `.env.docker` files were hashed before/after switching and were not changed.
+- The two Workflow Guide directories are identical on all three sites; canonical full-tree SHA-256 is `4ce17cc31c203ab91661454349188dec01a81f23cdb2a149e65dc9a3949b8919`. Soybean Guide assets are ZIP `4aea9941...`, MD `cab1fc3d...`, PDF `b1bcc343...`; Tourism assets are ZIP `243a29b1...`, MD `8e1ffad3...`, PDF `8363eebad...`. The ZIPs contain `soybean_agents.csv` (401 bytes) and `tourism_agents.csv` (422 bytes).
+- Correction backups are under `~/csis-platform/backups/20260805_recover_evening_b42cfd3_<site>/`. Each site retains `csic_backend:rollback-pre-b42cfd3` for the superseded `19bf93f5...` image and the earlier `rollback-pre-8692711` rollback. Do not delete these until manual Workflow acceptance.
+- No Gemini or live Workflow request was run during recovery; manual acceptance remains the behavioral release gate.

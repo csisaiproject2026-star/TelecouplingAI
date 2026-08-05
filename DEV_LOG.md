@@ -8467,3 +8467,24 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - 镜像：Backend `sha256:19bf93f520db4620d5c6709357c71956bc34ea00b2304bce284dfc7499edf5e7`；Frontend `sha256:8225d5485f937867403195579449bc204173d2ccc43cad3538a24b863bcf3492`，三站完全一致。
 - GCP1/GCP2/MSU：各 40/40 Compose 服务运行，0 unhealthy，0 restarting，关键源码哈希一致，本地与公网 `/health` 正常；MSU 公网 WAF `/health` 正常。
 - 未主动运行 Gemini、真实 Workflow 或网站业务测试；保留给用户手工验收。
+
+## 2026-08-05 — 恢复昨晚 Workflow Agents 版本并重新固化三站
+### 完成内容
+- 回看本 Session 记录和发布审计副本，锁定北京时间 2026-08-04 晚间两台 GCP 的共同稳定 Agent；确认今天首次固化错误遗漏了 GCP1 已验证的 Agents Workflow catalog。
+- 恢复 Soybean 5 步、Tourism 6 步的 `run_add_agents_interactively` 规划能力，并将 Agent 恢复为昨晚两站一致的 `5469de82...` 版本；保留 GCP2 严格 fail-fast engine。
+- 在 GCP2 构建不可变 Backend 镜像 `sha256:678c07da5346ef9ebb0b056e72c44fb4e65cb714333c73f97671d123ec8aa896`，服务器直传至 GCP1，再由 MSU 从 GCP1 直接拉取；镜像字节未经过本地工作站。
+- 三站均切换到同一 Backend 镜像，并将镜像内四个权威源码同步到服务器 host source；各站环境文件未修改。
+- 将 GCP1 昨晚最终的两个完整 Workflow Guide 目录同步到 GCP2 和 MSU，包括 Guide MD、Guide PDF、Sample Data ZIP、截图和示例数据；两个 ZIP 分别包含 `soybean_agents.csv` 和 `tourism_agents.csv`。
+- 保留今天首次固化镜像为 `csic_backend:rollback-pre-b42cfd3`，同时保留更早的 `rollback-pre-8692711`；三站纠正备份位于 `20260805_recover_evening_b42cfd3_<site>`。
+### 关键变更文件
+- `telecouplingAI-project/backend/agent.py`
+- `telecouplingAI-project/backend/workflow/catalog.py`
+- `telecouplingAI-project/backend/tests/test_workflow_scope.py`
+- `PROJECT_MEMORY.md`
+- `DEV_LOG.md`
+### 测试状态
+- 本地晚间基线聚焦测试 59/59 PASS；镜像内 Python compileall 通过。
+- 三站关键 Backend 哈希一致：Agent `5469de82...`、catalog `39ffe91e...`、engine `fd857aa2...`、session manager `798a5907...`。
+- 三站 Guide 完整目录指纹统一为 `4ce17cc31c203ab91661454349188dec01a81f23cdb2a149e65dc9a3949b8919`。
+- GCP1/GCP2/MSU 均为 40/40 Compose 服务运行、0 unhealthy、0 restarting；本地与公网 `/health` 正常。
+- 未运行 Gemini 或真实 Workflow，等待用户手工验收。
