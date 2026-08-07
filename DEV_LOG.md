@@ -8489,6 +8489,18 @@ nuance:LLM 把"soybean trade flows"选成 run_commodity_trade(语义对,但样�
 - GCP1/GCP2/MSU 均为 40/40 Compose 服务运行、0 unhealthy、0 restarting；本地与公网 `/health` 正常。
 - 未运行 Gemini 或真实 Workflow，等待用户手工验收。
 
+## 2026-08-07 — 生成三站 Workflow 发布交接 Prompt
+### 完成内容
+- 汇总当前 Git 分支、三站不可变 Backend/Frontend 镜像、关键源码哈希、Workflow Agents 5/6 步要求、Guide/Sample Data 指纹、回滚点和部署纪律。
+- 生成可直接交给下一 Session 的中文 Prompt：
+  `C:\Users\dru18\.copilot\session-state\6d31c262-ac1c-4f0d-9155-df293182eda0\files\HANDOFF_20260807_THREE_SITE_WORKFLOW_RELEASE.md`。
+- 明确下一步只等待用户手工 Workflow 验收；禁止主动运行 Gemini/真实 Workflow，验收前保留全部当前和回滚镜像。
+### 关键变更文件
+- `DEV_LOG.md`
+- Session artifact `HANDOFF_20260807_THREE_SITE_WORKFLOW_RELEASE.md`
+### 测试状态
+- 本次仅生成交接文档；未修改服务器、容器、镜像或环境，未运行测试。
+
 ## 2026-08-05 — 补齐 Agents 配套源码并重新固化 Frontend
 ### 完成内容
 - 从原始 `df104da` Agents 提交恢复 Soybean/Tourism 固定 Plan、Tourism 离线复现脚本和专门回归测试，避免 Git 源码缺少昨晚已完成的配套工件。
